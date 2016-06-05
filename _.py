@@ -153,16 +153,16 @@ def reconnect_wifi():
           )
           if i > 3:
             return False
-          p('reconnecting wifi, wait 3sec...')
-          time.sleep(2)
+          p('reconnecting wifi, wait 6sec...')
+          time.sleep(4)
           p('checking ping...')
-          time.sleep(1)
+          time.sleep(2)
           if Ping('google.com').is_connectable:
             p('ping is connecting. reconnect-program -> finished!!!!')
             break
           else:
             p('ping is NOT connecting... restart -> reconnect-program...')
-            time.sleep(3)
+            time.sleep(2)
         p('reconnected_wifi: ', get_jpn_time())
         return True
     except:
@@ -311,7 +311,7 @@ def getRandIMG(DIR):
   pics = [fn for fn in os.listdir(DIR) if not fn == '.DS_Store']
   pic = np.random.choice(pics)
   return '/'.join([DIR, pic])
-  
+
 def multiple_replace(text, adict):
     """ 一度に複数のパターンを置換する関数
     - text中からディクショナリのキーに合致する文字列を探し、対応の値で置換して返す

@@ -26,7 +26,7 @@ def get_stats(whose = 'sys', status = '', n = 100):
 		print(e)
 		core_sql.rollback()
 def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False):
-	core_sql.create_tables([CoreInfo], True)
+	# core_sql.create_tables([CoreInfo], True)
 	try:
 		with core_sql.transaction():
 			core_info, is_created = CoreInfo.get_or_create(whose_info = whose_info, info_label = info_label)

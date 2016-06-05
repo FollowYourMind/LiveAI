@@ -96,6 +96,7 @@ class StreamResponseFunctions(MyObject):
 		self.manager_id = '_mmkm'
 		self.twf = twtr_functions.TwtrTools(self.bot_id)
 		#CLASS
+		self.bot_profile = operate_sql.BotProfile(self.bot_id)
 		self.tmp = Temp()
 		self.twlog_pool = TweetLogPool()
 		self.stats = Stats()
@@ -182,7 +183,6 @@ class StreamResponseFunctions(MyObject):
 		# except:
 		# 	return False
 	def on_initial_main(self):
-		self.bot_profile = operate_sql.BotProfile(self.bot_id)
 		# self.bot_profile = Temp()
 		p(self.bot_id+' >> Loading Initial_datas...')
 		self.tmp.imitating = self.bot_id
@@ -544,7 +544,7 @@ class StreamResponseFunctions(MyObject):
 				elif 'banner' in text:
 					self.bot_profile.abs_banner_filename =  _.saveImg(media_url = status['extended_entities']['media'][0]['media_url'].replace('_normal', ''), DIR = ''.join([DIRusers,'/',self.bot_id]), filename = '_'.join([screen_name, fileID, 'banner.jpg']))
 					ans = operate_sql.get_phrase(status =  'update.icon.banner', character = character)
-				if screen_name == '_mmkm':
+				if screen_name == '_mmKm':
 					self.bot_profile.save()
 				else:
 					set_time = self.now + timedelta(hours=0, minutes=10)
@@ -1315,14 +1315,19 @@ def main(is_experience = True):
 	if not is_experience:
 		umi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Umi', args=('LiveAI_Umi', ))
 		umi_thread.start()
+		time.sleep(10)
 		honoka_thread = threading.Thread(target = live_intel, name = 'LiveAI_Honoka', args=('LiveAI_Honoka', ))
 		honoka_thread.start()
+		time.sleep(10)
 		rin_thread = threading.Thread(target = live_intel, name = 'LiveAI_Rin', args=('LiveAI_Rin', ))
 		rin_thread.start()
+		time.sleep(10)
 		eli_thread = threading.Thread(target = live_intel, name = 'LiveAI_Eli', args=('LiveAI_Eli', ))
 		eli_thread.start()
+		time.sleep(10)
 		maki_thread = threading.Thread(target = live_intel, name = 'LiveAI_Maki', args=('LiveAI_Maki', ))
 		maki_thread.start()
+		time.sleep(10)
 		hanayo_thread = threading.Thread(target = live_intel, name = 'LiveAI_Hanayo', args=('LiveAI_Hanayo', ))
 		hanayo_thread.start()
 	else:
@@ -1331,7 +1336,7 @@ def main(is_experience = True):
 if __name__ == '__main__':
 	# text = 'てsつと-- kusoripu sonoda_umi そ'
 	# p(extract_cmds_dic(text))
-	main(is_experience = 1)
+	main(is_experience = 0)
 	# p(sys.modules.keys())
 	# [importlib.reload(module) for module in sys.modules.keys() if isinstance(module, module)]
 
