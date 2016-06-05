@@ -1277,7 +1277,7 @@ class StreamResponseFunctions(MyObject):
 			'erase.tmp.stats.tweet_cnt_hour': 60,
 			'update.lists': 30,
 			'update_userprofile' : 10,
-			'save_stats': 10
+			'save_stats': 20
 			}
 		if self.bot_id == 'LiveAI_Umi':
 			task_duration_dic['reconnect_wifi'] = 3
