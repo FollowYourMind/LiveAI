@@ -3,7 +3,6 @@
 ## Link
 - ご意見ご要望があれば下までどうぞ。説明書読むより質問したほうが早いかも？
     - 作者アカウント https://twitter.com/_mmKm @_mmKm
-
 ## Concept
 - プログラムや統計, 社会工学, 情報科学など作者の「趣味的私的な」勉強
 - Twitter上で稼働するIntelligent Assistant :IAを目指しています。
