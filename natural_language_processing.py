@@ -1097,7 +1097,7 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''@pokeumi_315_umiumi をまねて'''    # text = 'したい'
+    text = '''再起動して'''    # text = 'したい'
     # reg = RegexTools.main(text)
     # # p(reg)
     # p(MA.get_mecab_coupled(text))

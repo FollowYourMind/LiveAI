@@ -89,6 +89,13 @@ def copy_json(place, backup_place = None):
     shutil.copy2(place, backup_place)
 def get_jpn_time():
     return  datetime.utcnow()+timedelta(hours = 9)
+def restart_program():
+    """Restarts the current program.
+    Note: this function does not return. Any cleanup action (like
+    saving data) must be done before calling this function."""
+    python = sys.executable
+    os.execl(python, python, * sys.argv)
+
 class Ping(object):
     def __init__(self, host):
         loss_pat='0 received'
@@ -331,6 +338,8 @@ class a(MyObject):
 if __name__ == '__main__':
   # adjustSize(DIR)
   s = '@yohane_t  最近絵里が可愛いです……'
+  p(s)
+  restart_program()
   # a = a()
   # a = BotProfile()
   # p(a)

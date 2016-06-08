@@ -33,7 +33,8 @@ class StreamListener(tweepy.streaming.StreamListener):
 		p('cannot get')
 		raise MyException
 	def on_timeout(self):
-		raise MyException
+		p('timeout...')
+		return True
 def get_twtr_auth(auth_dic):
 	try:
 		CONSUMER_KEY = auth_dic['consumer_key']

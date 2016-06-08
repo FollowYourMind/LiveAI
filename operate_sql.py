@@ -39,6 +39,8 @@ def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic =
 			return core_info
 	except Exception as e:
 		print(e)
+		if e == 'database is locked':
+			p('dddddddddd')
 		core_sql.rollback()
 def save_task(taskdict = {'who':'_umiS', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()+timedelta(hours = 9)}):
 	try:

@@ -93,7 +93,7 @@ class StreamResponseFunctions(MyObject):
 			self.default_character = 'sys'
 		self.bot_id = bot_id
 		self.atmarked_bot_id = ''.join(['@', self.bot_id])
-		self.manager_id = '_mmkm'
+		self.manager_id = '_mmKm'
 		self.twf = twtr_functions.TwtrTools(self.bot_id)
 		#CLASS
 		self.bot_profile = operate_sql.BotProfile(self.bot_id)
@@ -390,8 +390,10 @@ class StreamResponseFunctions(MyObject):
 		acceptability = np.random.rand()
 		# if not nlp_summary.delay_sec is None:
 			# delay_sec = nlp_summary.delay_sec
+		if not self.bot_id in status['text']:
+			pass
 		# 応答
-		if 'ping' in text:
+		elif 'ping' in text:
 			ans = ''.join(['Δsec : ', str(deltasec)])
 		# elif 'userinfo' in cmds_dic:
 		# 	ans = str(userinfo)
@@ -773,6 +775,13 @@ class StreamResponseFunctions(MyObject):
 						self.tmp.imitating = self.bot_id
 					else:
 						ans = 'デフォルトに戻るのに失敗 @_apkX'
+		elif nlp_summary.value in {'再起動する'}:
+			if screen_name != self.manager_id:
+				ans = '管理者権限なし'
+			else:
+				ans = 'restarting system... wait 60sec'
+				set_time = self.now + timedelta(hours=0, seconds=60)
+				operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': 'restart_program', 'to_whom': screen_name, 'when':set_time, 'tmptext': ''})
 		elif nlp_summary.value in {'まねる', 'モノマネする'}:
 			is_accepted = False
 			if nlp_summary.has_function('希望', '要望'):
@@ -950,9 +959,6 @@ class StreamResponseFunctions(MyObject):
 						ans = ''.join([nlp_summary.entity, 'は', nlp_summary.value, '...覚えましたし'])
 					else:
 						ans = ''.join(['なにが', nlp_summary.value, '...???'])
-		if 'LiveAI_' in screen_name:
-			ans = ''
-			delay_sec = 60
 		if not ans:
 			ans = dialog_obj.dialog()
 			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(''.join(['@', self.bot_id]), '')
@@ -974,7 +980,6 @@ class StreamResponseFunctions(MyObject):
 
 		if ans:
 			if delay_sec > 0:
-				# set_time = self.now + timedelta(hours=0, minutes= delay_sec)
 				set_time = self.get_time(hours = 0, seconds =  delay_sec, is_noised = True)
 				operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': 'tweet', 'to_whom': screen_name, 'when':set_time, 'tmpid': status_id, 'tmptext': ans})
 			else:
@@ -1241,6 +1246,9 @@ class StreamResponseFunctions(MyObject):
 				importlib.reload(game_functions)
 				# importlib.reload(twtr_functions)
 				task_restart()
+			elif todo == 'restart_program':
+				print('restrarting_program...')
+				_.restart_program()
 			elif todo == 'update_userprofile':
 				# self.bot_profile = self.twf.twtr_api.me()
 				# if not 'まねっこ' in self.bot_profile.location:
@@ -1268,7 +1276,7 @@ class StreamResponseFunctions(MyObject):
 		rand_time = self.now + timedelta(hours = hours, minutes = minutes, seconds = seconds)
 		return rand_time
 	def initialize_tasks(self):
-		operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teiki.MC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi'], taskdict = {'status': 'end'})
+		operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teiki.MC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program'], taskdict = {'status': 'end'})
 		self.sync_now()
 		task_duration_dic = {
 			'teiki': 30,
@@ -1277,7 +1285,8 @@ class StreamResponseFunctions(MyObject):
 			'erase.tmp.stats.tweet_cnt_hour': 60,
 			'update.lists': 30,
 			'update_userprofile' : 10,
-			'save_stats': 20
+			'save_stats': 20, 
+			'restart_program': 60
 			}
 		if self.bot_id == 'LiveAI_Umi':
 			task_duration_dic['reconnect_wifi'] = 3
@@ -1295,7 +1304,7 @@ def task_manager(bot_id, period = 60):
 	response_funcs.initialize_tasks()
 	while True:
 		now = response_funcs.sync_now()
-		print(bot_id, '_TASK_MANAGER>> ', now)
+		p(bot_id, '_TASK_MANAGER>> ', now)
 		tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
 		try:
 			[response_funcs.implement_tasks(task) for task in tasks if task]
@@ -1334,11 +1343,12 @@ def main(is_experience = True):
 		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
 		alpaca_thread.start()
 if __name__ == '__main__':
-	# text = 'てsつと-- kusoripu sonoda_umi そ'
-	# p(extract_cmds_dic(text))
-	main(is_experience = 0)
-	# p(sys.modules.keys())
-	# [importlib.reload(module) for module in sys.modules.keys() if isinstance(module, module)]
+	try:
+		argvs = sys.argv
+		cmd = argvs[1]
+	except:
+		cmd = 1
+	main(is_experience = cmd)
 
 
 
