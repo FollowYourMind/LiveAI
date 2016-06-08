@@ -1345,7 +1345,7 @@ def main(is_experience = True):
 if __name__ == '__main__':
 	try:
 		argvs = sys.argv
-		cmd = argvs[1]
+		cmd = argvs[2]
 	except:
 		cmd = 1
 	main(is_experience = cmd)
