@@ -954,23 +954,18 @@ class DialogObject(MyObject):
           kw = '私'
       else:
           kw = self.keywords[0]
-      # if not ans:
-        # if 'SYA' in tools:
-        #   p(info)
-        #   ans = reform_info(info, username)
-        #   generated_by = 'SYA'
-      if not ans:
-        if 'WN' in tools:
-          ans = wordnet_dialog(kw = kw)
-          generated_by = 'WN'
-          if ans:
-            character = '海未'
       if not ans:
         if 'LOG' in tools:
           ans = get_tweet_log(text = s, kws = self.keywords, UserList = UserList, BlackList = BlackList, min_similarity = min_similarity)
           generated_by = 'LOG'
           if ans:
             character = 'sys'
+      if not ans:
+        if 'WN' in tools:
+          ans = wordnet_dialog(kw = kw)
+          generated_by = 'WN'
+          if ans:
+            character = '海未'
       if not ans:
         if 'MC' in tools:
           trigram_markov_chain_instance = TrigramMarkovChain(character)
@@ -1029,25 +1024,24 @@ if __name__ == '__main__':
   sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
   command = ''
-  text = 'コンピュータを壊したいですか。'
-  text = '''凛ちゃんはhttp://unkonunkonkn.jpです'''    # text = 'したい'
-  # s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['haijinLove_pana', 'hanayo_hanahana', 'maid_hanayo_bot', 'OnigiriHanayo', 'Logical_Hanayo', 'DeadlineHANAYO', 'gohanayo', 'haijin_hanayo'], contains = '')
-  # p(len(s_ls))
-  # learn_trigram(s_ls, character = '花陽', over = 0)
+  text = '''凛ちゃんは,,,です''' 
+  s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot', 'TUKUNE7777'], contains = '')
+  p(len(s_ls))
+  learn_trigram(s_ls, character = '希', over = 0)
   # s_ls = ['足利さんに送信して']
   # trigram_main(s_ls[0], is_debug = True, character = '')
   # p(TFIDF.extract_keywords_from_text(text))
-  dialog_obj = DialogObject(text)
-  # reg = RegexTools.main(text)
-  # # p(reg)
-  # p(MA.get_mecab_coupled(text))
-  # # p(NLPdata(text).regex_analysis.__dict__)
-  nlp_data = dialog_obj.nlp_data
-  # p(nlp_data.summary)
-  p(dialog_obj.keywords)
+  # dialog_obj = DialogObject(text)
+  # # reg = RegexTools.main(text)
+  # # # p(reg)
+  # # p(MA.get_mecab_coupled(text))
+  # # # p(NLPdata(text).regex_analysis.__dict__)
+  # nlp_data = dialog_obj.nlp_data
+  # # p(nlp_data.summary)
+  # p(dialog_obj.keywords)
   # p(nlp_data.summary.has_function('疑問'))
   # ans = operate_sql.get_phrase(status =  'yes', character = character)
   # p(ans)
   # p(dialog_obj.save_facts())
-  # ans = dialog(s = text, context = 'この世をば我が世とぞ思う</>うんこ', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], min_similarity = 0.3, character = '海未', tools = 'SYA')
+  # ans = dialog(s = text, context = 'この世をば我が世とぞ思う', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], min_similarity = 0.3, character = '海未', tools = 'SYA')
   # p(wordnet_dialog(kw = 'テスト'))

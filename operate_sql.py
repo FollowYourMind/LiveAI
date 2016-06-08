@@ -58,7 +58,7 @@ def search_tasks(when = datetime.now(), who = '_umiS', n = 10):
 	try:
 		with core_sql.transaction():
 			active = Task.select().where(~Task.status == 'end')
-			if who == '':
+			if not who:
 				tasks = active.where(Task.when < when).order_by(Task.id.desc()).limit(n)
 			else:
 				tasks = active.where(Task.when < when, Task.who == who).order_by(Task.id.desc()).limit(n)

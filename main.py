@@ -89,6 +89,8 @@ class StreamResponseFunctions(MyObject):
 			self.default_character = '真姫'
 		if bot_id == 'LiveAI_Hanayo':
 			self.default_character = '花陽'
+		if bot_id == 'LiveAI_Nozomi':
+			self.default_character = '希'
 		if bot_id == 'LiveAI_Alpaca':
 			self.default_character = 'sys'
 		self.bot_id = bot_id
@@ -390,7 +392,7 @@ class StreamResponseFunctions(MyObject):
 		acceptability = np.random.rand()
 		# if not nlp_summary.delay_sec is None:
 			# delay_sec = nlp_summary.delay_sec
-		if not self.bot_id in status['text']:
+		if not self.bot_id in status['text'] and mode != 'dm':
 			pass
 		# 応答
 		elif 'ping' in text:
@@ -960,8 +962,8 @@ class StreamResponseFunctions(MyObject):
 					else:
 						ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			ans = dialog_obj.dialog()
-			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(''.join(['@', self.bot_id]), '')
+			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'WN,LOG,MC', username = '@〜〜')
+			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
 			if not ans:
 				ans = '...?'
 		if is_new_user:
@@ -1339,6 +1341,9 @@ def main(is_experience = True):
 		time.sleep(10)
 		hanayo_thread = threading.Thread(target = live_intel, name = 'LiveAI_Hanayo', args=('LiveAI_Hanayo', ))
 		hanayo_thread.start()
+		time.sleep(10)
+		nozomi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
+		nozomi_thread.start()
 	else:
 		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
 		alpaca_thread.start()
@@ -1347,7 +1352,7 @@ if __name__ == '__main__':
 		argvs = sys.argv
 		cmd = argvs[2]
 	except:
-		cmd = 1
+		cmd = 0
 	main(is_experience = cmd)
 
 
