@@ -81,6 +81,8 @@ class StreamResponseFunctions(MyObject):
 			self.default_character = '海未'
 		if bot_id == 'LiveAI_Honoka':
 			self.default_character = '穂乃果'
+		if bot_id == 'LiveAI_Kotori':
+			self.default_character = 'ことり'
 		if bot_id == 'LiveAI_Rin':
 			self.default_character = '凛'
 		if bot_id == 'LiveAI_Eli':
@@ -91,6 +93,8 @@ class StreamResponseFunctions(MyObject):
 			self.default_character = '花陽'
 		if bot_id == 'LiveAI_Nozomi':
 			self.default_character = '希'
+		if bot_id == 'LiveAI_Nico':
+			self.default_character = 'にこ'
 		if bot_id == 'LiveAI_Alpaca':
 			self.default_character = 'sys'
 		self.bot_id = bot_id
@@ -110,18 +114,6 @@ class StreamResponseFunctions(MyObject):
 		self.is_debug_event = 'event' in debug_style or 'all' in debug_style
 		if not os.path.exists(self.bot_dir):
 			os.mkdir(self.bot_dir)
-		# self.tmp_config_place = self.bot_dir + '/tmp_config.json'
-		# if not os.path.exists(self.tmp_config_place):
-		# 	self = {'user_profile':{'screen_name': bot_id, 'name': '', 'url': '', 'location': '', 'abs_icon_filename':'', 'abs_banner_filename':''}}
-			# self.sync_json('config')
-		# else:
-			# self.sync_json('config', is_save = False)
-		# self.tmp_place = self.bot_dir + '/tmp.json'
-		# if not os.path.exists(self.tmp_place):
-		# 	self.tmp = {'bot_id': bot_id, 'response_exception': }
-			# self.sync_json()
-		# else:
-			# self.sync_json(is_save = False)
 	def convert_text_as_character(self, text):
 		if self.bot_id == 'LiveAI_Rin':
 			text = text.replace('です', 'だにゃ').replace('ます', 'にゃ')
@@ -160,35 +152,10 @@ class StreamResponseFunctions(MyObject):
 		#Japan_Time
 		self.now = datetime.utcnow() + timedelta(hours = 9)
 		return self.now
-	# def sync_json(self, json = None, is_save = True):
-
-		# p(json)
-		# try:
-		# 	if json is None:
-		# 		json_place = self.tmp_place
-		# 		json_dic = self.tmp
-		# 	else:
-		# 		json_dic = self
-		# 		json_place = self.tmp_config_place
-		# 	backup_json_place = json_place
-		# except:
-		# 	p('reloading_json')
-		# 	is_save = False
-		# try:
-		# 	if is_save:
-		# 		_.save_json(json_dic, json_place)
-		# 	if json is None:
-		# 		self.tmp = _.get_json(json_place, backup_json_place)
-		# 	elif json == 'config':
-		# 		self = _.get_json(json_place, backup_json_place)
-		# 	return True
-		# except:
-		# 	return False
 	def on_initial_main(self):
 		# self.bot_profile = Temp()
 		p(self.bot_id+' >> Loading Initial_datas...')
 		self.tmp.imitating = self.bot_id
-		# self.tmp.bot_id. = self.bot_id
 		self.tmp.manager_id = self.manager_id
 		self.tmp.bots_list = self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT')
 		self.tmp.KARAMIx2 = self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2')
@@ -542,10 +509,10 @@ class StreamResponseFunctions(MyObject):
 			userinfo['cnt'] = 0
 			fileID = self.now.strftime('%Y%m%d%H%M%S')
 			if 'update' in text:
-				if 'icon' in text:
+				if 'icon' in text or 'アイコン' in text:
 					self.bot_profile.abs_icon_filename = _.saveImg(media_url = status['extended_entities']['media'][0]['media_url'].replace('_normal', ''), DIR = ''.join([DIRusers,'/',self.bot_id]), filename = '_'.join([screen_name, fileID, 'icon.jpg']))
 					ans = operate_sql.get_phrase(status =  'update.icon.success', character = character)
-				elif 'banner' in text:
+				elif 'banner' in text or '背景' in text:
 					self.bot_profile.abs_banner_filename =  _.saveImg(media_url = status['extended_entities']['media'][0]['media_url'].replace('_normal', ''), DIR = ''.join([DIRusers,'/',self.bot_id]), filename = '_'.join([screen_name, fileID, 'banner.jpg']))
 					ans = operate_sql.get_phrase(status =  'update.icon.banner', character = character)
 				if screen_name == '_mmKm':
@@ -1298,17 +1265,22 @@ class StreamResponseFunctions(MyObject):
 ##############
 def task_manager(bot_id, period = 60):
 	time.sleep(5)
-	response_funcs = StreamResponseFunctions(bot_id)
-	response_funcs.initialize_tasks()
-	while True:
-		now = response_funcs.sync_now()
-		p(bot_id, '_TASK_MANAGER>> ', now)
-		tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
-		try:
-			[response_funcs.implement_tasks(task) for task in tasks if task]
-		except Exception as e:
-			logger.debug(e)
-		time.sleep(period)
+	try:
+		response_funcs = StreamResponseFunctions(bot_id)
+		response_funcs.initialize_tasks()
+	except Exception as e:
+		d(bot_id, 'task_manager', e)
+		return False
+	else:
+		while True:
+			now = response_funcs.sync_now()
+			p(bot_id, 'TASK>> ', now)
+			tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
+			try:
+				[response_funcs.implement_tasks(task) for task in tasks if task]
+			except Exception as e:
+				logger.debug(e)
+			time.sleep(period)
 def stream(bot_id):
 	twf = twtr_functions.TwtrTools(bot_id)
 	twf.Stream()
@@ -1326,11 +1298,11 @@ def main(is_experience = True):
 		honoka_thread = threading.Thread(target = live_intel, name = 'LiveAI_Honoka', args=('LiveAI_Honoka', ))
 		honoka_thread.start()
 		time.sleep(10)
+		kotori_thread = threading.Thread(target = live_intel, name = 'LiveAI_Kotori', args=('LiveAI_Kotori', ))
+		kotori_thread.start()
+		time.sleep(10)
 		rin_thread = threading.Thread(target = live_intel, name = 'LiveAI_Rin', args=('LiveAI_Rin', ))
 		rin_thread.start()
-		time.sleep(10)
-		eli_thread = threading.Thread(target = live_intel, name = 'LiveAI_Eli', args=('LiveAI_Eli', ))
-		eli_thread.start()
 		time.sleep(10)
 		maki_thread = threading.Thread(target = live_intel, name = 'LiveAI_Maki', args=('LiveAI_Maki', ))
 		maki_thread.start()
@@ -1340,6 +1312,14 @@ def main(is_experience = True):
 		time.sleep(10)
 		nozomi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
 		nozomi_thread.start()
+		eli_thread = threading.Thread(target = live_intel, name = 'LiveAI_Eli', args=('LiveAI_Eli', ))
+		eli_thread.start()
+		time.sleep(10)
+		nico_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nico', args=('LiveAI_Nico', ))
+		nico_thread.start()
+		time.sleep(10)
+		nico_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
+		nico_thread.start()
 	else:
 		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
 		alpaca_thread.start()

@@ -1025,9 +1025,9 @@ if __name__ == '__main__':
 
   command = ''
   text = '''凛ちゃんは,,,です''' 
-  s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot', 'TUKUNE7777'], contains = '')
+  s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = [''], contains = '')
   p(len(s_ls))
-  learn_trigram(s_ls, character = '希', over = 0)
+  # learn_trigram(s_ls, character = 'ことり', over = 0)
   # s_ls = ['足利さんに送信して']
   # trigram_main(s_ls[0], is_debug = True, character = '')
   # p(TFIDF.extract_keywords_from_text(text))
