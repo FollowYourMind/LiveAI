@@ -56,14 +56,16 @@ class TwtrTools:
 		self.twtr_api = twtr_apis[bot_id]
 	def Stream(self):
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
 		while True:
 			try:
+				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
 				stream.userstream()
+				return True
 			except Exception as e:
 				d(e)
 				time.sleep(100)
-				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
+				return True
+				# stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
 	def send(self, ans, screen_name = '', status_id = '', imgfile = '', mode = 'dm', try_cnt = 0):
 		if mode == 'dm':
 			return self.send_direct_message(ans = ans, screen_name = screen_name)

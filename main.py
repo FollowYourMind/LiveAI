@@ -1082,12 +1082,10 @@ class StreamResponseFunctions(MyObject):
 							operate_sql.save_tweet_dialog(status)
 						except:
 							pass
-			# self.sync_json()
-			return True
 		except Exception as e:
 			logger.debug(e)
 			logger.debug('+++++timeline_status+++++++')
-			return True
+		return True
 	def on_direct_message_main(self, status):
 		try:
 			# self.sync_json(is_save = False)
@@ -1263,7 +1261,6 @@ class StreamResponseFunctions(MyObject):
 			if ans:
 				self.send(ans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = 'tweet', try_cnt = try_cnt)
 			operate_sql.update_task(who_ls = [self.bot_id], taskid = taskid, taskdict = {'status': 'end'})
-			# self.sync_json(is_save = False)
 			return True
 		except Exception as e:
 			p(task)
@@ -1300,7 +1297,6 @@ class StreamResponseFunctions(MyObject):
 # Main Functions
 ##############
 def task_manager(bot_id, period = 60):
-	# twf = twtr_functions.TwtrTools(bot_id)
 	time.sleep(5)
 	response_funcs = StreamResponseFunctions(bot_id)
 	response_funcs.initialize_tasks()
@@ -1313,7 +1309,6 @@ def task_manager(bot_id, period = 60):
 		except Exception as e:
 			logger.debug(e)
 		time.sleep(period)
-
 def stream(bot_id):
 	twf = twtr_functions.TwtrTools(bot_id)
 	twf.Stream()
@@ -1321,6 +1316,7 @@ def live_intel(bot_id):
 	LiveAI_thread = threading.Thread(target = stream, name = bot_id + '_LiveAI_program', args=(bot_id, ))
 	LiveAI_thread.start()
 	task_manager_thread = threading.Thread(target = task_manager, name = bot_id + '_task_manager', args=(bot_id, 30, ))
+	# task_manager_thread = threading.Timer(30, target = task_manager, name = bot_id + '_task_manager', args=(bot_id))
 	task_manager_thread.start()
 def main(is_experience = True):
 	if not is_experience:
