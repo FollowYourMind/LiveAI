@@ -101,7 +101,7 @@ def getBoomWords(username = '_umiA', n = 400):
                 print('です。')
     except IntegrityError as ex:
         print(ex)
-        db.rollback()    
+        db.rollback()
 
 
 class TFIDF():
@@ -125,7 +125,7 @@ class TFIDF():
         except Exception as e:
           talk_sql.rollback()
         # print(e)
-    
+
     def upsert_word(self, ma, is_learn = False, retry_cnt = 0):
         genkei = ma[7]
         hinshi = ma[1]
@@ -153,15 +153,16 @@ class TFIDF():
                       wdb.df +=  1
                     except:
                         wdb.df = 1
-                wdb.save()
                 document_frequency = wdb.df
-                talk_sql.commit()
+                if is_learn:
+                    wdb.save()
+                    talk_sql.commit()
         except DoesNotExist as e:
            return None, is_created
         except OperationalError as e:
            retry_cnt += 1
-           time.sleep(0.3*retry_cnt)
-           d(e, retry_cnt)
+           time.sleep(0.1*retry_cnt)
+           d(e, retry_cnt, 'tfidf_upsert')
            return self.upsert_word(ma, is_learn, retry_cnt)
         except IntegrityError as e:
            d(e)
@@ -171,7 +172,7 @@ class TFIDF():
            p(e)
         else:
           return document_frequency, is_created
-  
+
     def calc_tf_idf(self, w, term_frequency_dic, cnt = 5, total_documents = 30000, is_debug = False):
         word = w[7]
         word_cnt = term_frequency_dic[word]
@@ -191,7 +192,7 @@ class TFIDF():
         if is_debug:
             p(word, str(round(tf_idf, 2)))
         return w
-  
+
     def append_tf_idf_on_ma_result(self, ma, total_documents = 420000, is_learn = False, is_debug = False):
             # ma = natural_language_processing.MA.get_mecab_coupled(s)
         word_cnt = len(ma)
@@ -217,7 +218,7 @@ class TFIDF():
                 mas = self.append_tf_idf_on_ma_result(ma, i, True, True)
             except Exception as e:
                 print(e)
-            i += 1  
+            i += 1
     def extract_tf_idf(self, ma, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exception = {'数'}):
         def is_keyword(x, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exceptions = {'数'}):
             try:
@@ -236,7 +237,7 @@ class TFIDF():
         tf_idf_ma = self.append_tf_idf_on_ma_result(ma, total_documents = 420000, is_learn = False, is_debug = False)
         result = sort_tf_idf_ma(tf_idf_ma, needs)
         return result
-    
+
     def calc_keywords_tf_idf(self, ma, length = 1, needs = {'名詞', '固有名詞', '動詞', '形容詞'}):
         extracted_keywords_ma = self.extract_tf_idf(ma, needs)
         seen = set()
@@ -315,7 +316,7 @@ class TrigramMarkovChain(MyObject):
                     backward_ans = self.generate_backward(startWith = word)
                 except Exception as e:
                     p(e)
-                # backward_ans = '' 
+                # backward_ans = ''
                 try:
                     forward_ans = self.generate_forward(word, Plist = metaframe)
                 except Exception as e:
@@ -456,7 +457,7 @@ class TrigramMarkovChain(MyObject):
             # if i > 30:
             #     break
         return ''.join(ans)
-#   
+#
     def generate_backward(self, startWith = '', Plist = ['<EOS>', '名詞', '助詞', '形容詞', '顔文字','顔文字','顔文字','顔文字','顔文字','顔文字','顔文字','顔文字'], break_set = {'「', '」',  '。', '!', '！', '?', '？'}, n = 100):
         QuestionPhrase = '…'
         isAddFACE = False
@@ -795,8 +796,8 @@ def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pok
         return ''
   except OperationalError as e:
     retry_cnt += 1
-    time.sleep(0.3*retry_cnt)
-    d(e, retry_cnt)
+    time.sleep(0.2*retry_cnt)
+    d(e, retry_cnt, "get_tweet_log")
     return get_tweet_log(text, kws, UserList, BlackList, n, min_similarity, retry_cnt)
   except IntegrityError as e:
     d(e)
@@ -820,7 +821,7 @@ def reform_info(info, username = '@username'):
         ans = '__ERR__'
     if '__ERR__' in ans:
         ans = ''
-    return ans 
+    return ans
 
 def wordnet_dialog(kw = 'テスト'):
   ans = ''
@@ -945,7 +946,7 @@ class DialogObject(MyObject):
     if not keywords:
       s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
       keywords = TFIDF.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
-      keywords = [kw for kw in keywords if not '@' in kw] 
+      keywords = [kw for kw in keywords if not '@' in kw]
     return keywords
   def dialog(self, context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'SYA,WN,LOG,MC', username = '@〜〜'):
     #URL除去
@@ -1039,7 +1040,7 @@ if __name__ == '__main__':
   command = ''
   text = '''足利将軍は、変態'''
   # s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico'], contains = '')
-  # p(len(s_ls)) 
+  # p(len(s_ls))
   # learn_trigram(s_ls, character = 'にこ', over = 0)
   p(DialogObject(text).dialog())
   # s_ls = ['足利さんに送信して']

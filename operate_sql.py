@@ -5,6 +5,7 @@ from sql_models import *
 import dialog_generator
 import _
 from _ import p, d, MyObject, MyException
+import threading
 def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}, retry_cnt = 0):
 	try:
 		core_sql.create_tables([Stats], True)
@@ -15,7 +16,7 @@ def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}, re
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'save_stats')
 		return save_stats(stats_dict, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -38,7 +39,7 @@ def get_stats(whose = 'sys', status = '', n = 100, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_stats')
 		return get_stats(whose, status, n, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -64,7 +65,7 @@ def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic =
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'getcoreinfo')
 		return get_core_info(whose_info, info_label, standard_dic, is_update, retry_cnt = retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -82,7 +83,7 @@ def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'wh
 			core_sql.commit()
 			p(''.join(['TASK_SAVED]',taskdict['who'], '_', taskdict['what']]))
 	except Exception as e:
-		print(e)
+		d(e, 'save_task')
 		core_sql.rollback()
 
 def search_tasks(when = datetime.now(), who = '_mmKm', n = 10, retry_cnt = 0):
@@ -100,7 +101,7 @@ def search_tasks(when = datetime.now(), who = '_mmKm', n = 10, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'search_tasks')
 		return search_tasks(when, who, n, retry_cnt = retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -131,7 +132,7 @@ def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'w
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'update_tasks')
 		return update_task(taskid, who_ls, kinds, taskdict, retry_cnt = retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -142,29 +143,29 @@ def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'w
 		return False
 
 #####twlog_sql#######
-def save_tweet_status(status, bot_id = '', retry_cnt = 0):
+def save_tweet_status(status_dic = {
+				'status_id' : '',
+				'screen_name' : '',
+				'name' : '',
+				'text' : '',
+				'user_id' : '',
+				'in_reply_to_status_id_str' : '',
+				'bot_id' : '',
+				'createdAt' : datetime.utcnow(),
+				'updatedAt' : datetime.utcnow()
+			}, retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([Tweets], True)
 		with twlog_sql.transaction():
-			tweetstatus = Tweets(
-				status_id = int(status['id_str']),
-				screen_name = status['user']['screen_name'],
-				name = status['user']['name'],
-				text = status['text'],
-				user_id = status['user']['id_str'],
-				in_reply_to_status_id_str = status['in_reply_to_status_id_str'],
-				bot_id = bot_id,
-				createdAt = datetime.utcnow(),
-				updatedAt = datetime.utcnow()
-			)
+			tweetstatus = Tweets(**status_dic)
 			tweetstatus.save()
 			twlog_sql.commit()
 			return tweetstatus._data
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
-		return save_tweet_status(status, bot_id, retry_cnt = retry_cnt)
+		d(e, retry_cnt, 'save_tweet_status')
+		return save_tweet_status(status_dic, retry_cnt = retry_cnt)
 	except IntegrityError as e:
 		d(e)
 		twlog_sql.rollback()
@@ -183,7 +184,7 @@ def get_tweet_dialog(status_id = 1, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_tweet_dialog')
 		return get_tweet_dialog(status_id, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -203,7 +204,7 @@ def get_twlog(status_id = 1, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_twlog')
 		return get_twlog(status_id, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -235,7 +236,7 @@ def save_tweet_dialog(twdialog_dic = {
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'save_tweet_dialog')
 		return save_tweet_dialog(status, tmp, logtext, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -262,7 +263,7 @@ def get_twlog_list(n = 1000, UserList = ['sousaku_umi', 'umi0315_pokemon'], Blac
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_twloglist')
 		return get_twlog_list(n, UserList, BlackList, contains, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -296,7 +297,7 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys', retry_cnt = 
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_phrase')
 		return get_phrase(s_type, status, n, character, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -329,7 +330,7 @@ def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', 
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'save_phrase')
 		return save_phrase(phrase, author, status, s_type, character, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -381,7 +382,7 @@ def read_userinfo(screen_name, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'read_userinfo')
 		return read_userinfo(screen_name, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -406,7 +407,7 @@ def save_userinfo(userstatus, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'save_userinfo')
 		return save_userinfo(userstatus, retry_cnt)
 	except IntegrityError as e:
 		d(e)
@@ -445,7 +446,7 @@ def get_wordnet_result(lemma, retry_cnt = 0):
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
-		d(e, retry_cnt)
+		d(e, retry_cnt, 'get_wordnet')
 		return get_wordnet_result(lemma, retry_cnt)
 	except IntegrityError as e:
 		d(e)

@@ -70,9 +70,14 @@ class TweetLogPool(MyObject):
 		self.my_twlog = []
 		self.timeline_twlog = []
 		self.directmessage_twlog = []
-	def append_and_adjust_timeline_twlog(self, appendage):
-		self.timeline_twlog.append(appendage)
-		self.timeline_twlog = self.timeline_twlog[-20:]
+		self.status_ids = []
+	def append_and_adjust_timeline_twlog(self, appendage_status):
+		status_id = appendage_status['id_str']
+		if not status_id in self.status_ids:
+			self.timeline_twlog.append(appendage_status['clean_text'])
+			self.status_ids.append(status_id)
+			self.timeline_twlog = self.timeline_twlog[-20:]
+twlog_pool = TweetLogPool()
 class StreamResponseFunctions(MyObject):
 	def __init__(self, bot_id):
 		debug_style = ''
@@ -104,7 +109,7 @@ class StreamResponseFunctions(MyObject):
 		#CLASS
 		self.bot_profile = operate_sql.BotProfile(self.bot_id)
 		self.tmp = Temp()
-		self.twlog_pool = TweetLogPool()
+		# self.twlog_pool = TweetLogPool()
 		self.stats = Stats()
 		self.tmp.charas = Temp()
 		#
@@ -261,7 +266,7 @@ class StreamResponseFunctions(MyObject):
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
 				screen_name = ''
-		elif text in set(self.twlog_pool.timeline_twlog[:5]):
+		elif text in set(twlog_pool.timeline_twlog[:5]):
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
 			if len(''.join([ans,'@',screen_name, ' '])) > 140:
 				ans = text
@@ -970,25 +975,25 @@ class StreamResponseFunctions(MyObject):
 			p('userinfo save error')
 		return tweet_status
 
-	def is_not_ignore(self, status):
+	def is_ignore(self, status):
 		try:
 			if status['retweeted']:
-				return False
+				return True
 			if status['is_quote_status']:
-				return False
+				return True
 			screen_name = status['user']['screen_name']
 			if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '定期', '【', 'ポストに到達', 'リプライ数']]):
 				if screen_name != self.manager_id:
-					return False
+					return True
 			if screen_name == self.bot_id:
-				return False
+				return True
 			if screen_name in self.response_exception_set:
-				return False
-			return True
-		except Exception as e:
-			logger.debug('is_not_ignore')
-			logger.debug(e)
+				return True
 			return False
+		except Exception as e:
+			logger.debug('is_ignore')
+			logger.debug(e)
+			return True
 
 	def is_react(self, status):
 		try:
@@ -1013,8 +1018,9 @@ class StreamResponseFunctions(MyObject):
 			return False
 	def on_status_main(self, status):
 		try:
-			if self.is_not_ignore(status):
+			if not self.is_ignore(status):
 				self.stats.TL_cnt += 1
+				# status['clean_text']
 				status_id = status['id_str']
 				screen_name = status['user']['screen_name']
 				replyname = status['in_reply_to_screen_name']
@@ -1034,17 +1040,20 @@ class StreamResponseFunctions(MyObject):
 				if self.is_react(status):
 					tweet_status = self.main(status, mode = 'tweet')
 				# 記憶部
-				if not text in set(self.twlog_pool.timeline_twlog):
+				if not text in set(twlog_pool.timeline_twlog):
 					try:
-						operate_sql.save_tweet_status(status, self.bot_id)
-					except:
+						save_tweet_status_thread = threading.Thread(target = operate_sql.save_tweet_status, name = self.bot_id+'save_tweet_status', args=(self.status_dic(status), ))
+						save_tweet_status_thread.start()
+						# operate_sql.save_tweet_status(status, self.bot_id)
+					except Exception as e:
+						d(s, "threading save")
 						pass
 				#Tweetプーリング
 					if not screen_name in self.bots_set:
 						if not status['entities']['urls']:
 							if len(text) > 5:
 								if not any([ng_word in text for ng_word in ['便乗', 'imitate', 'learn', 'img', 'kusoripu', 'haken', 'add', '午̷̖̺͈̆͛͝前̧̢̖̫̊3̘̦時̗͡の̶̛̘̙̤̙̌̉͢い̷゙̊̈̓̓̅ば̬̬̩͈̊͡ら゙̜̩̹ぎ̫̺̓ͣ̕͡げ̧̛̩̞̽ん゙̨̼̗̤̂̄']]):
-									self.twlog_pool.append_and_adjust_timeline_twlog(text)
+									twlog_pool.append_and_adjust_timeline_twlog(status)
 				#Dialog保存
 				if not screen_name in {self.bot_id}:
 					if not status['in_reply_to_status_id_str'] is None:
@@ -1057,6 +1066,19 @@ class StreamResponseFunctions(MyObject):
 			logger.debug('+++++timeline_status+++++++')
 		else:
 			return True
+	def status_dic(self, status):
+		status_dic = {
+				'status_id' : int(status['id_str']),
+				'screen_name' : status['user']['screen_name'],
+				'name' : status['user']['name'],
+				'text' : status['text'],
+				'user_id' : status['user']['id_str'],
+				'in_reply_to_status_id_str' : status['in_reply_to_status_id_str'],
+				'bot_id' : self.bot_id,
+				'createdAt' : datetime.utcnow(),
+				'updatedAt' : datetime.utcnow()
+			}
+		return status_dic
 	def save_tweet_dialog(self, status):
 		try:
 			# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
@@ -1069,7 +1091,7 @@ class StreamResponseFunctions(MyObject):
 				logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
 				if not logstatus:
 					raise Exception
-				twlog = operate_sql.save_tweet_status(logstatus._json, self.bot_id)
+				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus))
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			kws = dialog_generator.DialogObject(clean_logtext).keywords
@@ -1098,8 +1120,8 @@ class StreamResponseFunctions(MyObject):
 			self.stats.DM_cnt += 1
 			# status = status._json
 			status = self.twf.convert_direct_message_to_tweet_status(status)
-			operate_sql.save_tweet_status(status, self.bot_id)
-			if self.is_not_ignore(status):
+			operate_sql.save_tweet_status(self.status_dic(status))
+			if not self.is_ignore(status):
 				try:
 					text = _.clean_text(status['text'])
 					status['clean_text'] = text
@@ -1234,7 +1256,7 @@ class StreamResponseFunctions(MyObject):
 				try:
 					ans = ''
 					while True:
-						dialog_obj = dialog_generator.DialogObject(self.twlog_pool.timeline_twlog[0].replace(self.atmarked_bot_id, ''))
+						dialog_obj = dialog_generator.DialogObject(twlog_pool.timeline_twlog[0].replace(self.atmarked_bot_id, ''))
 						ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n = 5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = self.default_character, tools = 'WN,LOG,MC', username = '@〜〜')
 						if not '<人名>' in ans:
 							break
@@ -1357,6 +1379,7 @@ def task_manager(bot_id, period = 60):
 			now = response_funcs.sync_now()
 			p(bot_id, 'TASK>> ', now)
 			tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
+			# p(twlog_pool.__dict__)
 			try:
 				[response_funcs.implement_tasks(task) for task in tasks if task]
 			except Exception as e:
