@@ -161,9 +161,9 @@ def reconnect_wifi():
           if i > 3:
             return False
           p('reconnecting wifi, wait 6sec...')
-          time.sleep(4)
+          time.sleep(5)
           p('checking ping...')
-          time.sleep(2)
+          time.sleep(5)
           if Ping('google.com').is_connectable:
             p('ping is connecting. reconnect-program -> finished!!!!')
             break

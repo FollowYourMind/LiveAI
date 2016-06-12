@@ -1251,8 +1251,9 @@ class StreamResponseFunctions(MyObject):
 				task_restart()
 			elif todo == 'followback_check':
 				followers = self.twf.get_followers_all(self.bot_id)
-				not_followbacked_followers_objects = [obj for obj in ans if check_if_follow(obj) if obj._json['following'] != True and check_if_follow(obj)]
-				for target_name in not_followbacked_followers_objects:
+				not_followbacked_followers_objects = [obj for obj in ans if self.check_if_follow(obj) if obj._json['following'] != True and check_if_follow(obj)]
+				for userobject in not_followbacked_followers_objects:
+					target_name = userobject['screen_name']
 					p(target_name)
 					try:
 						self.twf.is_create_friendship_success(screen_name = target_name)
@@ -1331,11 +1332,11 @@ class StreamResponseFunctions(MyObject):
 			'followback_check': 15,
 			'update.lists': 30,
 			'update_userprofile' : 10,
-			'save_stats': 20, 
+			'save_stats': 20,
 			# 'restart_program': 60
 			}
 		if self.bot_id == 'LiveAI_Umi':
-			task_duration_dic['reconnect_wifi'] = 3
+			task_duration_dic['reconnect_wifi'] = 30
 		def save_task(task_name, duration_min):
 			rand_start_min = np.random.randint(0, 20)
 			operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': task_name, 'to_whom': '', 'tmptext': str(duration_min), 'when': self.get_time(minutes = rand_start_min)})

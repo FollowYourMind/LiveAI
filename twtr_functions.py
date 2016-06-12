@@ -24,7 +24,11 @@ class StreamListener(tweepy.streaming.StreamListener):
 		p(track)
 		raise MyException
 	def on_status(self, status):
-		return self.response_main.on_status_main(status._json)
+		try:
+			return self.response_main.on_status_main(status._json)
+		except Exception as e:
+			d('on_status',e)
+			return True
 	def on_direct_message(self,status):
 		return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
