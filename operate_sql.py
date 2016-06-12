@@ -33,6 +33,8 @@ def get_stats(whose = 'sys', status = '', n = 100, retry_cnt = 0):
 			stats_data = Stats.select().where(Stats.whose ==  whose, Stats.status == status).order_by(Stats.time.desc()).limit(n)
 			data_ls = [(data.number, data.time) for data in stats_data]
 			return data_ls
+	except DoesNotExist as e:
+		return None
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -57,6 +59,8 @@ def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic =
 				ci.save()
 				return ci
 			return core_info
+	except DoesNotExist as e:
+		return CoreInfo(**standard_dic)
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -91,6 +95,8 @@ def search_tasks(when = datetime.now(), who = '_mmKm', n = 10, retry_cnt = 0):
 				tasks = active.where(Task.when < when, Task.who == who).order_by(Task.id.desc()).limit(n)
 			tasklist = [task.__dict__['_data'] for task in tasks]
 			return tasklist
+	except DoesNotExist as e:
+		return []
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -136,27 +142,29 @@ def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'w
 		return False
 
 #####twlog_sql#######
-def save_tweet_status(status, tmp, retry_cnt = 0):
+def save_tweet_status(status, bot_id = '', retry_cnt = 0):
 	try:
-		twlog_sql.create_tables([Tweets], True)
+		# twlog_sql.create_tables([Tweets], True)
 		with twlog_sql.transaction():
-			Tweets.create(
+			tweetstatus = Tweets(
 				status_id = int(status['id_str']),
 				screen_name = status['user']['screen_name'],
 				name = status['user']['name'],
 				text = status['text'],
 				user_id = status['user']['id_str'],
 				in_reply_to_status_id_str = status['in_reply_to_status_id_str'],
-				bot_id = tmp['bot_id'],
+				bot_id = bot_id,
 				createdAt = datetime.utcnow(),
 				updatedAt = datetime.utcnow()
 			)
+			tweetstatus.save()
 			twlog_sql.commit()
+			return tweetstatus._data
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
 		d(e, retry_cnt)
-		return save_tweet_status(status, tmp, retry_cnt = retry_cnt)
+		return save_tweet_status(status, bot_id, retry_cnt = retry_cnt)
 	except IntegrityError as e:
 		d(e)
 		twlog_sql.rollback()
@@ -171,7 +179,7 @@ def get_tweet_dialog(status_id = 1, retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([Tweets], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with twlog_sql.transaction():
-			return Tweets.select().where(Tweets.status_id == status_id).get().__dict__['_data']
+			return Tweets.select().where(Tweets.status_id == status_id).get()._data
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -183,36 +191,45 @@ def get_tweet_dialog(status_id = 1, retry_cnt = 0):
 		raise Exception
 	except Exception as e:
 		d(e)
-		return False
-	else:
-		return True
+		return None
 
-def save_tweet_dialog(status, tmp, logtext = '', retry_cnt = 0):
+def get_twlog(status_id = 1, retry_cnt = 0):
+	try:
+		# twlog_sql.create_tables([Tweets], True)# 第二引数がTrueの場合、存在している場合は、作成しない
+		with twlog_sql.transaction():
+			return Tweets.select().where(Tweets.status_id == status_id).get()._data
+	except DoesNotExist:
+		return None
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_twlog(status_id, retry_cnt)
+	except IntegrityError as e:
+		d(e)
+		twlog_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return None
+
+def save_tweet_dialog(twdialog_dic = {
+				'SID' : '',
+				'KWs' : '',
+				'nameA' : '',
+				'textA' : '',
+				'nameB' : '',
+				'textB' : '',
+				'posi' : 1,
+				'nega' : 0,
+				'bot_id' : 'bot',
+				'createdAt' : datetime.utcnow(),
+				'updatedAt' : datetime.utcnow()
+			}, retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with twlog_sql.transaction():
-			if not logtext:
-				twlog = Tweets.select().where(Tweets.status_id == int(status['in_reply_to_status_id_str'])).get().__dict__['_data']
-				screen_name = twlog['screen_name']
-				logtext = _.clean_text(twlog['text'])
-				SID = '/'.join([str(twlog['status_id']), status['id_str']])
-			else:
-				screen_name = tmp['bot_id']
-				SID = ''.join([status['id_str'], 'DM'])
-			kws = [key[0] for key in TFIDF.calcKWs(logtext, length = 1, needs = {'固有名詞', '名詞'})]
-			TwDialog.create(
-				SID = SID,
-				KWs = '</>'.join(kws),
-				nameA = screen_name,
-				textA = logtext,
-				nameB = status['user']['screen_name'],
-				textB = _.clean_text(status['text']),
-				posi = 1,
-				nega = 0,
-				bot_id = tmp['bot_id'],
-				createdAt = datetime.utcnow(),
-				updatedAt = datetime.utcnow()
-			)
+			TwDialog.create(**twdialog_dic)
 			twlog_sql.commit()
 			return True
 	except OperationalError as e:
@@ -240,6 +257,8 @@ def get_twlog_list(n = 1000, UserList = ['sousaku_umi', 'umi0315_pokemon'], Blac
 			 	tweets = Tweets.select().where(Tweets.screen_name << UserList , ~Tweets.screen_name << BlackList, ~Tweets.text.contains('RT'), ~Tweets.text.contains('【')).order_by(Tweets.createdAt.desc()).limit(n)
 		tweetslist = [_.clean_text(tweet.text) for tweet in tweets]
 		return tweetslist
+	except DoesNotExist as e:
+		return None
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -272,6 +291,8 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys', retry_cnt = 
 				return ''.join([np.random.choice([p.phrase for p in Ps]), '\n(代:[', status, ']of\'', character, '\')'])
 			else:
 				return np.random.choice([p.phrase for p in Ps])
+	except DoesNotExist as e:
+		return ''.join(['...:[', status, '] by \'', character, '\''])
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -419,6 +440,8 @@ def get_wordnet_result(lemma, retry_cnt = 0):
 			wn_relation = {link: words_ls for link, words_ls in [(synlink.link, convert_synset_into_words(target_synset = synlink.synset2))  for synlink in synlinks] if words_ls}
 			wn_relation['coordinate'] = coordinated_lemma_ls
 			return wn_relation
+	except DoesNotExist as e:
+		return None
 	except OperationalError as e:
 		retry_cnt += 1
 		time.sleep(0.3*retry_cnt)
@@ -451,7 +474,9 @@ class BotProfile(MyObject):
 		self.abs_banner_filename = get_core_info(whose_info = self.bot_id, info_label = 'abs_banner_filename', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 if __name__ == '__main__':
 	# a = read_userinfo('h_y_okaaaaaaaaaaaa')
-	a = BotProfile('LiveAI_Alpaca')
+	# a = BotProfile('LiveAI_Alpaca')
+	status = ''
+	save_tweet_dialog(status)
 	# a = get_twlog_list(UserList = ['kotori_ss', 'kotoli_h_bot', 'Smallbirds_poke', 'haijin_kotori_', 'yanderekotori_bot', 'umikiti_kotori'], n = 10)
 	# umi = get_phrase(status = 'ぬるぽ', n = 1)
 	# p(umi)
@@ -462,7 +487,7 @@ if __name__ == '__main__':
 	# p(bp)
 	# a = get_core_info(whose_info = 'LiveAI_Nick', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)
 	# a =read_userinfo(screen_name = 'masaMikam')[0]._data
-	p(a)
+	# p(a)
 	status = {'favorite_count': 0, 'created_at': 'Wed Feb 17 14:54:01 +0000 2016', 'contributors': None, 'truncated': False, 'in_reply_to_user_id_str': None, 'retweet_count': 0, 'id': 699970059683414016, 'in_reply_to_status_id_str': None, 'geo': None, 'entities': {'hashtags': [], 'urls': [], 'symbols': [], 'user_mentions': []}, 'id_str': '691170059683414016', 'in_reply_to_screen_name': None, 'is_quote_status': False, 'timestamp_ms': '1455720841700', 'coordinates': None, 'in_reply_to_status_id': None, 'filter_level': 'low', 'retweeted': False, 'in_reply_to_user_id': None, 'source': '<a href="http://twitter.com/download/iphone" rel="nofollow">Twitter for iPhone</a>', 'favorited': False, 'user': {'protected': False, 'created_at': 'Sun Mar 31 01:35:13 +0000 2013', 'utc_offset': 32400, 'favourites_count': 27, 'follow_request_sent': None, 'following': None, 'profile_image_url': 'http://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'profile_background_tile': False, 'description': '名前:つゆり きさめ/学生ラブライバー/絶叫勢/ぼっち勢/海未推し/善子推し(仮)/このすば/めぐみんはいいぞ/内田彩/詳細はツイプロ/+aで最近FFの比例がおかしい事に気がついたんでスパムを除く人に見つけ次第フォロー返してます。', 'profile_text_color': '333333', 'friends_count': 1481, 'time_zone': 'Tokyo', 'profile_sidebar_border_color': 'BDDCAD', 'profile_image_url_https': 'https://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'screen_name': 'tuyuri_kisame', 'default_profile_image': False, 'statuses_count': 40262, 'name': '栗花落 樹雨', 'is_translator': False, 'profile_background_image_url_https': 'https://abs.twimg.com/images/themes/theme16/bg.gif', 'followers_count': 1921, 'location': '神奈川県東部', 'geo_enabled': False, 'verified': False, 'notifications': None, 'profile_banner_url': 'https://pbs.twimg.com/profile_banners/1317490188/1455626298', 'listed_count': 33, 'profile_background_color': '9AE4E8', 'profile_sidebar_fill_color': 'DDFFCC', 'profile_link_color': '0084B4', 'default_profile': False, 'url': 'http://twpf.jp/tuyuri_kisame', 'profile_use_background_image': True, 'contributors_enabled': False, 'id': 1317490188, 'lang': 'ja', 'id_str': '1317490188', 'profile_background_image_url': 'http://abs.twimg.com/images/themes/theme16/bg.gif'}, 'place': None, 'text': 'トサカのないことりちゃん…( ˘ω˘ )', 'lang': 'ja'}
 	# save_tweet_status(status)
 	s = '酒'

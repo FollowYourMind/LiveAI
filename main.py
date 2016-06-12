@@ -1036,7 +1036,7 @@ class StreamResponseFunctions(MyObject):
 				# 記憶部
 				if not text in set(self.twlog_pool.timeline_twlog):
 					try:
-						operate_sql.save_tweet_status(status)
+						operate_sql.save_tweet_status(status, self.bot_id)
 					except:
 						pass
 				#Tweetプーリング
@@ -1045,15 +1045,51 @@ class StreamResponseFunctions(MyObject):
 							if len(text) > 5:
 								if not any([ng_word in text for ng_word in ['便乗', 'imitate', 'learn', 'img', 'kusoripu', 'haken', 'add', '午̷̖̺͈̆͛͝前̧̢̖̫̊3̘̦時̗͡の̶̛̘̙̤̙̌̉͢い̷゙̊̈̓̓̅ば̬̬̩͈̊͡ら゙̜̩̹ぎ̫̺̓ͣ̕͡げ̧̛̩̞̽ん゙̨̼̗̤̂̄']]):
 									self.twlog_pool.append_and_adjust_timeline_twlog(text)
+				#Dialog保存
 				if not screen_name in {self.bot_id}:
 					if not status['in_reply_to_status_id_str'] is None:
 						try:
-							operate_sql.save_tweet_dialog(status)
+							self.save_tweet_dialog(status)
 						except:
 							pass
 		except Exception as e:
 			logger.debug(e)
 			logger.debug('+++++timeline_status+++++++')
+		else:
+			return True
+	def save_tweet_dialog(self, status):
+		try:
+			# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
+			status_id = int(status['in_reply_to_status_id_str'])
+			try:
+				twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'], retry_cnt = 0)
+			except:
+				twlog = None
+			if not twlog:
+				logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
+				if not logstatus:
+					raise Exception
+				twlog = operate_sql.save_tweet_status(logstatus._json, self.bot_id)
+			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
+			logname = twlog['screen_name']
+			kws = dialog_generator.DialogObject(clean_logtext).keywords
+			operate_sql.save_tweet_dialog(
+ 				twdialog_dic = {
+				'SID' : '/'.join([str(twlog['status_id']), status['id_str']]),
+				'KWs' : '</>'.join(kws),
+				'nameA' : logname,
+				'textA' : clean_logtext,
+				'nameB' : status['user']['screen_name'],
+				'textB' : _.clean_text(status['text']),
+				'posi' : 1,
+				'nega' : 0,
+				'bot_id' : self.bot_id,
+				'createdAt' : datetime.utcnow(),
+				'updatedAt' : datetime.utcnow()
+			}, retry_cnt = 0)
+		except Exception as e:
+			d(e)
+			return False
 		else:
 			return True
 	def on_direct_message_main(self, status):
@@ -1062,7 +1098,7 @@ class StreamResponseFunctions(MyObject):
 			self.stats.DM_cnt += 1
 			# status = status._json
 			status = self.twf.convert_direct_message_to_tweet_status(status)
-			operate_sql.save_tweet_status(status, self.tmp)
+			operate_sql.save_tweet_status(status, self.bot_id)
 			if self.is_not_ignore(status):
 				try:
 					text = _.clean_text(status['text'])
@@ -1070,12 +1106,29 @@ class StreamResponseFunctions(MyObject):
 					self.sync_now()
 					#ツイートステータス情報追加処理
 					status['now'] = self.now
-					status['clean_text'] = text
 					screen_name = status['user']['screen_name']
 					userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
-					context = userinfo['context'].split('</>')[-1]
-					operate_sql.save_tweet_dialog(status, tmp = self.tmp, logtext = context)
+					try:
+						context = userinfo['context'].split('</>')[-1]
+					except Exception as e:
+						d(e)
+						context = ''
 					tweet_status = self.main(status, mode = 'dm', userinfo = userinfo, is_new_user = is_new_user)
+					kws = dialog_generator.DialogObject(context).keywords
+					operate_sql.save_tweet_dialog(
+ 						twdialog_dic = {
+						'SID' : '/'.join(['DM_', status['id_str']]),
+						'KWs' : '</>'.join(kws),
+						'nameA' : self.bot_id,
+						'textA' : _.clean_text(context),
+						'nameB' : status['user']['screen_name'],
+						'textB' : status['clean_text'],
+						'posi' : 1,
+						'nega' : 0,
+						'bot_id' : self.bot_id,
+						'createdAt' : status['now'],
+						'updatedAt' : status['now']
+					}, retry_cnt = 0)
 				except Exception as e:
 					logger.debug(e)
 		except Exception as e:
@@ -1083,7 +1136,6 @@ class StreamResponseFunctions(MyObject):
 			logger.debug('++++direct_message++++++')
 		else:
 			return True
-
 	def on_event_main(self, status):
 		p(status['event'])
 		try:
@@ -1100,21 +1152,8 @@ class StreamResponseFunctions(MyObject):
 						return True
 			elif status['event'] == 'follow':
 				if status['target']['screen_name'] == self.bot_id:
-					is_followback_ok = True
-					if status['source']['lang'] != 'ja':
-						return True
-					if status['source']['statuses_count'] < 100:
-						return True
-					if status['source']['favourites_count'] < 20:
-						return True
-					if status['source']['listed_count'] / status['source']['followers_count'] < 0.015:
-						is_followback_ok = False
-					ff_rate = status['source']['followers_count'] / status['source']['friends_count']
-					if ff_rate < 0.6:
-						is_followback_ok = False
-					if not is_followback_ok:
-						if status['source']['followers_count'] > 2000:
-							is_followback_ok = True
+					userobject = status['source']
+					is_followback_ok = self.check_if_follow(userobject)
 					if is_followback_ok:
 						screen_name = status['source']['screen_name']
 						if self.twf.is_create_friendship_success(screen_name = screen_name):
@@ -1135,6 +1174,27 @@ class StreamResponseFunctions(MyObject):
 			logger.debug('++++event++++++')
 		else:
 			return True
+
+	def check_if_follow(self, userobject):
+		try:
+			is_followback_ok = True
+			if userobject['lang'] != 'ja':
+				return True
+			if userobject['statuses_count'] < 100:
+				return True
+			if userobject['favourites_count'] < 20:
+				return True
+			if userobject['listed_count'] / userobject['followers_count'] < 0.015:
+				is_followback_ok = False
+			ff_rate = userobject['followers_count'] / userobject['friends_count']
+			if ff_rate < 0.6:
+				is_followback_ok = False
+			if not is_followback_ok:
+				if userobject['followers_count'] > 1000:
+					is_followback_ok = True
+			return is_followback_ok
+		except:
+			return False
 
 	def implement_tasks(self, task):
 		def task_restart(is_noised = True):
@@ -1172,9 +1232,13 @@ class StreamResponseFunctions(MyObject):
 			# 	operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
 			elif todo == 'teiki.MC':
 				try:
-					chara = self.default_character
-					ans = dialog_generator.dialog('', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.8, character = chara, tools = 'MC')
-					ans = ans.replace('<人名>', 'アルパカ')
+					ans = ''
+					while True:
+						dialog_obj = dialog_generator.DialogObject(self.twlog_pool.timeline_twlog[0].replace(self.atmarked_bot_id, ''))
+						ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n = 5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = self.default_character, tools = 'WN,LOG,MC', username = '@〜〜')
+						if not '<人名>' in ans:
+							break
+					ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
 					task_restart()
 				except Exception as e:
 					logger.debug(e)
@@ -1185,7 +1249,19 @@ class StreamResponseFunctions(MyObject):
 				ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
 				self.tmp.trendwords_ls = trendwords
 				task_restart()
-
+			elif todo == 'followback_check':
+				followers = self.twf.get_followers_all(self.bot_id)
+				not_followbacked_followers_objects = [obj for obj in ans if check_if_follow(obj) if obj._json['following'] != True and check_if_follow(obj)]
+				for target_name in not_followbacked_followers_objects:
+					p(target_name)
+					try:
+						self.twf.is_create_friendship_success(screen_name = target_name)
+					except Exception as e:
+						d(target_name, e)
+						pass
+					else:
+						time.sleep(10)
+				task_restart()
 			elif todo == 'update.lists':
 				userinfo_me = self.twf.twtr_api.me().__dict__
 				bot_id = userinfo_me['screen_name']
@@ -1216,9 +1292,9 @@ class StreamResponseFunctions(MyObject):
 				importlib.reload(game_functions)
 				# importlib.reload(twtr_functions)
 				task_restart()
-			elif todo == 'restart_program':
-				print('restrarting_program...')
-				_.restart_program()
+			# elif todo == 'restart_program':
+			# 	print('restrarting_program...')
+			# 	_.restart_program()
 			elif todo == 'update_userprofile':
 				# self.bot_profile = self.twf.twtr_api.me()
 				# if not 'まねっこ' in self.bot_profile.location:
@@ -1245,17 +1321,18 @@ class StreamResponseFunctions(MyObject):
 		rand_time = self.now + timedelta(hours = hours, minutes = minutes, seconds = seconds)
 		return rand_time
 	def initialize_tasks(self):
-		operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teiki.MC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program'], taskdict = {'status': 'end'})
+		operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teiki.MC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program', 'followback_check'], taskdict = {'status': 'end'})
 		self.sync_now()
 		task_duration_dic = {
 			'teiki': 30,
-			'teikiMC': 40,
-			'teiki.trendword': 30,
+			'teikiMC': 20,
+			'teiki.trendword': 60,
 			'erase.tmp.stats.tweet_cnt_hour': 60,
+			'followback_check': 15,
 			'update.lists': 30,
 			'update_userprofile' : 10,
 			'save_stats': 20, 
-			'restart_program': 60
+			# 'restart_program': 60
 			}
 		if self.bot_id == 'LiveAI_Umi':
 			task_duration_dic['reconnect_wifi'] = 3

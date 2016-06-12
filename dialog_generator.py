@@ -105,198 +105,199 @@ def getBoomWords(username = '_umiA', n = 400):
 
 
 class TFIDF():
-  def __init__(self, option = ''):
-    self.option = option
-  def increase_document_frequency(self, word):
-    try:
-      # talk_sql.create_tables([managementInfos, tf_idf], True)
-      with talk_sql.transaction():
+    def __init__(self, option = ''):
+        self.option = option
+    def increase_document_frequency(self, word):
         try:
-          wdb, created = TFIDFModel.get_or_create(word = word)
-          if not created:
-            try:
-              wdb.df +=  1
-            except:
-              wdb.df = 1
-            wdb.save()
+            # talk_sql.create_tables([managementInfos, tf_idf], True)
+            with talk_sql.transaction():
+                try:
+                    wdb, created = TFIDFModel.get_or_create(word = word)
+                    if not created:
+                        try:
+                            wdb.df +=  1
+                        except:
+                            wdb.df = 1
+                        wdb.save()
+                except Exception as e:
+                    d(e)
+                talk_sql.commit()
         except Exception as e:
-          print('')
-        talk_sql.commit()
-    except Exception as e:
-      talk_sql.rollback()
-      # print(e)
-  
-  def upsert_word(self, ma, is_learn = False):
-    genkei = ma[7]
-    hinshi = ma[1]
-    hinshi2 = ma[2]
-    document_frequency = 1;
-    is_created = False
-    try:
-      # talk_sql.create_tables([managementInfos, tf_idf], True)
-      with talk_sql.transaction():
+          talk_sql.rollback()
+        # print(e)
+    
+    def upsert_word(self, ma, is_learn = False, retry_cnt = 0):
+        genkei = ma[7]
+        hinshi = ma[1]
+        hinshi2 = ma[2]
+        document_frequency = 1;
+        is_created = False
         try:
-          wdb, is_created = TFIDFModel.get_or_create(word = genkei, hinshi = hinshi, hinshi2 = hinshi2)
-          if not is_learn:
-            document_frequency = 1
-          elif is_created:
-            wdb.word = genkei
-            wdb.yomi = ma[8]
-            wdb.hinshi = ma[1]
-            wdb.hinshi2  = ma[2]
-            wdb.info3  = ma[3]
-            wdb.termcnt = 1
-            wdb.df = 1
-            wdb.term_frequency = 1
-            wdb.save()
-            document_frequency = 1
-          else:
-            try:
-              wdb.df +=  1
-            except:
-              wdb.df = 1
-            wdb.save()
-            document_frequency = wdb.df
+            with talk_sql.transaction():
+                wdb, is_created = TFIDFModel.get_or_create(word = genkei, hinshi = hinshi, hinshi2 = hinshi2)
+                if not is_learn:
+                    document_frequency = 1
+                elif is_created:
+                    wdb.word = genkei
+                    wdb.yomi = ma[8]
+                    wdb.hinshi = ma[1]
+                    wdb.hinshi2  = ma[2]
+                    wdb.info3  = ma[3]
+                    wdb.termcnt = 1
+                    wdb.df = 1
+                    wdb.term_frequency = 1
+                    wdb.save()
+                    document_frequency = 1
+                else:
+                    try:
+                      wdb.df +=  1
+                    except:
+                        wdb.df = 1
+                wdb.save()
+                document_frequency = wdb.df
+                talk_sql.commit()
+        except DoesNotExist as e:
+           return None, is_created
+        except OperationalError as e:
+           retry_cnt += 1
+           time.sleep(0.3*retry_cnt)
+           d(e, retry_cnt)
+           return self.upsert_word(ma, is_learn, retry_cnt)
+        except IntegrityError as e:
+           d(e)
+           wordnet_sql.rollback()
+           raise Exception
         except Exception as e:
-          print('')
-        talk_sql.commit()
-    except Exception as e:
-      talk_sql.rollback()
-      # print(e)
-    return document_frequency, is_created
-  
-  def calc_tf_idf(self, w, term_frequency_dic, cnt = 5, total_documents = 30000, is_debug = False):
-    word = w[7]
-    word_cnt = term_frequency_dic[word]
-    term_frequency =  word_cnt / cnt
-    if word == '*':
-      return ''
-    else:
-      document_frequency, is_created = self.upsert_word(w)
-    try:
-      base_inversed_document_frequency = total_documents / document_frequency
-      inversed_document_frequency = 1 + np.log2(base_inversed_document_frequency)
-    except:
-      inversed_document_frequency = 1
-    tf_idf = term_frequency * inversed_document_frequency
-    w.append(tf_idf)
-    w.append(is_created)
-    if is_debug:
-      print(word, str(round(tf_idf, 2)))
-    return w
-  
-  def append_tf_idf_on_ma_result(self, ma, total_documents = 420000, is_learn = False, is_debug = False):
-    # ma = natural_language_processing.MA.get_mecab_coupled(s)
-    word_cnt = len(ma)
-    word_ls = [w[7] for w in ma]
-    counter = Counter(word_ls)
-    term_frequency_dic = {}
-    for word, cnt in counter.most_common():
-      term_frequency_dic[word] = cnt
-    result = [self.calc_tf_idf(w, term_frequency_dic, cnt = 5, total_documents = total_documents, is_debug = is_debug) for w in ma]
-    if is_learn:
-      for key in term_frequency_dic.keys():
-        self.increase_document_frequency(key)
-    return result
-
-  def learn_tf_idf(self, sList):
-    # result = [Main(s, 1, True, True) for s in sList]
-    # print(len(result))
-    i = 1;
-    for s in sList:
-      print('++++++++++++++++++++++++++++++++++++++++++++++++++')
-      print(i, s)
-      try:
-        ma = natural_language_processing.MA.get_mecab_coupled(s)
-        mas = self.append_tf_idf_on_ma_result(ma, i, True, True)
-      except Exception as e:
-        print('')
-      i += 1  
-  def extract_tf_idf(self, ma, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exception = {'数'}):
-    def is_keyword(x, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exceptions = {'数'}):
-      try:
-        if x[1] in needs:
-          if not x[2] in exceptions:
-            return True
-        elif x[2] in needs:
-          if not x[2] in exceptions:
-            return True
-        return False
-      except Exception as e:
-        return False
-    def sort_tf_idf_ma(tf_idf_ma, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exceptions = {'数'}):
-      return [x for x in sorted(tf_idf_ma, key = lambda x: x[10], reverse = True) if is_keyword(x, needs, exceptions)]
-    ##
-    tf_idf_ma = self.append_tf_idf_on_ma_result(ma, total_documents = 420000, is_learn = False, is_debug = False)
-    result = sort_tf_idf_ma(tf_idf_ma, needs)
-    return result
-  
-  def calc_keywords_tf_idf(self, ma, length = 1, needs = {'名詞', '固有名詞', '動詞', '形容詞'}):
-    extracted_keywords_ma = self.extract_tf_idf(ma, needs)
-    seen = set()
-    seen_add = seen.add
-    keywords = [(x[7], x[1], x[10], x[11]) for x in extracted_keywords_ma if len(x[0])>length]
-    keyword_tf_idf = np.array([x for x in keywords if x[0] not in seen and not seen_add(x[0])])
-    return keyword_tf_idf
-  
-  def get_random_keywords(self, keywords, random_cnt = 1):
-    kwcnt = len(keywords)
-    tf_idf = np.array([float(x[2]) for x in keywords])
-    per = np.sum(tf_idf)
-    p = tf_idf / per
-    if random_cnt > kwcnt:
-      random_cnt = kwcnt
-    try:
-      return np.random.choice([x[0] for x in keywords], random_cnt, replace=False, p = p)
-    except:
-      return ['']
-  def extract_keywords_from_text(self, s, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
-    ma = natural_language_processing.MA.get_mecab_coupled(s)
-    return self.extract_keywords_from_ma(ma = ma, threshold = threshold, n = n, length = length, is_print = is_print, needs = needs, random_cnt = random_cnt)
-  def extract_keywords_from_ma(self, ma, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
-    def keyword_filter(datas):
-      exception_set = {'ちゃん'}
-      return [data for data in datas if not data[0] in exception_set]
-
-    keyword_tf_idf = self.calc_keywords_tf_idf(ma, length = length, needs = needs)
-    kwcnt = len(keyword_tf_idf)
-    keyword_tf_idf = keyword_filter(keyword_tf_idf)
-  
-    if random_cnt > 0:
-      return self.get_random_keywords(keyword_tf_idf, random_cnt = random_cnt)
-    if kwcnt == 0:
-      if is_print:
-        print('=> キーワードは見つかりませんでした。')
-      return ['']
-    else:
-      if is_print:
-        if kwcnt < n:
-          print('=> ' + str(kwcnt) + '個の文章の重要キーワードを抽出しました。')
+           p(e)
         else:
-          print('=> ' + str(n) + '個の文章の重要キーワードを抽出しました。')
-      mostImptf_idf = keyword_tf_idf[0][2]
-      print(mostImptf_idf)
-      convImpRate = 100 / float(mostImptf_idf)
+          return document_frequency, is_created
   
-      return impkey
+    def calc_tf_idf(self, w, term_frequency_dic, cnt = 5, total_documents = 30000, is_debug = False):
+        word = w[7]
+        word_cnt = term_frequency_dic[word]
+        term_frequency =  word_cnt / cnt
+        if word == '*':
+            return ''
+        else:
+            document_frequency, is_created = self.upsert_word(w)
+        try:
+            base_inversed_document_frequency = total_documents / document_frequency
+            inversed_document_frequency = 1 + np.log2(base_inversed_document_frequency)
+        except:
+            inversed_document_frequency = 1
+        tf_idf = term_frequency * inversed_document_frequency
+        w.append(tf_idf)
+        w.append(is_created)
+        if is_debug:
+            p(word, str(round(tf_idf, 2)))
+        return w
   
-  def calc_cosine_similarity(self, s1, s2):
-    try:
-      intexts = [s1, s2]
-      tf_idf_ls = [{ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(text)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}} for text in intexts]
-      vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls[0].keys()] + [tf_idf_ls[1].keys()]))))
-      tf_idf_ls0 = tf_idf_ls[0]
-      tf_idf_ls1 = tf_idf_ls[1]
-      v1 = np.array([tf_idf_ls0[w] if w in set(tf_idf_ls0) else 0 for w in vecF])
-      v2 = np.array([tf_idf_ls1[w] if w in set(tf_idf_ls1) else 0 for w in vecF])
-      bunbo = (np.linalg.norm(v1) * np.linalg.norm(v2))
-      if bunbo:
-        return np.dot(v1, v2) / bunbo
-      else:
-        return 0
-    except Exception as e:
-      print(e)
-      return 0
+    def append_tf_idf_on_ma_result(self, ma, total_documents = 420000, is_learn = False, is_debug = False):
+            # ma = natural_language_processing.MA.get_mecab_coupled(s)
+        word_cnt = len(ma)
+        word_ls = [w[7] for w in ma]
+        counter = Counter(word_ls)
+        term_frequency_dic = {}
+        for word, cnt in counter.most_common():
+            term_frequency_dic[word] = cnt
+        result = [self.calc_tf_idf(w, term_frequency_dic, cnt = 5, total_documents = total_documents, is_debug = is_debug) for w in ma]
+        if is_learn:
+            [self.increase_document_frequency(key) for key in term_frequency_dic.keys()]
+        return result
+
+    def learn_tf_idf(self, sList):
+        # result = [Main(s, 1, True, True) for s in sList]
+        # print(len(result))
+        i = 1;
+        for s in sList:
+            print('++++++++++++++++++++++++++++++++++++++++++++++++++')
+            print(i, s)
+            try:
+                ma = natural_language_processing.MA.get_mecab_coupled(s)
+                mas = self.append_tf_idf_on_ma_result(ma, i, True, True)
+            except Exception as e:
+                print(e)
+            i += 1  
+    def extract_tf_idf(self, ma, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exception = {'数'}):
+        def is_keyword(x, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exceptions = {'数'}):
+            try:
+                if x[1] in needs:
+                    if not x[2] in exceptions:
+                        return True
+                elif x[2] in needs:
+                    if not x[2] in exceptions:
+                        return True
+                return False
+            except Exception as e:
+                return False
+        def sort_tf_idf_ma(tf_idf_ma, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, exceptions = {'数'}):
+            return [x for x in sorted(tf_idf_ma, key = lambda x: x[10], reverse = True) if is_keyword(x, needs, exceptions)]
+        ##
+        tf_idf_ma = self.append_tf_idf_on_ma_result(ma, total_documents = 420000, is_learn = False, is_debug = False)
+        result = sort_tf_idf_ma(tf_idf_ma, needs)
+        return result
+    
+    def calc_keywords_tf_idf(self, ma, length = 1, needs = {'名詞', '固有名詞', '動詞', '形容詞'}):
+        extracted_keywords_ma = self.extract_tf_idf(ma, needs)
+        seen = set()
+        seen_add = seen.add
+        keywords = [(x[7], x[1], x[10], x[11]) for x in extracted_keywords_ma if len(x[0])>length]
+        keyword_tf_idf = np.array([x for x in keywords if x[0] not in seen and not seen_add(x[0])])
+        return keyword_tf_idf
+    def get_random_keywords(self, keywords, random_cnt = 1):
+        kwcnt = len(keywords)
+        tf_idf = np.array([float(x[2]) for x in keywords])
+        per = np.sum(tf_idf)
+        p = tf_idf / per
+        if random_cnt > kwcnt:
+            random_cnt = kwcnt
+        try:
+            return np.random.choice([x[0] for x in keywords], random_cnt, replace=False, p = p)
+        except:
+            return ['']
+    def extract_keywords_from_text(self, s, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
+        ma = natural_language_processing.MA.get_mecab_coupled(s)
+        return self.extract_keywords_from_ma(ma = ma, threshold = threshold, n = n, length = length, is_print = is_print, needs = needs, random_cnt = random_cnt)
+    def extract_keywords_from_ma(self, ma, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
+        def keyword_filter(datas):
+            exception_set = {'ちゃん'}
+            return [data for data in datas if not data[0] in exception_set]
+        keyword_tf_idf = self.calc_keywords_tf_idf(ma, length = length, needs = needs)
+        kwcnt = len(keyword_tf_idf)
+        keyword_tf_idf = keyword_filter(keyword_tf_idf)
+        if random_cnt > 0:
+            return self.get_random_keywords(keyword_tf_idf, random_cnt = random_cnt)
+        if kwcnt == 0:
+            if is_print:
+                p('=> キーワードは見つかりませんでした。')
+            return ['']
+        else:
+            if is_print:
+                if kwcnt < n:
+                    p('=> ' + str(kwcnt) + '個の文章の重要キーワードを抽出しました。')
+                else:
+                    print('=> ' + str(n) + '個の文章の重要キーワードを抽出しました。')
+            mostImptf_idf = keyword_tf_idf[0][2]
+            print(mostImptf_idf)
+            convImpRate = 100 / float(mostImptf_idf)
+            return impkey
+    def calc_cosine_similarity(self, s1, s2):
+        try:
+            intexts = [s1, s2]
+            tf_idf_ls = [{ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(text)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}} for text in intexts]
+            vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls[0].keys()] + [tf_idf_ls[1].keys()]))))
+            tf_idf_ls0 = tf_idf_ls[0]
+            tf_idf_ls1 = tf_idf_ls[1]
+            v1 = np.array([tf_idf_ls0[w] if w in set(tf_idf_ls0) else 0 for w in vecF])
+            v2 = np.array([tf_idf_ls1[w] if w in set(tf_idf_ls1) else 0 for w in vecF])
+            bunbo = (np.linalg.norm(v1) * np.linalg.norm(v2))
+            if bunbo:
+                return np.dot(v1, v2) / bunbo
+            else:
+                return 0
+        except Exception as e:
+            print(e)
+            return 0
 TFIDF = TFIDF()
 class TrigramMarkovChain(MyObject):
     def __init__(self, character = 'sys'):
@@ -775,7 +776,7 @@ def extractKeywords(ma, exp = {'助詞', '助動詞', '記号', '接続詞', '�
 #   ans = ''.join([word, 'といえば', anal[0], 'とか', anal[1], 'ですよね。'])
 #   return ans
 
-def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], n = 20, min_similarity = 0.2):
+def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], n = 20, min_similarity = 0.2, retry_cnt = 0):
   try:
     if not kws[0]:
       return ''
@@ -792,9 +793,17 @@ def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pok
         return ''.join([d_listS[0][1], '\n(Log合致度:', str(d_listS[0][0]), ')'])
       else:
         return ''
-  except Exception as e:
-    print(e)
+  except OperationalError as e:
+    retry_cnt += 1
+    time.sleep(0.3*retry_cnt)
+    d(e, retry_cnt)
+    return get_tweet_log(text, kws, UserList, BlackList, n, min_similarity, retry_cnt)
+  except IntegrityError as e:
+    d(e)
     twlog_sql.rollback()
+    raise Exception
+  except Exception as e:
+    d(e)
     return ''
 def reform_info(info, username = '@username'):
     try:
@@ -821,6 +830,8 @@ def wordnet_dialog(kw = 'テスト'):
     return ''
   try:
     wn_dic = operate_sql.get_wordnet_result(lemma = kw)
+    if not wn_dic:
+      raise Exception
     wn_dic_keys = ([key for key in wn_dic.keys()])
     rand_key = np.random.choice(wn_dic_keys)
     rand_ls = wn_dic[rand_key]
@@ -961,7 +972,9 @@ class DialogObject(MyObject):
           if ans:
             character = 'sys'
       if not ans:
-        if 'WN' in tools:
+        if np.random.rand() < 0.7:
+          pass
+        elif 'WN' in tools:
           ans = wordnet_dialog(kw = kw)
           generated_by = 'WN'
           if ans:
@@ -1024,10 +1037,11 @@ if __name__ == '__main__':
   sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
   command = ''
-  text = '''凛ちゃんは,,,です''' 
-  s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['kotori_ss', 'kotoli_h_bot', 'Smallbirds_poke', 'haijin_kotori_', 'yanderekotori_bot', 'umikiti_kotori'], contains = '')
-  p(len(s_ls)) 
-  learn_trigram(s_ls, character = 'ことり', over = 0)
+  text = '''足利将軍は、変態'''
+  # s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico'], contains = '')
+  # p(len(s_ls)) 
+  # learn_trigram(s_ls, character = 'にこ', over = 0)
+  p(DialogObject(text).dialog())
   # s_ls = ['足利さんに送信して']
   # trigram_main(s_ls[0], is_debug = True, character = '')
   # p(TFIDF.extract_keywords_from_text(text))

@@ -66,14 +66,18 @@ class TwtrTools:
 				time.sleep(100)
 				return True
 				# stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
+	def get_status(self, status_id):
+		try:
+			return self.twtr_api.get_status(id = status_id)
+		except tweepy.error.TweepError as e:
+			return None
 	def send(self, ans, screen_name = '', status_id = '', imgfile = '', mode = 'dm', try_cnt = 0):
 		if mode == 'dm':
 			return self.send_direct_message(ans = ans, screen_name = screen_name)
 		elif mode == 'open':
-			return self.tweet(ans = ans, screen_name = '', status_id = '', imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
+			return self.send_tweet(ans = ans, screen_name = '', status_id = '', imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
 		else:
-			return self.tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
-
+			return self.send_tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
 	def tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0):
 		p('old')
 		return self.send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False, try_cnt = 0)
@@ -105,7 +109,6 @@ class TwtrTools:
 			# 140字越えの際は、分割ツイート
 			if is_split:
 				if screen_name:
-					# self.tweet(''.join(['...', ans[139:]]), screen_name = screen_name, status_id = status_id, tmp = tmp)
 					try_cnt += 1
 					return self.tweet(''.join(['...', ans[139:]]), screen_name = screen_name, status_id = status_id, is_debug = is_debug, try_cnt = try_cnt)
 				else:
@@ -117,7 +120,6 @@ class TwtrTools:
 			p(e)
 			if e.response and e.response.status == 403:
 				print('403')
-				# tmp['tweetStatus']['tempStop_since'] = tmp["clocks"]['now']
 				return False
 			else:
 				return True
@@ -203,12 +205,13 @@ class TwtrTools:
 		except tweepy.error.TweepError as e:
 			if e.api_code == '34':
 				if username == self.bot_id:
-					self.is_create_list_success(name = listname)
+					p(listname, 'MAKE the LIST!!')
+			# 		self.is_create_list_success(name = listname)
 			return []
 		except:
 			return []
-	# def get_lists(self):
-	# 	return [UserObject.__dict__ for UserObject in tweepy.Cursor(self.twtr_api.lists, username, listname).items()]
+	def get_followers_all(self, screen_name):
+		return self.twtr_api.followers(screen_name = screen_name)
 	def give_fav(self, status_id):
 		try:
 			self.twtr_api.create_favorite(id = status_id)
@@ -287,13 +290,11 @@ class TwtrTools:
 			return False
 
 if __name__ == '__main__':
-	twf = TwtrTools('LiveAI_Rin')
+	twf = TwtrTools('LiveAI_Maki')
 	# twf.Stream()
 	# ans = twf.get_listmembers_all(username = 'LiveAI_Rin' , listname = 'BOaaa')
-	ans = twf.twtr_api.me()
-	p(ans)
-	print(ans.description)
-
+	# ans = twf.get_status(status_id = '715662952372699136')
+	# p(ans._json['user']['screen_name'])
 	# twf.imitate(screen_name = 'LiveAI_Umi', DIR = DIRusers)
 	# twf.send(ans = 'testです', screen_name = '_mmkm', status_id = '', imgfile = '', mode = 'dm',  trycnt = 0)
 
