@@ -964,7 +964,10 @@ class StreamResponseFunctions(MyObject):
 			userinfo['exp'] += 10
 		except:
 			userinfo['exp'] = 0
-		operate_sql.save_userinfo(userinfo)
+		try:
+			operate_sql.save_userinfo(userinfo)
+		except:
+			p('userinfo save error')
 		return tweet_status
 
 	def is_not_ignore(self, status):
@@ -1010,7 +1013,6 @@ class StreamResponseFunctions(MyObject):
 			return False
 	def on_status_main(self, status):
 		try:
-			# self.sync_json(json = None, is_save = False)
 			if self.is_not_ignore(status):
 				self.stats.TL_cnt += 1
 				status_id = status['id_str']
@@ -1052,7 +1054,8 @@ class StreamResponseFunctions(MyObject):
 		except Exception as e:
 			logger.debug(e)
 			logger.debug('+++++timeline_status+++++++')
-		return True
+		else:
+			return True
 	def on_direct_message_main(self, status):
 		try:
 			# self.sync_json(is_save = False)
@@ -1075,21 +1078,20 @@ class StreamResponseFunctions(MyObject):
 					tweet_status = self.main(status, mode = 'dm', userinfo = userinfo, is_new_user = is_new_user)
 				except Exception as e:
 					logger.debug(e)
-			# self.sync_json()
 		except Exception as e:
 			logger.debug(e)
 			logger.debug('++++direct_message++++++')
-		return True
+		else:
+			return True
 
 	def on_event_main(self, status):
 		p(status['event'])
-		p(status)
 		try:
-			if status['event'] == 'favorite':
-				if status['target']['screen_name'] == self.bot_id:
-					text = _.clean_text(status['target_object']['text'])
-					operate_sql.save_phrase(phrase = text, author = status['source']['name'], status = 'favorite', character = 'sys',s_type = 'favorite')
-			elif status['event'] == 'unfollow':
+			# if status['event'] == 'favorite':
+			# 	if status['target']['screen_name'] == self.bot_id:
+			# 		text = _.clean_text(status['target_object']['text'])
+			# 		operate_sql.save_phrase(phrase = text, author = status['source']['name'], status = 'favorite', character = 'sys',s_type = 'favorite')
+			if status['event'] == 'unfollow':
 				p('unfollow')
 				if status['target']['screen_name'] == self.bot_id:
 					screen_name = status['source']['screen_name']
@@ -1105,7 +1107,7 @@ class StreamResponseFunctions(MyObject):
 						return True
 					if status['source']['favourites_count'] < 20:
 						return True
-					if status['source']['listed_count'] / status['source']['followers_count'] < 0.02:
+					if status['source']['listed_count'] / status['source']['followers_count'] < 0.015:
 						is_followback_ok = False
 					ff_rate = status['source']['followers_count'] / status['source']['friends_count']
 					if ff_rate < 0.6:
@@ -1131,7 +1133,8 @@ class StreamResponseFunctions(MyObject):
 		except Exception as e:
 			logger.debug(e)
 			logger.debug('++++event++++++')
-		return True
+		else:
+			return True
 
 	def implement_tasks(self, task):
 		def task_restart(is_noised = True):
@@ -1294,31 +1297,21 @@ def main(is_experience = True):
 	if not is_experience:
 		umi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Umi', args=('LiveAI_Umi', ))
 		umi_thread.start()
-		time.sleep(10)
 		honoka_thread = threading.Thread(target = live_intel, name = 'LiveAI_Honoka', args=('LiveAI_Honoka', ))
 		honoka_thread.start()
-		time.sleep(10)
 		kotori_thread = threading.Thread(target = live_intel, name = 'LiveAI_Kotori', args=('LiveAI_Kotori', ))
 		kotori_thread.start()
-		time.sleep(10)
 		rin_thread = threading.Thread(target = live_intel, name = 'LiveAI_Rin', args=('LiveAI_Rin', ))
 		rin_thread.start()
-		time.sleep(10)
 		maki_thread = threading.Thread(target = live_intel, name = 'LiveAI_Maki', args=('LiveAI_Maki', ))
 		maki_thread.start()
-		time.sleep(10)
 		hanayo_thread = threading.Thread(target = live_intel, name = 'LiveAI_Hanayo', args=('LiveAI_Hanayo', ))
 		hanayo_thread.start()
-		time.sleep(10)
 		nozomi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
 		nozomi_thread.start()
 		eli_thread = threading.Thread(target = live_intel, name = 'LiveAI_Eli', args=('LiveAI_Eli', ))
 		eli_thread.start()
-		time.sleep(10)
 		nico_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nico', args=('LiveAI_Nico', ))
-		nico_thread.start()
-		time.sleep(10)
-		nico_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
 		nico_thread.start()
 	else:
 		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
@@ -1326,8 +1319,10 @@ def main(is_experience = True):
 if __name__ == '__main__':
 	try:
 		argvs = sys.argv
-		cmd = argvs[2]
-	except:
+		p(argvs)
+		cmd = argvs[1]
+	except Exception as e:
+		p(e)
 		cmd = 0
 	main(is_experience = cmd)
 

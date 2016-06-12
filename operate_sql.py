@@ -5,27 +5,47 @@ from sql_models import *
 import dialog_generator
 import _
 from _ import p, d, MyObject, MyException
-def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}):
+def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}, retry_cnt = 0):
 	try:
 		core_sql.create_tables([Stats], True)
 		with core_sql.transaction():
 			t = Stats(**stats_dict)
 			t.save()
 			core_sql.commit()
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return save_stats(stats_dict, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return False
+	else:
+		return True
 
-def get_stats(whose = 'sys', status = '', n = 100):
+def get_stats(whose = 'sys', status = '', n = 100, retry_cnt = 0):
 	try:
 		with core_sql.transaction():
 			stats_data = Stats.select().where(Stats.whose ==  whose, Stats.status == status).order_by(Stats.time.desc()).limit(n)
 			data_ls = [(data.number, data.time) for data in stats_data]
 			return data_ls
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_stats(whose, status, n, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
-def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False):
+		raise Exception
+	except Exception as e:
+		d(e)
+		return []
+def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False, retry_cnt = 0):
 	# core_sql.create_tables([CoreInfo], True)
 	try:
 		with core_sql.transaction():
@@ -37,12 +57,19 @@ def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic =
 				ci.save()
 				return ci
 			return core_info
-	except Exception as e:
-		print(e)
-		if e == 'database is locked':
-			p('dddddddddd')
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_core_info(whose_info, info_label, standard_dic, is_update, retry_cnt = retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
-def save_task(taskdict = {'who':'_umiS', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()+timedelta(hours = 9)}):
+		raise Exception
+	except Exception as e:
+		d(e)
+		return CoreInfo(**standard_dic)
+def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()+timedelta(hours = 9)}):
 	try:
 		core_sql.create_tables([Task], True)
 		with core_sql.transaction():
@@ -54,7 +81,7 @@ def save_task(taskdict = {'who':'_umiS', 'what': 'call', 'to_whom': '_apkX', 'wh
 		print(e)
 		core_sql.rollback()
 
-def search_tasks(when = datetime.now(), who = '_umiS', n = 10):
+def search_tasks(when = datetime.now(), who = '_mmKm', n = 10, retry_cnt = 0):
 	try:
 		with core_sql.transaction():
 			active = Task.select().where(~Task.status == 'end')
@@ -64,11 +91,20 @@ def search_tasks(when = datetime.now(), who = '_umiS', n = 10):
 				tasks = active.where(Task.when < when, Task.who == who).order_by(Task.id.desc()).limit(n)
 			tasklist = [task.__dict__['_data'] for task in tasks]
 			return tasklist
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return search_tasks(when, who, n, retry_cnt = retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return []
 
-def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
+def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}, retry_cnt = 0):
 	try:
 		with core_sql.transaction():
 			if who_ls:
@@ -86,12 +122,21 @@ def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'w
 				else:
 					task = Task.update(**taskdict).where(Task.id == taskid, Task.what << kinds)
 			task.execute()
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return update_task(taskid, who_ls, kinds, taskdict, retry_cnt = retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return False
 
 #####twlog_sql#######
-def save_tweet_status(status, tmp):
+def save_tweet_status(status, tmp, retry_cnt = 0):
 	try:
 		twlog_sql.create_tables([Tweets], True)
 		with twlog_sql.transaction():
@@ -107,22 +152,42 @@ def save_tweet_status(status, tmp):
 				updatedAt = datetime.utcnow()
 			)
 			twlog_sql.commit()
-			# print('SAVED]')
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return save_tweet_status(status, tmp, retry_cnt = retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		twlog_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return False
+	else:
+		return True
 
-def get_tweet_dialog(status_id = 1):
+def get_tweet_dialog(status_id = 1, retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([Tweets], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with twlog_sql.transaction():
 			return Tweets.select().where(Tweets.status_id == status_id).get().__dict__['_data']
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_tweet_dialog(status_id, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		twlog_sql.rollback()
-		return ''
+		raise Exception
+	except Exception as e:
+		d(e)
+		return False
+	else:
+		return True
 
-def save_tweet_dialog(status, tmp, logtext = ''):
+def save_tweet_dialog(status, tmp, logtext = '', retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with twlog_sql.transaction():
@@ -150,12 +215,22 @@ def save_tweet_dialog(status, tmp, logtext = ''):
 			)
 			twlog_sql.commit()
 			return True
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return save_tweet_dialog(status, tmp, logtext, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		twlog_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
 		return False
+	else:
+		return True
 
-def get_twlog_list(n = 1000, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], contains = ''):
+def get_twlog_list(n = 1000, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], contains = '', retry_cnt = 0):
 	try:
 		# twlog_sql.create_tables([Tweets], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with twlog_sql.transaction():
@@ -165,14 +240,23 @@ def get_twlog_list(n = 1000, UserList = ['sousaku_umi', 'umi0315_pokemon'], Blac
 			 	tweets = Tweets.select().where(Tweets.screen_name << UserList , ~Tweets.screen_name << BlackList, ~Tweets.text.contains('RT'), ~Tweets.text.contains('【')).order_by(Tweets.createdAt.desc()).limit(n)
 		tweetslist = [_.clean_text(tweet.text) for tweet in tweets]
 		return tweetslist
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_twlog_list(n, UserList, BlackList, contains, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		twlog_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return []
 
 def getPhrase(s_type = '', status = '', n = 10, character = 'sys'):
 	p('old get_phrase')
 	return get_phrase(s_type = s_type, status = status, n = n, character = character)
-def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
+def get_phrase(s_type = '', status = '', n = 10, character = 'sys', retry_cnt = 0):
 	try:
 		with core_sql.transaction():
 			if character == 'sys':
@@ -188,15 +272,22 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
 				return ''.join([np.random.choice([p.phrase for p in Ps]), '\n(代:[', status, ']of\'', character, '\')'])
 			else:
 				return np.random.choice([p.phrase for p in Ps])
-
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_phrase(s_type, status, n, character, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
 		return ''.join(['...:[', status, '] by \'', character, '\''])
 def savePhrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys'):
 	p('old save_phrase')
 	return save_phrase(s_type = s_type, author = author, phrase = phrase, status = status, n = n, character = character)
-def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys'):
+def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys', retry_cnt = 0):
 	try:
 		core_sql.create_tables([Phrases], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with core_sql.transaction():
@@ -209,15 +300,22 @@ def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', 
 				P.ok_cnt = 1
 				P.ng_cnt = 0
 				P.author = author
-				# P.createdAt
 				P.character = character
 				P.save()
 				core_sql.commit()
 				return True
 			return True
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return save_phrase(phrase, author, status, s_type, character, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
 		return False
 
 def eval_phrase(phrase, ok_add = 0, ng_add = 1):
@@ -237,19 +335,13 @@ def eval_phrase(phrase, ok_add = 0, ng_add = 1):
 def get_userinfo(screen_name):
 	return read_userinfo(screen_name = screen_name)
 
-def read_userinfo(screen_name):
+def read_userinfo(screen_name, retry_cnt = 0):
 	try:
 		# core_sql.create_tables([Users], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with core_sql.transaction():
-			try:
-				userinfo, is_created = Users.get_or_create(screen_name = screen_name)
-			except Exception as e:
-				if screen_name == 'h_y_ok':
-					screen_name = '例外h_y_ok'
-					userinfo, is_created = Users.get_or_create(screen_name = screen_name)
-				else:
-					print(e)
-					is_created = False
+			if screen_name == 'h_y_ok':
+				screen_name = '例外h_y_ok'
+			userinfo, is_created = Users.get_or_create(screen_name = screen_name)
 			if is_created:
 				userinfo.name = screen_name
 				userinfo.nickname = screen_name
@@ -265,11 +357,20 @@ def read_userinfo(screen_name):
 			except:
 				userinfodata = ''
 			return userinfodata, is_created
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return read_userinfo(screen_name, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		core_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return '', False
 
-def save_userinfo(userstatus):
+def save_userinfo(userstatus, retry_cnt = 0):
 	try:
 		# core_sql.create_tables([Tweets], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with core_sql.transaction():
@@ -281,10 +382,19 @@ def save_userinfo(userstatus):
 				return False, userstatus
 			core_sql.commit()
 			return True, userstatus
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return save_userinfo(userstatus, retry_cnt)
+	except IntegrityError as e:
+		d(e)
+		core_sql.rollback()
+		raise Exception
 	except Exception as e:
-	  core_sql.rollback()
-	  return False, userstatus
-def get_wordnet_result(lemma):
+		d(e)
+		return False, userstatus
+def get_wordnet_result(lemma, retry_cnt = 0):
 	n = 10
 	langs_ls = ['jpn', 'eng']
 	langs_ls = ['jpn']
@@ -309,9 +419,18 @@ def get_wordnet_result(lemma):
 			wn_relation = {link: words_ls for link, words_ls in [(synlink.link, convert_synset_into_words(target_synset = synlink.synset2))  for synlink in synlinks] if words_ls}
 			wn_relation['coordinate'] = coordinated_lemma_ls
 			return wn_relation
-	except Exception as e:
-		print(e)
+	except OperationalError as e:
+		retry_cnt += 1
+		time.sleep(0.3*retry_cnt)
+		d(e, retry_cnt)
+		return get_wordnet_result(lemma, retry_cnt)
+	except IntegrityError as e:
+		d(e)
 		wordnet_sql.rollback()
+		raise Exception
+	except Exception as e:
+		d(e)
+		return None
 class BotProfile(MyObject):
 	def __init__(self, bot_id = 'a'):
 		self.bot_id = bot_id
@@ -331,17 +450,19 @@ class BotProfile(MyObject):
 		self.abs_icon_filename = get_core_info(whose_info = self.bot_id, info_label = 'abs_icon_filename', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 		self.abs_banner_filename = get_core_info(whose_info = self.bot_id, info_label = 'abs_banner_filename', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 if __name__ == '__main__':
-	# umi = read_userinfo('h_y_ok')
-	# umi = get_twlog_list(n = 10)
+	# a = read_userinfo('h_y_okaaaaaaaaaaaa')
+	a = BotProfile('LiveAI_Alpaca')
+	# a = get_twlog_list(UserList = ['kotori_ss', 'kotoli_h_bot', 'Smallbirds_poke', 'haijin_kotori_', 'yanderekotori_bot', 'umikiti_kotori'], n = 10)
 	# umi = get_phrase(status = 'ぬるぽ', n = 1)
 	# p(umi)
-	# a= get_wordnet_result('米')
-	bp = BotProfile('a')
+	# a= get_wordnet_result('ううううううううう')
+	# bp = BotProfile('a')
 	# bp.name = 'てすとおととおお'
 	# bp.save()
-	p(bp)
+	# p(bp)
+	# a = get_core_info(whose_info = 'LiveAI_Nick', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)
 	# a =read_userinfo(screen_name = 'masaMikam')[0]._data
-	# p(a)
+	p(a)
 	status = {'favorite_count': 0, 'created_at': 'Wed Feb 17 14:54:01 +0000 2016', 'contributors': None, 'truncated': False, 'in_reply_to_user_id_str': None, 'retweet_count': 0, 'id': 699970059683414016, 'in_reply_to_status_id_str': None, 'geo': None, 'entities': {'hashtags': [], 'urls': [], 'symbols': [], 'user_mentions': []}, 'id_str': '691170059683414016', 'in_reply_to_screen_name': None, 'is_quote_status': False, 'timestamp_ms': '1455720841700', 'coordinates': None, 'in_reply_to_status_id': None, 'filter_level': 'low', 'retweeted': False, 'in_reply_to_user_id': None, 'source': '<a href="http://twitter.com/download/iphone" rel="nofollow">Twitter for iPhone</a>', 'favorited': False, 'user': {'protected': False, 'created_at': 'Sun Mar 31 01:35:13 +0000 2013', 'utc_offset': 32400, 'favourites_count': 27, 'follow_request_sent': None, 'following': None, 'profile_image_url': 'http://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'profile_background_tile': False, 'description': '名前:つゆり きさめ/学生ラブライバー/絶叫勢/ぼっち勢/海未推し/善子推し(仮)/このすば/めぐみんはいいぞ/内田彩/詳細はツイプロ/+aで最近FFの比例がおかしい事に気がついたんでスパムを除く人に見つけ次第フォロー返してます。', 'profile_text_color': '333333', 'friends_count': 1481, 'time_zone': 'Tokyo', 'profile_sidebar_border_color': 'BDDCAD', 'profile_image_url_https': 'https://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'screen_name': 'tuyuri_kisame', 'default_profile_image': False, 'statuses_count': 40262, 'name': '栗花落 樹雨', 'is_translator': False, 'profile_background_image_url_https': 'https://abs.twimg.com/images/themes/theme16/bg.gif', 'followers_count': 1921, 'location': '神奈川県東部', 'geo_enabled': False, 'verified': False, 'notifications': None, 'profile_banner_url': 'https://pbs.twimg.com/profile_banners/1317490188/1455626298', 'listed_count': 33, 'profile_background_color': '9AE4E8', 'profile_sidebar_fill_color': 'DDFFCC', 'profile_link_color': '0084B4', 'default_profile': False, 'url': 'http://twpf.jp/tuyuri_kisame', 'profile_use_background_image': True, 'contributors_enabled': False, 'id': 1317490188, 'lang': 'ja', 'id_str': '1317490188', 'profile_background_image_url': 'http://abs.twimg.com/images/themes/theme16/bg.gif'}, 'place': None, 'text': 'トサカのないことりちゃん…( ˘ω˘ )', 'lang': 'ja'}
 	# save_tweet_status(status)
 	s = '酒'
