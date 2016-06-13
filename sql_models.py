@@ -6,7 +6,7 @@ DATADIR = '/Users/masaMikam/Desktop/Data'
 twlog_sql_PLACE = DATADIR + '/SQL/sys.twlog'
 core_sql_PLACE = DATADIR + '/SQL/sys.info'
 talk_sql_PLACE = DATADIR + '/SQL/sys.talk'
-wordnet_sql_PLACE =DATADIR + '/lib/wnjpn.db'
+wordnet_sql_PLACE = DATADIR + '/lib/wnjpn.db'
 
 from playhouse.sqlite_ext import SqliteExtDatabase
 core_sql = SqliteExtDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist')

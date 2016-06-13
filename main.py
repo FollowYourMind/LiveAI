@@ -1354,11 +1354,11 @@ class StreamResponseFunctions(MyObject):
 			'followback_check': 15,
 			'update.lists': 30,
 			'update_userprofile' : 10,
-			'save_stats': 20,
-			# 'restart_program': 60
+			'save_stats': 20
 			}
 		if self.bot_id == 'LiveAI_Umi':
-			task_duration_dic['reconnect_wifi'] = 30
+			task_duration_dic['reconnect_wifi'] = 3
+			# task_duration_dic['restart_program'] = 60
 		def save_task(task_name, duration_min):
 			rand_start_min = np.random.randint(0, 20)
 			operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': task_name, 'to_whom': '', 'tmptext': str(duration_min), 'when': self.get_time(minutes = rand_start_min)})
@@ -1392,7 +1392,6 @@ def live_intel(bot_id):
 	LiveAI_thread = threading.Thread(target = stream, name = bot_id + '_LiveAI_program', args=(bot_id, ))
 	LiveAI_thread.start()
 	task_manager_thread = threading.Thread(target = task_manager, name = bot_id + '_task_manager', args=(bot_id, 30, ))
-	# task_manager_thread = threading.Timer(30, target = task_manager, name = bot_id + '_task_manager', args=(bot_id))
 	task_manager_thread.start()
 def main(is_experience = True):
 	if not is_experience:

@@ -130,6 +130,9 @@ class Ping(object):
               self.is_connectable = False
 def reconnect_wifi():
     try:
+        if Ping('google.com').is_connectable:
+            p('ping is connecting. reconnect-program -> finished!!!!')
+            return True
         networksetup_cmd = '/usr/sbin/networksetup'
         optionargs = ['off']
         args = [networksetup_cmd, '-setairportpower', 'en0']
@@ -337,9 +340,9 @@ class a(MyObject):
     self.b = 1
 if __name__ == '__main__':
   # adjustSize(DIR)
-  s = '@yohane_t  最近絵里が可愛いです……'
-  p(s)
-  restart_program()
+  # s = '@yohane_t  最近絵里が可愛いです……'
+  # p(s)
+  reconnect_wifi()
   # a = a()
   # a = BotProfile()
   # p(a)

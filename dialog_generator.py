@@ -312,15 +312,22 @@ class TrigramMarkovChain(MyObject):
                 if '助詞,' in metaframe:
                     metaframe = [''.join([f, '助詞']) if f[-1] != '>' else f for f in metaframe.split('助詞,')][0]
                 self.selected_character_database = TrigramModel.select().where(TrigramModel.character == self.character)
+                if not word:
+                    try:
+                        Ws = self.selected_character_database.where(TrigramModel.W1 == '<BOS>', TrigramModel.P2 == '名詞').order_by(TrigramModel.cnt.desc())
+                        word = self.choose_randomword(Ws, place = 2)
+                    except Exception as e:
+                        word = '...'
                 try:
                     backward_ans = self.generate_backward(startWith = word)
                 except Exception as e:
-                    p(e)
-                # backward_ans = ''
+                    d(e)
+                    backward_ans = ''
                 try:
                     forward_ans = self.generate_forward(word, Plist = metaframe)
                 except Exception as e:
-                    p(e)
+                    d(e)
+                    forward_ans = ''
                 ans = ''.join([backward_ans, forward_ans])
                 ans = ans.replace('<BOS>', '').replace('<EOS>', '')
         except Exception as e:
@@ -344,27 +351,28 @@ class TrigramMarkovChain(MyObject):
         try:
             Ms = mSentence.select().where(mSentence.framework.contains('<BOS>,名詞,助詞')).order_by(mSentence.cnt.desc()).limit(n)
             return self.choose_randomword(Ms, place = 10)
-        except Exception as e:
-            p(e)
+        except DoesNotExist:
+            pass
     def get_same_hinshi(self, hinshi):
             W = ''
+            n = 100
             # print('品詞一致1')
             try:
-                Ws = self.selected_character_database.where(TrigramModel.P1 == P1).order_by(TrigramModel.cnt.desc()).limit(n)
+                Ws = self.selected_character_database.where(TrigramModel.P1 == hinshi).order_by(TrigramModel.cnt.desc()).limit(n)
                 W = self.choose_randomword(Ws, place = 1)
             except Exception as e:
                 pass
             if not W:
                 # print('品詞一致2')
                 try:
-                    Ws = self.selected_character_database.where(TrigramModel.P2 == P2).order_by(TrigramModel.cnt.desc()).limit(n)
+                    Ws = self.selected_character_database.where(TrigramModel.P2 == hinshi).order_by(TrigramModel.cnt.desc()).limit(n)
                     W = self.choose_randomword(Ws, place = 2)
                 except Exception as e:
                     pass
             if not W:
                 # print('品詞一致3')
                 try:
-                    Ws = self.selected_character_database.where(TrigramModel.P3 == P3).order_by(TrigramModel.cnt.desc()).limit(n)
+                    Ws = self.selected_character_database.where(TrigramModel.P3 == hinshi).order_by(TrigramModel.cnt.desc()).limit(n)
                     W = self.choose_randomword(Ws, place = 3)
                 except Exception as e:
                     pass
@@ -377,13 +385,7 @@ class TrigramMarkovChain(MyObject):
         if startWith:
             ans = ['<BOS>', startWith]
         else:
-            try:
-                Ws = self.selected_character_database.where(TrigramModel.W1 == ans[0], TrigramModel.P2 == Plist[1]).order_by(TrigramModel.cnt.desc())
-                W = self.choose_randomword(Ws, place = 2)
-            except Exception as e:
-                W = ['...']
-                i+= 1
-            ans = ['<BOS>', W]
+            ans = ['<BOS>']
         while True:
             pre1 = ans[i]
             i1 = i+1
@@ -401,7 +403,6 @@ class TrigramMarkovChain(MyObject):
                     Ws = self.selected_character_database.where(TrigramModel.W1 == pre1, TrigramModel.W2 == pre2, TrigramModel.P3 == P3, TrigramModel.P2 == P2, TrigramModel.P1 == P1).order_by(TrigramModel.cnt.desc()).limit(n)
                     W = self.choose_randomword(Ws, place = 3)
                 except Exception as e:
-                    p(e)
                     pass
             if not W and is_correct_with_hinshi:
             # print('2単語一致前方1品詞一致')
@@ -409,7 +410,6 @@ class TrigramMarkovChain(MyObject):
                     Ws = self.selected_character_database.where(TrigramModel.W1 == pre1, TrigramModel.W2 == pre2, TrigramModel.P3 == P3, TrigramModel.P2 == P2).order_by(TrigramModel.cnt.desc()).limit(n)
                     W = self.choose_randomword(Ws, place = 3)
                 except Exception as e:
-                    p(e)
                     pass
             if not W and is_correct_with_hinshi:
                 # print('2単語一致品詞一致')
@@ -438,7 +438,6 @@ class TrigramMarkovChain(MyObject):
                 # print('1単語一致2')
                 try:
                     Ws = self.selected_character_database.where(TrigramModel.W1 == pre1).order_by(TrigramModel.cnt.desc()).limit(n)
-                    W = self.choose_randomword(Ws, place = 2)
                 except Exception as e:
                     if i == 0:
                         return QuestionPhrase.replace('<KEY>', pre2)
@@ -973,7 +972,7 @@ class DialogObject(MyObject):
           if ans:
             character = 'sys'
       if not ans:
-        if np.random.rand() < 0.7:
+        if np.random.rand() < 0.8:
           pass
         elif 'WN' in tools:
           ans = wordnet_dialog(kw = kw)
@@ -1027,8 +1026,8 @@ class DialogObject(MyObject):
     ans = ans.replace('Threetwo', '').replace('Three', '').replace('one', '').replace('RaidOntheCity', '')
     if not ans[-1] in {'。', '!', '?', '！', '？'}:
       ans = ''. join([ans, '。'])
-    if character != 'sys':
-      ans = ''.join([character, '「', ans, '」'])
+    # if character != 'sys':
+    #   ans = ''.join([character, '「', ans, '」'])
     return ans
 
 if __name__ == '__main__':
@@ -1038,11 +1037,11 @@ if __name__ == '__main__':
   sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
   command = ''
-  text = '''足利将軍は、変態'''
+  text = ''''''
   # s_ls = operate_sql.get_twlog_list(n = 1000000, UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico'], contains = '')
   # p(len(s_ls))
   # learn_trigram(s_ls, character = 'にこ', over = 0)
-  p(DialogObject(text).dialog())
+  p(DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'MC', username = '@〜〜'))
   # s_ls = ['足利さんに送信して']
   # trigram_main(s_ls[0], is_debug = True, character = '')
   # p(TFIDF.extract_keywords_from_text(text))
