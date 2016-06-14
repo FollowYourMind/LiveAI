@@ -642,12 +642,10 @@ def trigram_main(s, is_debug = False, character = 'sys'):
         triMA = [(ma[i], ma[i+1], ma[i+2]) for i in range(wcnt-2)]
         if is_debug:
             p(triMA)
-        # if is_learn:
-        #     [save_trigram(ma, character = character) for ma in triMA]
         return triMA
     except Exception as e:
-        p(e)
-        return False
+        d(e, 'trigram_main')
+        return None
 # def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
 #     i = 1
 #     proc = 2
@@ -702,144 +700,96 @@ def trigram_main(s, is_debug = False, character = 'sys'):
 #         return True
 def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     i = 1
-    proc = 2
+    proc = 4
     import queue
     import random
     import time
     def sender(q, target_ls, process_id):
         time.sleep(process_id)
         try:
-            with talk_sql.transaction():
-                target_length = len(target_ls)
-                ini = target_length * process_id // proc
-                fin = target_length * (process_id+1) // proc
-                split_target_ls = target_ls[ini:fin]
-                cnt = 0
-                for s in split_target_ls:
-                    process = multiprocessing.current_process()
-                    p('_______', ''.join([process.name, str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
-                    p(s)
+            # with talk_sql.transaction():
+            target_length = len(target_ls)
+            ini = target_length * process_id // proc
+            fin = target_length * (process_id+1) // proc
+            split_target_ls = target_ls[ini:fin]
+            cnt = 0
+            for s in split_target_ls:
+                process = multiprocessing.current_process()
+                p('_______', ''.join([process.name, '=>', str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
+                p(s)
+                try:
+                    trigrams = trigram_main(s, is_debug = False, character = 'sys')
+                    if not trigrams:
+                        raise Exception
                     try:
-                        trigrams = trigram_main(s, is_debug = False, character = 'sys')
                         for trigram in trigrams:
-                            try:
-                                q.put(trigram)
-                            except queue.Full:
-                                p('%s: put() timed out. Queue is Full' % process.name)
-                            # time.sleep(random.random())
-                            q.close()
+                            q.put(trigram, timeout = 5)
+                    except queue.Full:
+                       d('%s: put() timed out. Queue is Full' % process.name)
                     except Exception as e:
-                        d(e, '_learn_trigram1')
-                        pass
-                    else:
-                        talk_sql.commit()
-                        cnt += 1
-        except IntegrityError as e:
-            d(e, '_learn_trigram2')
-            talk_sql.rollback()
-            raise Exception
+                       d(e, 'q.put()')
+                except Exception as e:
+                    d(e, '_learn_trigram1')
+                    pass
+                else:
+                    # talk_sql.commit()
+                    cnt += 1
+        # except IntegrityError as e:
+        #     d(e, '_learn_trigram2')
+        #     talk_sql.rollback()
+        #     raise Exception
         except Exception as e:
             d(e)
             return None
-    def receiver(q):
-        process = multiprocessing.current_process()
+        else:
+            q.close()
+            q.join_thread()
+    def receiver(q, process_id):
         while True:
             try:
-                trigram = q.get()
-                p(process.name, trigram)
-                # save_trigram_in_transaction(trigram, character = character)
-                time.sleep(random.random())
+                trigram = q.get(timeout = 5)
+                p(trigram)
+                if trigram:
+                    with talk_sql.transaction():
+                        save_trigram_in_transaction(trigram, character = character)
+                        talk_sql.commit()
+                        p('____Receiver-', str(process_id), 'saved!!')
+                # time.sleep(random.random())
             except queue.Empty:
                 # queue が空だったらループを抜ける.
-                print('%s: get() timed out. Queue is Empty' % process.name)
+                d('get() timed out. Queue is Empty')
                 break
             except Exception as e:
                 d(e)
     ##
     target_ls = s_ls[over:]
-    q = multiprocessing.Queue(maxsize=100)
+    q = multiprocessing.Queue(maxsize=0)
     senders = []
     for i in range(proc):
-        p(i)
         process = multiprocessing.Process(target = sender, args=(q, target_ls, i), name='Sender-%02d' % i)
         senders.append(process)
         process.start()
     receivers = []
-    for i in range(1):
-        process = multiprocessing.Process(target=receiver, args=(q,), name='Receiver-%02d' % i)
-        receivers.append(process)
-        process.start()
+    i = 1
+    process = multiprocessing.Process(target=receiver, args=(q, i), name='Receiver1')
+    receivers.append(process)
+    process.start()
+    # for i in range(1):
     for s_r_process in senders + receivers:
         s_r_process.join()
-    # def _learn_trigram(target_ls, process_id, lc):
-    #     time.sleep(process_id)
-    #     try:
-    #         with talk_sql.transaction():
-    #             target_length = len(target_ls)
-    #             ini = target_length * process_id // proc
-    #             fin = target_length * (process_id+1) // proc
-    #             split_target_ls = target_ls[ini:fin]
-    #             cnt = 0
-    #             for s in split_target_ls:
-    #                 p('_______', ''.join(['Process:', str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
-    #                 p(s)
-    #                 try:
-    #                     trigrams = trigram_main(s, is_debug = False, character = 'sys')
-    #                     for trigram in trigrams:
-    #                         lc.acquire()
-    #                         save_trigram_in_transaction(trigram, character = character)
-    #                         lc.release()
-    #                 except Exception as e:
-    #                     d(e, '_learn_trigram1')
-    #                     pass
-    #                 else:
-    #                     talk_sql.commit()
-    #                     cnt += 1
-    #     except IntegrityError as e:
-    #         d(e, '_learn_trigram2')
-    #         talk_sql.rollback()
-    #         raise Exception
-    #     except Exception as e:
-    #         d(e)
-    #         return None
-    # try:
-    #     # talk_sql.create_tables([TrigramModel], True)
-    #     lc = multiprocessing.Lock()
-    #     target_ls = s_ls[over:]
-    #     processes = [ 
-    #         multiprocessing.Process(target=_learn_trigram, args=(target_ls, 0, lc)),
-    #         multiprocessing.Process(target=_learn_trigram, args=(target_ls, 1, lc)),
-    #         # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 2, lc)),
-    #         # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 3, lc)),
-    #     ]
-    #     for process in processes:
-    #         process.start()
-    # except Exception as e:
-    #     # talk_sql.rollback()
-    #     return False
-    # else:
-    #     p('complete!! all trigram-learning')
-    #     return True
 def save_trigram_in_transaction(tri, character = 'sys', retry_cnt = 0):
     ma1 = tri[0]
     ma2 = tri[1]
     ma3 = tri[2]
     try:
-        try:
-            T =  TrigramModel.get(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0])
-        except DoesNotExist:
-            T = TrigramModel(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1], cnt = 0, posi = 1, nega = 0)
-        else:
-            T.cnt = T.cnt +1
-            T.save()
-    # except OperationalError as e:
-    #     retry_cnt += 1
-    #     if retry_cnt > 5:
-    #         p(tri[0][0])
-    #         return None
-    #     time.sleep(0.1)
-    #     d(e, retry_cnt, 'save_trigram_in_transaction, op')
-    #     return save_trigram_in_transaction(tri, character, retry_cnt)
+        T, is_created = TrigramModel.get_or_create(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1], defaults={'cnt' : 0, 'posi':1 , 'nega':0})
+        T.cnt += 1
+        T.save()
+    except OperationalError as e:
+        retry_cnt += 1
+        time.sleep(0.1)
+        d(e, retry_cnt, 'save_trigram_in_transaction, op')
+        return save_trigram_in_transaction(tri, character, retry_cnt)
     except IntegrityError as e:
         d(e, 'save_trigram_in_transaction_ie')
         talk_sql.rollback()
@@ -1201,10 +1151,10 @@ if __name__ == '__main__':
     # command = ''
     text = ''''''
     # Nico = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
-    s_ls = operate_sql.get_twlog_list(n = 10, UserList = [], contains = '')
+    s_ls = operate_sql.get_twlog_list(n = 50000, UserList = [], contains = '')
     # p(s_ls)
-    # s_ls = []
-    learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5)
+    # s_ls = ['足利さんに送信して']
+    learn_trigram(s_ls, character = 'sys', over = 10000, save_freqcnt = 5)
     # text = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'MC', username = '@〜〜')
     # p(text)
     # s_ls = ['足利さんに送信して']
