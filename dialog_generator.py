@@ -650,8 +650,8 @@ def trigram_main(s, is_debug = False, character = 'sys'):
         return False
 def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     i = 1
-    proc = 2
-    def _learn_trigram(target_ls, process_id):
+    proc = 4
+    def _learn_trigram(target_ls, process_id, lc):
         try:
             target_length = len(target_ls)
             ini = target_length * process_id // proc
@@ -664,7 +664,9 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
                 try:
                     trigrams = trigram_main(s, is_debug = False, character = 'sys')
                     for trigram in trigrams:
+                        lc.acquire()
                         save_trigram_in_transaction(trigram, character = character)
+                        lc.release()
                 except Exception as e:
                     print(e)
                     pass
@@ -675,13 +677,14 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
             pass
     try:
         # talk_sql.create_tables([TrigramModel], True)
+        lc = multiprocessing.Lock()
         with talk_sql.transaction():
             target_ls = s_ls[over:]
             processes = [ 
-                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 0)),
-                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 1))
-                # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 2)),
-                # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 3))
+                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 0, lc)),
+                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 1, lc)),
+                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 2, lc)),
+                multiprocessing.Process(target=_learn_trigram, args=(target_ls, 3, lc)),
             ]
             for process in processes:
                 process.start()
@@ -696,34 +699,41 @@ def save_trigram_in_transaction(tri, character = 'sys', retry_cnt = 0):
     ma2 = tri[1]
     ma3 = tri[2]
     try:
-        T, created = TrigramModel.get_or_create(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1])
-        if created:
-            T.character = character
-            T.W1 = ma1[0]
-            T.W2 = ma2[0]
-            T.W3    = ma3[0]
-            T.P1    = ma1[1]
-            T.P2 = ma2[1]
-            T.P3 = ma3[1]
-            T.cnt = 1
-            T.posi = 1
-            T.nega = 0
+        # T, created = TrigramModel.get_or_create(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1])
+        # if created:
+        #     # T.character = character
+        #     # T.W1 = ma1[0]
+        #     # T.W2 = ma2[0]
+        #     # T.W3    = ma3[0]
+        #     # T.P1    = ma1[1]
+        #     # T.P2 = ma2[1]
+        #     # T.P3 = ma3[1]
+        #     T.cnt = 1
+        #     T.posi = 1
+        #     T.nega = 0
+        # else:
+        #     T.cnt = T.cnt +1
+        # T.save()
+        # talk_sql.commit()
+        try:
+            T =  TrigramModel.get(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0])
+        except DoesNotExist:
+            T = TrigramModel(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1], cnt = 0, posi = 1, nega = 0)
         else:
             T.cnt = T.cnt +1
-        T.save()
-        # talk_sql.commit()
+            T.save()
     except DoesNotExist:
         return None
     except DatabaseError as e:
-        d(e)
+        d(e, 'save_trigram_in_transaction')
         return None
     except OperationalError as e:
         retry_cnt += 1
         time.sleep(0.2*retry_cnt)
-        d(e, retry_cnt, 'save_trigram_in_transaction')
+        d(e, retry_cnt, 'save_trigram_in_transaction, op')
         return save_trigram_in_transaction(tri, character, retry_cnt)
     except IntegrityError as e:
-        d(e)
+        d(e, 'save_trigram_in_transaction')
         talk_sql.rollback()
         raise Exception
     except Exception as e:
@@ -1083,11 +1093,11 @@ if __name__ == '__main__':
     # command = ''
     text = ''''''
     # Nico = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
-    # s_ls = operate_sql.get_twlog_list(n = 100000000, UserList = [], contains = '')
+    s_ls = operate_sql.get_twlog_list(n = 1000, UserList = [], contains = '')
     # p(s_ls)
-    # learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5)
-    text = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'MC', username = '@〜〜')
-    p(text)
+    learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5)
+    # text = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'MC', username = '@〜〜')
+    # p(text)
     # s_ls = ['足利さんに送信して']
     # trigram_main(s_ls[0], is_debug = True, character = '')
     # p(TFIDF.extract_keywords_from_text(text))
