@@ -10,7 +10,7 @@ import bs4
 def get_bs4soup(url):
 	header = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
 	html = urllib.request.urlopen(url)
-	soup = bs4.BeautifulSoup(html, "lxml")
+	soup = bs4.BeautifulSoup(html, 'lxml')
 	return soup
 
 def search_weblioEJJE(word = 'ask'):
@@ -20,7 +20,7 @@ def search_weblioEJJE(word = 'ask'):
 		soup = get_bs4soup(ejje_url)
 		return ''.join(['\'', word, '\'の訳:\n', str(soup.find("div", class_ = "summaryM")).split('</b>')[1][:-6]])
 	except Exception as e:
-		print(e)
+		d(e)
 		return ''.join(['\'', word, '\'に一致する語は見つかりませんでした。'])
 
 def search_wiki(word = 'クロマニョン人'):
@@ -37,7 +37,7 @@ def search_wiki(word = 'クロマニョン人'):
 		ans = ''.join(['。'.join(anslist[:8]), '。']).replace('。。', '。')
 		return ans
 	except Exception as e:
-		print(e)
+		d(e)
 		return ''.join(['\'', word, '\'に一致する語は見つかりませんでした。'])
 
 def get_dl_links(url = "https://www.jstage.jst.go.jp/browse/jspa1962/-char/ja/", extention = 'pdf', except_str = 'pub', DIR = DATADIR, sleep_time = 1):
@@ -65,6 +65,22 @@ def get_dl_links(url = "https://www.jstage.jst.go.jp/browse/jspa1962/-char/ja/",
 	except Exception as e:
 		p(e)
 		return abs_filename_ls
+def get_ss(word = 'クロマニョン人'):
+	ans = ''
+	try:
+		converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
+		wiki_url = ''.join(["https://ja.wikipedia.org/wiki/", converted_word])
+		soup = get_bs4soup(wiki_url)
+		ptext = soup.findAll("p")
+		pstr =  ''.join([p.get_text() for p in ptext])
+		ans = re.sub(re.compile('\<.+\>'), '' , pstr)
+		ans = ans.replace('この記事には複数の問題があります。改善やノートページでの議論にご協力ください。', '').replace('■カテゴリ / ■テンプレート', '')
+		anslist = [re.sub(re.compile('\[.+\]'), '' , s) for s in ans.split('。')]
+		ans = ''.join(['。'.join(anslist[:8]), '。']).replace('。。', '。')
+		return ans
+	except Exception as e:
+		d(e)
+		return ''.join(['\'', word, '\'に一致する語は見つかりませんでした。'])
 if __name__ == '__main__':
 	import sys
 	import io
@@ -77,9 +93,11 @@ if __name__ == '__main__':
 	except:
 		user = 'p_eval'
 		text = "皇居"
+	url = 'http://www.lovelive-ss.com/?p=8560'
+	soup = get_bs4soup(url)
+	p(soup)
 	# print(search_wiki(word = '官僚制'))
-	get_dl_links('http://www.fsa.go.jp/news/newsj/16/ginkou/f-20050629-3.html', extention = 'pdf', DIR = '/Users/masaMikam/Dropbox/Research/金融庁分析', sleep_time = 1)
-	# print( get_num_of_results( que =  'ドバイショック'))
+	# get_dl_links('http://www.fsa.go.jp/news/newsj/16/ginkou/f-20050629-3.html', extention = 'pdf', DIR = '/Users/masaMikam/Dropbox/Research/金融庁分析', sleep_time = 1)
 # 	while len(ans) > 130:
 # 		ans = '。'.join(ans.split('。')[:-2])
 # 	ans = ''.join([ans, '。'])

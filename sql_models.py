@@ -197,6 +197,7 @@ class TrigramModel(TalkSQLModel):
     nega = IntegerField(null=True)
     class Meta:
         db_table = 'trigram'
+        primary_key = CompositeKey('character', 'W1', 'W2', 'W3')
 
 class FactModel(TalkSQLModel):
     function = CharField(null=True)
