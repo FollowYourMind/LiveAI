@@ -1082,7 +1082,8 @@ class StreamResponseFunctions(MyObject):
 	def save_tweet_dialog(self, status):
 		try:
 			# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
-			status_id = int(status['in_reply_to_status_id_str'])
+			# status_id = int(status['in_reply_to_status_id_str'])
+			p(status['in_reply_to_status_id_str'])
 			try:
 				twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'], retry_cnt = 0)
 			except:
@@ -1091,10 +1092,15 @@ class StreamResponseFunctions(MyObject):
 				logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
 				if not logstatus:
 					raise Exception
-				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus))
+				# p(logstatus)
+				p(logstatus.__dict__)
+				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus._json))
+			p(twlog)
+			p('a')
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			kws = dialog_generator.DialogObject(clean_logtext).keywords
+			p('aa')
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
 				'SID' : '/'.join([str(twlog['status_id']), status['id_str']]),
@@ -1109,6 +1115,7 @@ class StreamResponseFunctions(MyObject):
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}, retry_cnt = 0)
+			p('aaa')
 		except Exception as e:
 			d(e)
 			return False
@@ -1388,11 +1395,6 @@ def task_manager(bot_id, period = 60):
 def stream(bot_id):
 	twf = twtr_functions.TwtrTools(bot_id)
 	twf.Stream()
-def live_intel(bot_id):
-	LiveAI_thread = threading.Thread(target = stream, name = bot_id + '_LiveAI_program', args=(bot_id, ))
-	LiveAI_thread.start()
-	task_manager_thread = threading.Thread(target = task_manager, name = bot_id + '_task_manager', args=(bot_id, 30, ))
-	task_manager_thread.start()
 def main(is_experience = True):
 	if not is_experience:
 		umi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Umi', args=('LiveAI_Umi', ))
@@ -1416,15 +1418,36 @@ def main(is_experience = True):
 	else:
 		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
 		alpaca_thread.start()
+def live_intel(lock):
+	process = multiprocessing.current_process()
+	bot_id = process.name
+	p(bot_id)
+	# LiveAI_thread = threading.Thread(target = stream, name = bot_id + '_LiveAI_program', args=(bot_id, ))
+	# LiveAI_thread.start()
+	task_manager_thread = threading.Thread(target = task_manager, name = bot_id + '_task_manager', args=(bot_id, 30, ))
+	task_manager_thread.start()
+def mpmain():
+	with multiprocessing.Manager() as manager:
+		ls = manager.list()
+		lock = multiprocessing.Lock()
+		bot_processes = []
+		manage_processes = []
+		# bots = ['LiveAI_Alpaca']
+		bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+		#
+		for bot_id in bots:
+			bot_process = multiprocessing.Process(target = stream, args=(bot_id,), name=bot_id)
+			bot_processes.append(bot_process)
+			bot_process.start()
+			manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
+			manage_processes.append(manage_process)
+			manage_process.start()
+		# for process in processes:
+		# 	process.join()
+
 if __name__ == '__main__':
-	try:
-		argvs = sys.argv
-		p(argvs)
-		cmd = argvs[1]
-	except Exception as e:
-		p(e)
-		cmd = 0
-	main(is_experience = cmd)
+	# main(is_experience = cmd)
+	mpmain()
 
 
 

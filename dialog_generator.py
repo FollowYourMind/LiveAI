@@ -704,6 +704,7 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     import queue
     import random
     import time
+    import main
     def sender(q, target_ls, process_id):
         time.sleep(process_id)
         try:
@@ -714,26 +715,29 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
             split_target_ls = target_ls[ini:fin]
             cnt = 0
             for s in split_target_ls:
-                process = multiprocessing.current_process()
-                p('_______', ''.join([process.name, '=>', str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
-                p(s)
-                try:
-                    trigrams = trigram_main(s, is_debug = False, character = 'sys')
-                    if not trigrams:
-                        raise Exception
-                    try:
-                        for trigram in trigrams:
-                            q.put(trigram, timeout = 5)
-                    except queue.Full:
-                       d('%s: put() timed out. Queue is Full' % process.name)
-                    except Exception as e:
-                       d(e, 'q.put()')
-                except Exception as e:
-                    d(e, '_learn_trigram1')
-                    pass
+                if main.is_kusoripu(s):
+                    p('kusoripu', s)
                 else:
-                    # talk_sql.commit()
-                    cnt += 1
+                    process = multiprocessing.current_process()
+                    p('_______', ''.join([process.name, '=>', str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
+                    p(s)
+                    try:
+                        trigrams = trigram_main(s, is_debug = False, character = 'sys')
+                        if not trigrams:
+                            raise Exception
+                        try:
+                            for trigram in trigrams:
+                                q.put(trigram, timeout = 5)
+                        except queue.Full:
+                           d('%s: put() timed out. Queue is Full' % process.name)
+                        except Exception as e:
+                           d(e, 'q.put()')
+                    except Exception as e:
+                        d(e, '_learn_trigram1')
+                        pass
+                    else:
+                        # talk_sql.commit()
+                        cnt += 1
         # except IntegrityError as e:
         #     d(e, '_learn_trigram2')
         #     talk_sql.rollback()
@@ -832,8 +836,8 @@ def save_trigram_in_transaction(tri, character = 'sys', retry_cnt = 0):
 def learnLang(sList, character = 'U'):
     i = 1;
     for s in sList:
-        print('++++++++++++++++++++++++++++++++++++++++++++++++++')
-        print(i, s)
+        p('++++++++++++++++++++++++++++++++++++++++++++++++++')
+        p(i, s)
         try:
             TrigramModel = trigram_main(s, 1, 0, character)
             tfidf = TFIDF.append_tf_idf_on_ma_result(s, i, True, 0)
@@ -1150,16 +1154,31 @@ if __name__ == '__main__':
 
     # command = ''
     text = ''''''
-    # Nico = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
-    s_ls = operate_sql.get_twlog_list(n = 50000, UserList = [], contains = '')
-    # p(s_ls)
-    # s_ls = ['足利さんに送信して']
-    learn_trigram(s_ls, character = 'sys', over = 10000, save_freqcnt = 5)
-    # text = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'MC', username = '@〜〜')
-    # p(text)
-    # s_ls = ['足利さんに送信して']
-    # trigram_main(s_ls[0], is_debug = True, character = '')
-    # p(TFIDF.extract_keywords_from_text(text))
+    # UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
+    # UserList = ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
+    # UserList = ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin', ]
+    UserLists = {
+    # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
+    # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
+    # '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin', ]
+    'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
+    '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
+    '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
+    '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
+    '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
+    '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
+    '雪穂': ['yukiho_h_bot_', 'haijin_yukiho'],
+    'ちゃんあ': ['chana1031'],
+    }
+    # for chara, userlist in UserLists.items():
+    #     p(chara, userlist)
+    #     s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
+    #     learn_trigram(s_ls, character = chara, over = 0)
+    ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'にこ', tools = 'MC', username = '@〜〜')
+    p(ans)
+    # ans = DialogObject(text).keywords
+    # trigram_main(s_ls, is_debug = True, character = 'にこ')
+    # p(TFIDF.ebxtract_keywords_from_text(text))
     # dialog_obj = DialogObject(text)
     # # reg = RegexTools.main(text)
     # # # p(reg)
@@ -1170,7 +1189,6 @@ if __name__ == '__main__':
     # p(dialog_obj.keywords)
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =    'yes', character = character)
-    # p(ans)
     # p(dialog_obj.save_facts())
     # ans = dialog(s = text, context = 'この世をば我が世とぞ思う', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], min_similarity = 0.3, character = '海未', tools = 'SYA')
     # p(wordnet_dialog(kw = 'テスト'))
