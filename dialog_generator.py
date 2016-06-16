@@ -284,6 +284,10 @@ class TFIDF():
                         return impkey
         def calc_cosine_similarity(self, s1, s2):
                 try:
+                        if not s1:
+                            return 0
+                        if not s2:
+                            return 0
                         intexts = [s1, s2]
                         tf_idf_ls = [{ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(text)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}} for text in intexts]
                         vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls[0].keys()] + [tf_idf_ls[1].keys()]))))
@@ -308,7 +312,8 @@ class TrigramMarkovChain(MyObject):
                 ans = ''
                 try:
                         with talk_sql.transaction():
-                                metaframe = self.get_metasentence()
+                                metaframe_str = self.get_metasentence()
+                                metaframe = metaframe_str.split(',')
                                 # if '助詞,' in metaframe:
                                 #         metaframe = [''.join([f, '助詞']) if f[-1] != '>' else f for f in metaframe.split('助詞,')][0]
                                 self.database = TrigramModel.select()
@@ -379,9 +384,10 @@ class TrigramMarkovChain(MyObject):
                         #         except Exception as e:
                         #                 pass
                         return W
-        def generate_forward(self, startWith = '', Plist = ['<BOS>','名詞','名詞','名詞','助詞','動詞','助詞','助詞','名詞','名詞','名詞','助詞','動詞','助動詞','助動詞','<EOS>'], break_set = {'」', '。', '!', '！', '?', '？'}, is_debug = False, n = 100000):
+        def generate_forward(self, startWith = '', Plist = ['<BOS>','名詞','','名詞','助詞','動詞','助詞','助詞','名詞','名詞','名詞','助詞','動詞','助動詞','助動詞','<EOS>'], break_set = {'」', '。', '!', '！', '?', '？'}, is_debug = False, n = 100000):
                 QuestionPhrase = '<KEY>...？'
                 # p(Plist)
+                # Plist = ['<BOS>', '名詞', '助詞', '名詞', '記号', '<EOS>']
                 lenP = len(Plist)
                 is_correct_with_hinshi = True
                 i = 0
@@ -389,11 +395,12 @@ class TrigramMarkovChain(MyObject):
                         ans = ['<BOS>', startWith]
                 else:
                         ans = ['<BOS>']
+                        i -= 1
                 while True:
-                        # p(ans)
-                        pre1 = ans[i]
+                        W = ''
                         i1 = i+1
                         i2 = i+2
+                        pre1 = ans[i]
                         pre2 = ans[i1]
                         if i2 >= lenP:
                                 is_correct_with_hinshi = False
@@ -401,7 +408,6 @@ class TrigramMarkovChain(MyObject):
                                 P3 = Plist[i2]
                                 P2 = Plist[i1]
                                 P1 = Plist[i]
-                        W = ''
                         if not W and is_correct_with_hinshi:
                                 # print('2単語一致前方2品詞一致')
                                 try:
@@ -423,8 +429,6 @@ class TrigramMarkovChain(MyObject):
                                         W = self.choose_randomword(Ws, place = 3)
                                 except DoesNotExist:
                                         pass
-                        if not W and is_correct_with_hinshi:
-                                W = self.get_same_hinshi(P1)
                         if not W:
                                 # print('2単語一致')
                                 try:
@@ -443,17 +447,18 @@ class TrigramMarkovChain(MyObject):
                                 # print('1単語一致2')
                                 try:
                                         Ws = self.selected_character_database.where(TrigramModel.W1 == pre1).order_by(TrigramModel.cnt.desc()).limit(n)
+                                        W = self.choose_randomword(Ws, place = 2)
                                 except DoesNotExist:
                                         if i == 0:
                                                 return QuestionPhrase.replace('<KEY>', pre2)
+                        if not W and is_correct_with_hinshi:
+                                W = self.get_same_hinshi(P2)
                         if ans[-1] != W:
                                 ans.append(W)
                         else:
                                 break
-                        i = i +1
-                        # if lenP < i+3:
-                        #         break
-                        if W == '<EOS>':
+                        i += 1
+                        if W in {'<EOS>'}:
                                 break
                         # if W in break_set:
                         #         break
@@ -939,6 +944,7 @@ def wordnet_dialog(kw = 'テスト'):
         if not wn_dic:
             raise Exception
         wn_dic_keys = ([key for key in wn_dic.keys()])
+        # p(wn_dic.values())
         rand_key = np.random.choice(wn_dic_keys)
         rand_ls = wn_dic[rand_key]
         while rand_ls == [kw]:
@@ -1052,6 +1058,11 @@ class DialogObject(MyObject):
             s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
             keywords = TFIDF.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
             keywords = [kw for kw in keywords if not '@' in kw]
+        if keywords:
+            kw = keywords[0]
+            wn_dic = operate_sql.get_wordnet_result(lemma = kw)
+            if wn_dic:
+                keywords = _.flatten(wn_dic.values())
         return keywords
     def dialog(self, context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'SYA,WN,LOG,MC', username = '@〜〜'):
         #URL除去
@@ -1059,36 +1070,43 @@ class DialogObject(MyObject):
         ans = ''
         if context:
             try:
-                p(context.split('</>'))
                 s = context.split('</>')[-1] + s
             except:
                 pass
         s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
         generated_by = 'nod'
-        mas = natural_language_processing.MA.get_mecab_coupled(s)
         try:
             if not self.keywords:
                     kw = '私'
             else:
-                    kw = self.keywords[0]
+                    kw = np.random.choice(self.keywords)
+            # mas = natural_language_processing.MA.get_mecab_coupled(s)
+            # p(mas)
             if not ans:
                 if 'LOG' in tools:
                     ans = get_tweet_log(text = s, kws = self.keywords, UserList = UserList, BlackList = BlackList, min_similarity = min_similarity)
                     generated_by = 'LOG'
-                    if ans:
-                        character = 'sys'
-            if not ans:
-                if np.random.rand() < 0.8:
-                    pass
-                elif 'WN' in tools:
-                    ans = wordnet_dialog(kw = kw)
-                    generated_by = 'WN'
-                    if ans:
-                        character = '海未'
+            # if not ans:
+            #     if np.random.rand() < 0.8:
+            #         pass
+            #     elif 'WN' in tools:
+            #         ans = wordnet_dialog(kw = kw)
+            #         generated_by = 'WN'
+            #         if ans:
+            #             character = '海未'
             if not ans:
                 if 'MC' in tools:
                     trigram_markov_chain_instance = TrigramMarkovChain(character)
                     ans = trigram_markov_chain_instance.generate(word = kw, is_randomize_metasentence = is_randomize_metasentence)
+                    # d_list = [(TFIDF.calc_cosine_similarity(s1 = s, s2 = trians), trians) for trians in ans_ls]
+                    # d_listS = sorted(d_list, key = lambda x: x[0], reverse = True)
+                    # p(d_listS)
+                    # if not d_listS[0][1]:
+                    #     ans = ''
+                    # if d_listS[0][0] > 0:
+                    #     ans = ''.join([d_listS[0][1], '\n(Log合致度:', str(d_listS[0][0]), ')'])
+                    # else:
+                    #     ans = ''
                     generated_by = 'MC'
             if not ans:
                 if 'MC' in tools:
@@ -1103,9 +1121,7 @@ class DialogObject(MyObject):
             generated_by = 'nod'
             if '...:[' in ans:
                 BA = operate_sql.get_phrase(status = 'nod')
-        p(ans)
-        # if is_learn:
-        #     trigram_main(s, is_learn = True, is_debug = False)
+        # p(ans)
         ans = self._get_longest_split(ans, split_word = '」')
         ans = self._get_longest_split(ans, split_word = '「')
         ans = self._get_longest_split(ans, split_word = '。')
@@ -1153,7 +1169,7 @@ if __name__ == '__main__':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
     # command = ''
-    text = ''''''
+    text = '''みなさんお久しぶりですニコッまたこれからもよろしくお願いします☺️''' 
     # UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
     # UserList = ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # UserList = ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin', ]
@@ -1174,9 +1190,10 @@ if __name__ == '__main__':
     #     p(chara, userlist)
     #     s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
     #     learn_trigram(s_ls, character = chara, over = 0)
-    ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = 'にこ', tools = 'MC', username = '@〜〜')
+    # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'MC', username = '@〜〜')
+    # p(ans)
+    ans = DialogObject(text).nlp_data.summary
     p(ans)
-    # ans = DialogObject(text).keywords
     # trigram_main(s_ls, is_debug = True, character = 'にこ')
     # p(TFIDF.ebxtract_keywords_from_text(text))
     # dialog_obj = DialogObject(text)

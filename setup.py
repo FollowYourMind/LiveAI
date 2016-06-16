@@ -48,17 +48,6 @@ bkupTEMPJSONPLACE = DATADIR + "/tmp_bkup.json"
 bkup2TEMPJSONPLACE = DATADIR + "/tmp_bkup2.json"
 TMP_CONFIG_PLACE = DATADIR + "/tmp_config.json"
 TMP_STATS_PLACE = DATADIR + "/tmp_stats.json"
-# def load_json(place):
-# 	try:
-# 		with open(place, "r", encoding='utf-8') as tmpjson:
-# 			return json.load(tmpjson)
-# 	except Exception as e:
-# 		print(e)
-# 		with open(place, "w", encoding='utf-8') as tmpjson:
-# 			json.dump({},tmpjson, ensure_ascii=False, sort_keys=True, indent = 4, default = _.support_datetime_default)
-# 			return {}
-# tmp = load_json(TEMPJSONPLACE)
-# tmp_config = TMP_CONFIG_PLACE
 
 DIRIMGfeedback = DATADIR + '/imgs/feedback/'
 DIRIMGtmp = DATADIR + '/imgs/feedback/tmp'
@@ -66,10 +55,6 @@ DIRIMGundefined = DATADIR + '/imgs/feedback/undefined'
 DIRusers = DATADIR + '/user'
 
 #DBs
-# twlog_sql_PLACE = DATADIR + '/SQL/sys.twlog'
-# core_sql_PLACE = DATADIR + '/SQL/sys.info'
-# talk_sql_PLACE = DATADIR + '/SQL/sys.talk'
-# wordnet_sql_PLACE =DATADIR + '/lib/wnjpn.db'
 from peewee import *
 from playhouse.sqlite_ext import SqliteExtDatabase
 # modelmachine_learning_img = DATADIR + '/ML_Brain/DNN_1-3_8'

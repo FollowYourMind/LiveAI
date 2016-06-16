@@ -115,10 +115,12 @@ class RegexTools(MyObject):
             functions = ['(', '|'.join([youbou, order,deny,kibou, kanyu, gimon, dantei,  ban]), ')+']
             reg = ''.join(functions)
             reg_group_dic = self.complie_and_get_groupdict(reg, text)
-            p(reg_group_dic)
+            # p(reg_group_dic)
             return reg_group_dic
     def convert_time_expression_into_datetime_sec(self, target, target_expression = '秒'):
         if target is None:
+            return None
+        elif not target.isdigit():
             return None
         elif target_expression in {'秒', 'sec'}:
             sec = int(target)
@@ -356,6 +358,7 @@ class SyntacticAnalysis(MorphologicalAnalysis):#CaboCha
             ret = ret.split('\n')
             return ret
         except Exception as e:
+            d(e, 'spawn_cabocha')
             return ''
     # def get_cabocha_dic(self, mas):
     def get_dics(self, mas, cas):
@@ -366,6 +369,7 @@ class SyntacticAnalysis(MorphologicalAnalysis):#CaboCha
         while not 'EOS' in cas[cursor]:
             if cas[cursor][0] == '*':
                 chunk_info = cas[cursor].split(' ')
+                # if not chunk_info[1].isdigit():
                 chunk_number = int(chunk_info[1])
                 content_function_ids_ls = chunk_info[3].split('/')
                 content_word_id = int(content_function_ids_ls[0])
@@ -953,7 +957,10 @@ class NLPSummary(MyObject):
         self.value = ''
         self.function = ''
     def has_function(self, *args):
-        return any(arg in self.function for arg in args)
+        if self.function is None:
+            return False
+        else:
+            return any(arg in self.function for arg in args)
 
 class NLPdata(MyObject):
     def __init__(self, sentence):
@@ -975,7 +982,6 @@ class NLPdata(MyObject):
         self.value_function_ids = []
         self.value_function_mas = []
         self.value_ma = []
-        # p(self.cabocha_class.word_catalog)
         try:
             value_info = [(info, info['word_id'], info['pair_function_id']) for key, info in self.cabocha_class.word_catalog.items() if info['word_type'] != 'function_word']
             if value_info:
@@ -984,41 +990,42 @@ class NLPdata(MyObject):
                     value_function_id = self.value_id + 1
                 self.value_ma = self.joint_mas[self.value_id]
                 self.summary.value = self.value_ma[7]
-                while self.cabocha_class.word_catalog[value_function_id]['word_type'] == 'function_word':
-                    value_function_id += 1
-                    if value_function_id +2 > self.ma_len:
-                        break
+                if value_function_id in self.cabocha_class.word_catalog:
+                    while self.cabocha_class.word_catalog[value_function_id]['word_type'] == 'function_word':
+                        value_function_id += 1
+                        if value_function_id +2 > self.ma_len:
+                            break
                 if value_function_id +1 > self.ma_len:
                     value_function_id = self.ma_len -1
                 if value_function_id:
                     self.value_function_id_range = range(self.value_id + 1, value_function_id + 1)
                     self.value_function_mas = [self.joint_mas[function_id] for function_id in self.value_function_id_range]
         except Exception as e:
-            p(e)
+            d(e, 'NLPdata.init.ma')
             pass
         else:
             self.summary.function = self.judge_function()
+            # p(self.summary.function )
         try:
             cabocha_akkusativ = self.extract_phrase_with_joshi({'を', 'で'})
-            p(cabocha_akkusativ)
             if cabocha_akkusativ:
                 self.summary.akkusativ = cabocha_akkusativ[0]
         except Exception as e:
-            p(e)
+            d(e, 'NLPdata.init.ak')
             pass
         try:
             cabocha_dativ = self.extract_phrase_with_joshi({'に', 'へ'})
             if cabocha_dativ:
                 self.summary.dativ = cabocha_dativ[0]
         except Exception as e:
-            p(e)
+            d(e, 'NLPdata.init.da')
             pass
         try:
             cabocha_entity = self.extract_phrase_with_joshi({'が', 'は', 'とは'})
             if cabocha_entity:
                 self.summary.entity = cabocha_entity[0]
         except Exception as e:
-            p(e)
+            d(e, 'NLPdata.init.en')
             pass
     def judge_function(self):
         if not self.value_ma:
@@ -1097,13 +1104,12 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''再起動して'''    # text = 'したい'
+    text = '''みなさんは変態かな'''    # text = 'したい'
     # reg = RegexTools.main(text)
-    # # p(reg)
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
     nlp_data = NLPdatas(text).main
-    p(nlp_data.summary)
+    p(nlp_data.summary.has_function('疑問'))
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =  'yes', character = character)
     # p(ans)

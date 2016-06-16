@@ -18,14 +18,16 @@ class StreamListener(tweepy.streaming.StreamListener):
 		self.response_main.on_initial_main()
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
+	def on_connect(self):
+		return True
 	def on_friends(self, friends):
 		return self.response_main.on_friends_main(friends)
-	def on_limit(self, track):
-		p(track)
-		raise MyException
 	def on_status(self, status):
 		try:
-			return self.response_main.on_status_main(status._json)
+			status_main_process = multiprocessing.Process(target = self.response_main.on_status_main, args=(status._json,), name=self.bot_id)
+			status_main_process.start()
+			return True
+			# return self.response_main.on_status_main(status._json)
 		except Exception as e:
 			d('on_status',e)
 			return True
@@ -33,12 +35,27 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
 		return self.response_main.on_event_main(status._json)
+	def on_limit(self, track):
+		p(track, 'track')
+		return True
+	def keep_alive(self):
+		p('keep_alive')
+		return True
+	def on_exception(self, exception):
+		p(exception, 'exception')
+		return True
+	def on_warning(self, notice):
+		p(notice, 'warning')
+		return True
+	def on_disconnect(self, notice):
+		d(notice, 'disconnect')
+		return False
 	def on_error(self,status):
 		p('cannot get')
-		raise MyException
+		return False
 	def on_timeout(self):
 		p('timeout...')
-		return True
+		return False
 def get_twtr_auth(auth_dic):
 	try:
 		CONSUMER_KEY = auth_dic['consumer_key']
@@ -62,13 +79,14 @@ class TwtrTools:
 		auth = self.twtr_auth
 		while True:
 			try:
-				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
+				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), timeout = 60, async = True, secure=True)
 				stream.userstream()
-				return True
-			except Exception as e:
-				d(e)
+			except tweepy.TweepError as e:
+				d(e, 'twf.stream tweeperror waiting 100sec')
 				time.sleep(100)
-				return True
+			except Exception as e:
+				d(e, 'twf.stream waiting 100sec')
+				time.sleep(100)
 				# stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
 	def get_status(self, status_id):
 		try:
@@ -241,7 +259,7 @@ class TwtrTools:
 		except:
 			return False
 	def convert_direct_message_to_tweet_status(self, status):
-  		s= status['direct_message']
+  		s = status['direct_message']
   		s['user'] = {}
   		s['user']['screen_name'] = s['sender_screen_name']
   		s['user']['name'] = s['sender']['name']

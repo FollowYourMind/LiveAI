@@ -151,7 +151,7 @@ class StreamResponseFunctions(MyObject):
 			self.twf.update_profile(name = self.bot_profile.name, description = self.bot_profile.description, location= self.bot_profile.location, url = self.bot_profile.url, filename = self.bot_profile.abs_icon_filename, BGfilename = '', Bannerfilename = self.bot_profile.abs_banner_filename)
 			return True
 		except Exception as e:
-			logger.debug(e)
+			d(e, 'default_profile')
 			return False
 	def sync_now(self):
 		#Japan_Time
@@ -285,14 +285,13 @@ class StreamResponseFunctions(MyObject):
 			try:
 				if screen_name:
 					userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
-					p(userinfo)
 					if not 'select_chara' in userinfo:
 						userinfo['select_chara'] = self.default_character
 					if userinfo['select_chara'] != self.default_character:
 						return False
 				return self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
 			except Exception as e:
-				logger.debug(e)
+				d(e, 'main tweet')
 				return False
 		else:
 			return False
@@ -307,7 +306,7 @@ class StreamResponseFunctions(MyObject):
 			deltasec = delta.total_seconds()
 			return deltasec
 		except Exception as e:
-			logger.debug(e)
+			d(e, 'get_deltasec')
 			deltasec = 50
 			return deltasec
 	def _convert_first_personal_pronoun(self, word, convert_word):
@@ -348,10 +347,8 @@ class StreamResponseFunctions(MyObject):
 				filename = _.getRandIMG(DATADIR + '/imgs/' + new_chara)
 			except:
 				filename = ''
-		# character = userinfo['select_chara']
 		character = self.default_character
 		deltasec = self.get_deltasec(time_future = self.now, time_past = userinfo['time'])
-
 		#返答タイムアウト処理
 		if deltasec > 1000:
 			userinfo['cnt'] = 0
@@ -360,23 +357,12 @@ class StreamResponseFunctions(MyObject):
 			userinfo['select_chara'] = self.default_character
 		dialog_obj = dialog_generator.DialogObject(status['text'].replace(self.atmarked_bot_id, ''))
 		nlp_summary = dialog_obj.nlp_data.summary
-		# p(nlp_summary)
 		acceptability = np.random.rand()
-		# if not nlp_summary.delay_sec is None:
-			# delay_sec = nlp_summary.delay_sec
 		if not self.bot_id in status['text'] and mode != 'dm':
 			pass
 		# 応答
 		elif 'ping' in text:
 			ans = ''.join(['Δsec : ', str(deltasec)])
-		# elif 'userinfo' in cmds_dic:
-		# 	ans = str(userinfo)
-		# elif 'system' in cmds_dic:
-		# 	if 'default' in cmds_dic['system']['<key0>']:
-		# 		userinfo['mode'] = 'dialog'
-		# 		userinfo['select_chara'] = 'sys'
-		# 		screen_name = self.manager_id
-		# 		ans = 'system log]\n --force, @' + screen_name+ '\'s mode -> default...'
 		elif userinfo['mode'] == 'ignore':
 			if 'ごめん' in text:
 				userinfo['cnt'] = 0
@@ -385,6 +371,7 @@ class StreamResponseFunctions(MyObject):
 			else:
 				userinfo['cnt'] = 0
 				userinfo['mode'] = 'dialog'
+				ans = 'ignore'
 		elif deltasec < 3 and not is_new_user:
 			ans = operate_sql.get_phrase(status =  'tooFreq', n = 20, character = character)
 			userinfo['mode'] = 'ignore'
@@ -533,7 +520,7 @@ class StreamResponseFunctions(MyObject):
 					filenames = _.saveMedias(status, ID = fileID, DIR = '/'.join([DIRIMGfeedback, imgtag]))
 					ans = operate_sql.get_phrase(status =  'appreciate.giveme.img', character = character).format(imgtag)
 				except Exception as e:
-					logger.debug(e)
+					d(e, 'hashtag_imgs')
 					ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 			else:
 				try:
@@ -570,10 +557,10 @@ class StreamResponseFunctions(MyObject):
 						userinfo['mode'] = 'dialog'
 
 				except Exception as e:
-					logger.debug(e)
+					d(e, 'main get_img')
 					ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
-		elif userinfo['cnt'] > 6:
+		elif userinfo['cnt'] > 6 and mode != 'dm':
 			ans = operate_sql.get_phrase(status =  'cntOver', n = 20, character = character)
 			userinfo['mode'] = 'ignore'
 
@@ -692,7 +679,7 @@ class StreamResponseFunctions(MyObject):
 						else:
 							ans = ''.join([nlp_summary.akkusativ, 'は呼び出しできません。'])
 					except Exception as e:
-						logger.debug(e)
+						d(e, 'calling')
 						ans = 'よびだし失敗。管理者にお問い合わせください。'
 					else:
 						ans = ''.join([nlp_summary.akkusativ, 'は呼び出しできません。'])
@@ -726,7 +713,7 @@ class StreamResponseFunctions(MyObject):
 							status_id = ''
 							ans = get_kusoripu(tg1 = target_name)
 						except Exception as e:
-							logger.debug(e)
+							d(e, 'kusoripu')
 							ans = 'クソリプ失敗。管理者にお問い合わせください。'
 					else:
 						ans = ''.join([nlp_summary.akkusativ, 'は送信できません。'])
@@ -787,8 +774,8 @@ class StreamResponseFunctions(MyObject):
 							else:
 								ans = operate_sql.get_phrase(status =  'imitate.error.notFF', character = character).format(''.join(['@', target_name, ' ']))
 						except Exception as e:
-							logger.debug(e)
-							ans = 'クソリプ失敗。管理者にお問い合わせください。'
+							d(e, 'imitate')
+							ans = 'ものまね失敗。管理者にお問い合わせください。'
 		elif nlp_summary.value in {'遊ぶ', '尻取りする'} or userinfo['mode'] == 'srtr':
 			is_accepted = False
 			if userinfo['mode'] == 'srtr':
@@ -849,7 +836,7 @@ class StreamResponseFunctions(MyObject):
 							ans, exp = ans.split('#exp')
 							userinfo['exp'] += 20
 				except Exception as e:
-					p(e)
+					d(e, 'battle_game')
 					ans = '工事中...'
 					userinfo['mode'] = 'dialog'
 		#----------------
@@ -934,10 +921,13 @@ class StreamResponseFunctions(MyObject):
 					else:
 						ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'WN,LOG,MC', username = '@〜〜')
-			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
-			if not ans:
-				ans = '...?'
+			if ans != 'ignore':
+				ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'WN,LOG,MC', username = '@〜〜')
+				ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
+				if not ans:
+					ans = '...'
+			else:
+				ans = ''
 		if is_new_user:
 			p('detected_new_user')
 			user = self.twf.get_userinfo(screen_name = screen_name)
@@ -991,8 +981,7 @@ class StreamResponseFunctions(MyObject):
 				return True
 			return False
 		except Exception as e:
-			logger.debug('is_ignore')
-			logger.debug(e)
+			d(e, 'is_ignore')
 			return True
 
 	def is_react(self, status):
@@ -1013,14 +1002,12 @@ class StreamResponseFunctions(MyObject):
 				return True
 			return False
 		except Exception as e:
-			logger.debug('is_react')
-			logger.debug(e)
+			d(e, 'is_react')
 			return False
 	def on_status_main(self, status):
 		try:
 			if not self.is_ignore(status):
 				self.stats.TL_cnt += 1
-				# status['clean_text']
 				status_id = status['id_str']
 				screen_name = status['user']['screen_name']
 				replyname = status['in_reply_to_screen_name']
@@ -1046,7 +1033,7 @@ class StreamResponseFunctions(MyObject):
 						save_tweet_status_thread.start()
 						# operate_sql.save_tweet_status(status, self.bot_id)
 					except Exception as e:
-						d(s, "threading save")
+						d(s, 'threading save')
 						pass
 				#Tweetプーリング
 					if not screen_name in self.bots_set:
@@ -1054,20 +1041,20 @@ class StreamResponseFunctions(MyObject):
 							if len(text) > 5:
 								if not any([ng_word in text for ng_word in ['便乗', 'imitate', 'learn', 'img', 'kusoripu', 'haken', 'add', '午̷̖̺͈̆͛͝前̧̢̖̫̊3̘̦時̗͡の̶̛̘̙̤̙̌̉͢い̷゙̊̈̓̓̅ば̬̬̩͈̊͡ら゙̜̩̹ぎ̫̺̓ͣ̕͡げ̧̛̩̞̽ん゙̨̼̗̤̂̄']]):
 									twlog_pool.append_and_adjust_timeline_twlog(status)
-				#Dialog保存
-				if not screen_name in {self.bot_id}:
-					if not status['in_reply_to_status_id_str'] is None:
-						try:
-							self.save_tweet_dialog(status)
-						except:
-							pass
+					#Dialog保存
+					if not screen_name in {self.bot_id}:
+						if not status['in_reply_to_status_id_str'] is None:
+							try:
+								self.save_tweet_dialog(status)
+							except:
+								pass
 		except Exception as e:
-			logger.debug(e)
-			logger.debug('+++++timeline_status+++++++')
+			d(e, '+++++timeline_status+++++++')
 		else:
 			return True
 	def status_dic(self, status):
-		status_dic = {
+		if status['id_str'].isdigit():
+			status_dic = {
 				'status_id' : int(status['id_str']),
 				'screen_name' : status['user']['screen_name'],
 				'name' : status['user']['name'],
@@ -1078,29 +1065,22 @@ class StreamResponseFunctions(MyObject):
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}
-		return status_dic
+			return status_dic
 	def save_tweet_dialog(self, status):
 		try:
-			# twlog_sql.create_tables([TwDialog], True)# 第二引数がTrueの場合、存在している場合は、作成しない
-			# status_id = int(status['in_reply_to_status_id_str'])
-			p(status['in_reply_to_status_id_str'])
-			try:
-				twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'], retry_cnt = 0)
-			except:
-				twlog = None
+			twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'], retry_cnt = 0)
+		except:
+			twlog = None
+		try:
 			if not twlog:
 				logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
 				if not logstatus:
 					raise Exception
-				# p(logstatus)
-				p(logstatus.__dict__)
 				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus._json))
-			p(twlog)
-			p('a')
+			#save
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			kws = dialog_generator.DialogObject(clean_logtext).keywords
-			p('aa')
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
 				'SID' : '/'.join([str(twlog['status_id']), status['id_str']]),
@@ -1115,19 +1095,15 @@ class StreamResponseFunctions(MyObject):
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}, retry_cnt = 0)
-			p('aaa')
 		except Exception as e:
-			d(e)
+			d(e, 'save_tweet status')
 			return False
 		else:
 			return True
 	def on_direct_message_main(self, status):
 		try:
-			# self.sync_json(is_save = False)
 			self.stats.DM_cnt += 1
-			# status = status._json
 			status = self.twf.convert_direct_message_to_tweet_status(status)
-			operate_sql.save_tweet_status(self.status_dic(status))
 			if not self.is_ignore(status):
 				try:
 					text = _.clean_text(status['text'])
@@ -1140,9 +1116,11 @@ class StreamResponseFunctions(MyObject):
 					try:
 						context = userinfo['context'].split('</>')[-1]
 					except Exception as e:
-						d(e)
+						d(e, 'on_direct_message_main context splitter')
 						context = ''
 					tweet_status = self.main(status, mode = 'dm', userinfo = userinfo, is_new_user = is_new_user)
+					# save
+					operate_sql.save_tweet_status(self.status_dic(status))
 					kws = dialog_generator.DialogObject(context).keywords
 					operate_sql.save_tweet_dialog(
  						twdialog_dic = {
@@ -1159,10 +1137,9 @@ class StreamResponseFunctions(MyObject):
 						'updatedAt' : status['now']
 					}, retry_cnt = 0)
 				except Exception as e:
-					logger.debug(e)
+					d(e, 'on_direct_message')
 		except Exception as e:
-			logger.debug(e)
-			logger.debug('++++direct_message++++++')
+			d(e, '++++direct_message++++++')
 		else:
 			return True
 	def on_event_main(self, status):
@@ -1173,7 +1150,6 @@ class StreamResponseFunctions(MyObject):
 			# 		text = _.clean_text(status['target_object']['text'])
 			# 		operate_sql.save_phrase(phrase = text, author = status['source']['name'], status = 'favorite', character = 'sys',s_type = 'favorite')
 			if status['event'] == 'unfollow':
-				p('unfollow')
 				if status['target']['screen_name'] == self.bot_id:
 					screen_name = status['source']['screen_name']
 					p(screen_name)
@@ -1199,8 +1175,7 @@ class StreamResponseFunctions(MyObject):
 					self.bot_profile.location = status['source']['location']
 					self.bot_profile.save()
 		except Exception as e:
-			logger.debug(e)
-			logger.debug('++++event++++++')
+			d(e, '++++event++++++')
 		else:
 			return True
 
@@ -1270,7 +1245,7 @@ class StreamResponseFunctions(MyObject):
 					ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
 					task_restart()
 				except Exception as e:
-					logger.debug(e)
+					d(e, 'teiki.MC')
 
 			elif todo == 'teiki.trendword':
 				trendwords = self.twf.getTrendwords()
@@ -1339,15 +1314,9 @@ class StreamResponseFunctions(MyObject):
 			operate_sql.update_task(who_ls = [self.bot_id], taskid = taskid, taskdict = {'status': 'end'})
 			return True
 		except Exception as e:
-			p(task)
-			logger.debug(e)
+			d(task, 'task_manager', e)
 			return True
 	def get_time(self, hours = 0, minutes = 5, seconds = 0, is_noised = True):
-		if is_noised:
-			rand_sec = np.random.randint(0, 60)
-		else:
-			rand_sec = 0
-		seconds += rand_sec
 		rand_time = self.now + timedelta(hours = hours, minutes = minutes, seconds = seconds)
 		return rand_time
 	def initialize_tasks(self):
@@ -1374,7 +1343,6 @@ class StreamResponseFunctions(MyObject):
 # Main Functions
 ##############
 def task_manager(bot_id, period = 60):
-	time.sleep(5)
 	try:
 		response_funcs = StreamResponseFunctions(bot_id)
 		response_funcs.initialize_tasks()
@@ -1386,54 +1354,24 @@ def task_manager(bot_id, period = 60):
 			now = response_funcs.sync_now()
 			p(bot_id, 'TASK>> ', now)
 			tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
-			# p(twlog_pool.__dict__)
 			try:
 				[response_funcs.implement_tasks(task) for task in tasks if task]
 			except Exception as e:
-				logger.debug(e)
+				d(e, 'task_manager whileloop')
 			time.sleep(period)
 def stream(bot_id):
 	twf = twtr_functions.TwtrTools(bot_id)
 	twf.Stream()
-def main(is_experience = True):
-	if not is_experience:
-		umi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Umi', args=('LiveAI_Umi', ))
-		umi_thread.start()
-		honoka_thread = threading.Thread(target = live_intel, name = 'LiveAI_Honoka', args=('LiveAI_Honoka', ))
-		honoka_thread.start()
-		kotori_thread = threading.Thread(target = live_intel, name = 'LiveAI_Kotori', args=('LiveAI_Kotori', ))
-		kotori_thread.start()
-		rin_thread = threading.Thread(target = live_intel, name = 'LiveAI_Rin', args=('LiveAI_Rin', ))
-		rin_thread.start()
-		maki_thread = threading.Thread(target = live_intel, name = 'LiveAI_Maki', args=('LiveAI_Maki', ))
-		maki_thread.start()
-		hanayo_thread = threading.Thread(target = live_intel, name = 'LiveAI_Hanayo', args=('LiveAI_Hanayo', ))
-		hanayo_thread.start()
-		nozomi_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nozomi', args=('LiveAI_Nozomi', ))
-		nozomi_thread.start()
-		eli_thread = threading.Thread(target = live_intel, name = 'LiveAI_Eli', args=('LiveAI_Eli', ))
-		eli_thread.start()
-		nico_thread = threading.Thread(target = live_intel, name = 'LiveAI_Nico', args=('LiveAI_Nico', ))
-		nico_thread.start()
-	else:
-		alpaca_thread = threading.Thread(target = live_intel, name = 'LiveAI_Alpaca', args=('LiveAI_Alpaca', ))
-		alpaca_thread.start()
-def live_intel(lock):
-	process = multiprocessing.current_process()
-	bot_id = process.name
-	p(bot_id)
-	# LiveAI_thread = threading.Thread(target = stream, name = bot_id + '_LiveAI_program', args=(bot_id, ))
-	# LiveAI_thread.start()
-	task_manager_thread = threading.Thread(target = task_manager, name = bot_id + '_task_manager', args=(bot_id, 30, ))
-	task_manager_thread.start()
-def mpmain():
+def main(is_experience = False):
 	with multiprocessing.Manager() as manager:
 		ls = manager.list()
 		lock = multiprocessing.Lock()
 		bot_processes = []
 		manage_processes = []
-		# bots = ['LiveAI_Alpaca']
-		bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+		if not is_experience:
+			bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+		else:
+			bots = ['LiveAI_Alpaca']
 		#
 		for bot_id in bots:
 			bot_process = multiprocessing.Process(target = stream, args=(bot_id,), name=bot_id)
@@ -1442,13 +1380,24 @@ def mpmain():
 			manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
 			manage_processes.append(manage_process)
 			manage_process.start()
-		# for process in processes:
-		# 	process.join()
+		try:        
+			for process in manage_processes + bot_processes:
+				process.join()
+		except KeyboardInterrupt:
+			p('-> Exiting..')
+			for worker in manage_processes + bot_processes:
+				worker.terminate()
+				worker.join()
 
 if __name__ == '__main__':
 	# main(is_experience = cmd)
-	mpmain()
-
+	main(0)
+	# try:        
+	# 	while True:
+	# 		p('aa')
+	# 		time.sleep(1)
+	# except KeyboardInterrupt:
+	# 	p('inter')
 
 
 
