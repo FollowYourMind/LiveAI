@@ -265,6 +265,13 @@ class StreamResponseFunctions(MyObject):
 			rand = np.random.rand()
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
+				# ans = operate_sql.get_phrase(status = 'kusoripu', n = 10000)
+				# if '{ID}' in ans:
+				# 	ans = ans.format(ID= ''.join(['@', tg1, ' ']))
+				# else:
+				# 	ans = ''.join(['@', screen_name,' \n', ans])
+				# if '{name}' in ans:
+				# 	ans = ans.format(name= 'アルパカ')
 				screen_name = ''
 		elif text in set(twlog_pool.timeline_twlog[:5]):
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
@@ -712,6 +719,15 @@ class StreamResponseFunctions(MyObject):
 							screen_name = ''
 							status_id = ''
 							ans = get_kusoripu(tg1 = target_name)
+							# def get_kusoripu(tg1):
+							# ans = operate_sql.get_phrase(status = 'kusoripu', n = 10000)
+							# if '{ID}' in ans:
+							# 	ans = ans.format(ID= ''.join(['@', tg1, ' ']))
+							# else:
+							# 	ans = ''.join(['@', target_name,' \n', ans])
+							# if '{name}' in ans:
+							# 	ans = ans.format(name= 'アルパカ')
+							# return ans
 						except Exception as e:
 							d(e, 'kusoripu')
 							ans = 'クソリプ失敗。管理者にお問い合わせください。'
@@ -921,13 +937,12 @@ class StreamResponseFunctions(MyObject):
 					else:
 						ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			if ans != 'ignore':
-				ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'WN,LOG,MC', username = '@〜〜')
-				ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
-				if not ans:
-					ans = '...'
-			else:
-				ans = ''
+			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'LOG,MC', username = '@〜〜')
+			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
+			if not ans:
+				ans = '...'
+		if ans == 'ignore':
+			ans = ''
 		if is_new_user:
 			p('detected_new_user')
 			user = self.twf.get_userinfo(screen_name = screen_name)
@@ -995,9 +1010,9 @@ class StreamResponseFunctions(MyObject):
 			if status['user']['screen_name'] in self.bots_set:
 				if rand < 0.001: #BOTに対する自発。0.1%
 					return True
-			if status['user']['screen_name'] in self.karamix2_set:
-				if rand < 0.02: #2%
-					return True
+			# if status['user']['screen_name'] in self.karamix2_set:
+			# 	if rand < 0.02: #2%
+			# 		return True
 			if rand < 0.01: #自発。0.5%
 				return True
 			return False
@@ -1008,6 +1023,7 @@ class StreamResponseFunctions(MyObject):
 		try:
 			if not self.is_ignore(status):
 				self.stats.TL_cnt += 1
+				np.random.seed()
 				status_id = status['id_str']
 				screen_name = status['user']['screen_name']
 				replyname = status['in_reply_to_screen_name']
@@ -1106,6 +1122,7 @@ class StreamResponseFunctions(MyObject):
 			status = self.twf.convert_direct_message_to_tweet_status(status)
 			if not self.is_ignore(status):
 				try:
+					np.random.seed()
 					text = _.clean_text(status['text'])
 					status['clean_text'] = text
 					self.sync_now()
@@ -1390,15 +1407,9 @@ def main(is_experience = False):
 				worker.join()
 
 if __name__ == '__main__':
-	# main(is_experience = cmd)
-	main(0)
-	# try:        
-	# 	while True:
-	# 		p('aa')
-	# 		time.sleep(1)
-	# except KeyboardInterrupt:
-	# 	p('inter')
-
+	main(1)
+	# np.random.seed()
+	# p(np.random.randint(100))
 
 
 

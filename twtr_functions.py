@@ -29,17 +29,25 @@ class StreamListener(tweepy.streaming.StreamListener):
 			return True
 			# return self.response_main.on_status_main(status._json)
 		except Exception as e:
-			d('on_status',e)
+			d('StreamListener on_status',e)
 			return True
 	def on_direct_message(self,status):
-		return self.response_main.on_direct_message_main(status._json)
+		try:
+			dm_main_process = multiprocessing.Process(target = self.response_main.on_direct_message_main, args=(status._json,), name=self.bot_id)
+			dm_main_process.start()
+			return True
+			# return self.response_main.on_status_main(status._json)
+		except Exception as e:
+			d('StreamListener on_direct_message',e)
+			return True
+		# return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
 		return self.response_main.on_event_main(status._json)
 	def on_limit(self, track):
 		p(track, 'track')
 		return True
 	def keep_alive(self):
-		p('keep_alive')
+		p('|')
 		return True
 	def on_exception(self, exception):
 		p(exception, 'exception')

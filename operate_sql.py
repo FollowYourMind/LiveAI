@@ -476,8 +476,8 @@ class BotProfile(MyObject):
 if __name__ == '__main__':
 	# a = read_userinfo('h_y_okaaaaaaaaaaaa')
 	# a = BotProfile('LiveAI_Alpaca')
-	status = ''
-	save_tweet_dialog(status)
+	# status = ''
+	# save_tweet_dialog(status)
 	# a = get_twlog_list(UserList = ['kotori_ss', 'kotoli_h_bot', 'Smallbirds_poke', 'haijin_kotori_', 'yanderekotori_bot', 'umikiti_kotori'], n = 10)
 	# umi = get_phrase(status = 'ぬるぽ', n = 1)
 	# p(umi)
@@ -488,7 +488,8 @@ if __name__ == '__main__':
 	# p(bp)
 	# a = get_core_info(whose_info = 'LiveAI_Nick', info_label = 'test', standard_dic = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)
 	# a =read_userinfo(screen_name = 'masaMikam')[0]._data
-	# p(a)
+	a = get_phrase(status = 'kusoripu', n = 30000)
+	p(a)
 	status = {'favorite_count': 0, 'created_at': 'Wed Feb 17 14:54:01 +0000 2016', 'contributors': None, 'truncated': False, 'in_reply_to_user_id_str': None, 'retweet_count': 0, 'id': 699970059683414016, 'in_reply_to_status_id_str': None, 'geo': None, 'entities': {'hashtags': [], 'urls': [], 'symbols': [], 'user_mentions': []}, 'id_str': '691170059683414016', 'in_reply_to_screen_name': None, 'is_quote_status': False, 'timestamp_ms': '1455720841700', 'coordinates': None, 'in_reply_to_status_id': None, 'filter_level': 'low', 'retweeted': False, 'in_reply_to_user_id': None, 'source': '<a href="http://twitter.com/download/iphone" rel="nofollow">Twitter for iPhone</a>', 'favorited': False, 'user': {'protected': False, 'created_at': 'Sun Mar 31 01:35:13 +0000 2013', 'utc_offset': 32400, 'favourites_count': 27, 'follow_request_sent': None, 'following': None, 'profile_image_url': 'http://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'profile_background_tile': False, 'description': '名前:つゆり きさめ/学生ラブライバー/絶叫勢/ぼっち勢/海未推し/善子推し(仮)/このすば/めぐみんはいいぞ/内田彩/詳細はツイプロ/+aで最近FFの比例がおかしい事に気がついたんでスパムを除く人に見つけ次第フォロー返してます。', 'profile_text_color': '333333', 'friends_count': 1481, 'time_zone': 'Tokyo', 'profile_sidebar_border_color': 'BDDCAD', 'profile_image_url_https': 'https://pbs.twimg.com/profile_images/681463777951236096/SbnleYeJ_normal.jpg', 'screen_name': 'tuyuri_kisame', 'default_profile_image': False, 'statuses_count': 40262, 'name': '栗花落 樹雨', 'is_translator': False, 'profile_background_image_url_https': 'https://abs.twimg.com/images/themes/theme16/bg.gif', 'followers_count': 1921, 'location': '神奈川県東部', 'geo_enabled': False, 'verified': False, 'notifications': None, 'profile_banner_url': 'https://pbs.twimg.com/profile_banners/1317490188/1455626298', 'listed_count': 33, 'profile_background_color': '9AE4E8', 'profile_sidebar_fill_color': 'DDFFCC', 'profile_link_color': '0084B4', 'default_profile': False, 'url': 'http://twpf.jp/tuyuri_kisame', 'profile_use_background_image': True, 'contributors_enabled': False, 'id': 1317490188, 'lang': 'ja', 'id_str': '1317490188', 'profile_background_image_url': 'http://abs.twimg.com/images/themes/theme16/bg.gif'}, 'place': None, 'text': 'トサカのないことりちゃん…( ˘ω˘ )', 'lang': 'ja'}
 	# save_tweet_status(status)
 	s = '酒'
