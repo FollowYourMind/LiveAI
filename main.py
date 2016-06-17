@@ -265,13 +265,6 @@ class StreamResponseFunctions(MyObject):
 			rand = np.random.rand()
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
-				# ans = operate_sql.get_phrase(status = 'kusoripu', n = 10000)
-				# if '{ID}' in ans:
-				# 	ans = ans.format(ID= ''.join(['@', tg1, ' ']))
-				# else:
-				# 	ans = ''.join(['@', screen_name,' \n', ans])
-				# if '{name}' in ans:
-				# 	ans = ans.format(name= 'アルパカ')
 				screen_name = ''
 		elif text in set(twlog_pool.timeline_twlog[:5]):
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
@@ -282,6 +275,7 @@ class StreamResponseFunctions(MyObject):
 		elif status['in_reply_to_screen_name'] in {None, self.bot_id}:
 			special_response_word = _.crowlList(text = text, dic = self.tmp.response)
 			if special_response_word:
+				np.random.seed()
 				ans = operate_sql.get_phrase(status =  special_response_word, character= self.default_character)
 			else:
 				text = _.clean_text2(text)
@@ -494,16 +488,11 @@ class StreamResponseFunctions(MyObject):
 						ans = operate_sql.get_phrase(status =  '勧誘チケ.success', character = character) + ' EXP -500'
 					except:
 						ans = operate_sql.get_phrase(status =  '勧誘チケ.error', character = character)
-		# elif 'NG' in text:
-		# 	try:
-		# 		cmds = text.split(' ')
-		# 		tag = cmds[1]
-		# 		if operate_sql.evalPhrase(phrase = tag, ok_add = 0, ng_add = 1):
-		# 			ans = operate_sql.get_phrase(status =  'reportNG.success', character = character)
-		# 		else:
-		# 			ans = operate_sql.get_phrase(status =  'reportNG.false', character = character)
-		# 	except:
-		# 		ans = operate_sql.get_phrase(status =  'reportNG.error', character = character)
+		elif 'NG' in text:
+			self.twf.give_fav(status_id)
+			ans = operate_sql.get_phrase(status =  'NGreport', character = character)
+		elif '淫夢' in text:
+			ans = operate_sql.get_phrase(status =  '淫夢', character = character)
 		elif 'media' in status['entities'] and status['in_reply_to_screen_name'] in {self.bot_id}:
 			userinfo['cnt'] = 0
 			fileID = self.now.strftime('%Y%m%d%H%M%S')
@@ -719,15 +708,6 @@ class StreamResponseFunctions(MyObject):
 							screen_name = ''
 							status_id = ''
 							ans = get_kusoripu(tg1 = target_name)
-							# def get_kusoripu(tg1):
-							# ans = operate_sql.get_phrase(status = 'kusoripu', n = 10000)
-							# if '{ID}' in ans:
-							# 	ans = ans.format(ID= ''.join(['@', tg1, ' ']))
-							# else:
-							# 	ans = ''.join(['@', target_name,' \n', ans])
-							# if '{name}' in ans:
-							# 	ans = ans.format(name= 'アルパカ')
-							# return ans
 						except Exception as e:
 							d(e, 'kusoripu')
 							ans = 'クソリプ失敗。管理者にお問い合わせください。'
@@ -747,6 +727,7 @@ class StreamResponseFunctions(MyObject):
 				if nlp_summary.dativ is None:
 					ans = ''.join(['えっと...なにに戻ってほしいのですか？'])
 				elif nlp_summary.dativ in {'デフォルト', '元', '元通り'}:
+					self.twf.give_fav(status_id)
 					if self.default_profile():
 						ans = 'デフォルトに戻りました'
 						self.tmp.imitating = self.bot_id
@@ -756,10 +737,10 @@ class StreamResponseFunctions(MyObject):
 			if screen_name != self.manager_id:
 				ans = '管理者権限なし'
 			else:
-				ans = 'restarting system... wait 60sec'
-				set_time = self.now + timedelta(hours=0, seconds=60)
+				ans = 'restarting system... wait 30sec'
+				set_time = self.now
 				operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': 'restart_program', 'to_whom': screen_name, 'when':set_time, 'tmptext': ''})
-		elif nlp_summary.value in {'まねる', 'モノマネする'}:
+		elif nlp_summary.value in {'まねる','真似る', 'まねする', '真似する', 'ものまねする', 'モノマネする', '擬態する', '変身して', 'メタモルフォーゼする'}:
 			is_accepted = False
 			if nlp_summary.has_function('希望', '要望'):
 				is_accepted = True
@@ -782,6 +763,7 @@ class StreamResponseFunctions(MyObject):
 					else:
 						try:
 							if self.twf.imitate(target_name):
+								self.twf.give_fav(status_id)
 								ans = operate_sql.get_phrase(status =  'imitate.success', character = character).format(''.join(['@', target_name, ' ']))
 								mode = 'open'
 								self.tmp.imitating = target_name
@@ -792,13 +774,14 @@ class StreamResponseFunctions(MyObject):
 						except Exception as e:
 							d(e, 'imitate')
 							ans = 'ものまね失敗。管理者にお問い合わせください。'
-		elif nlp_summary.value in {'遊ぶ', '尻取りする'} or userinfo['mode'] == 'srtr':
+		elif nlp_summary.value in {'遊ぶ', '尻取りする', '頭取りする', '頭とりする'} or userinfo['mode'] == 'srtr':
 			is_accepted = False
+			p(nlp_summary)
 			if userinfo['mode'] == 'srtr':
 				is_accepted = True
-			if nlp_summary.has_function('希望', '要望', '勧誘'):
+			elif nlp_summary.has_function('希望', '要望', '勧誘'):
 				is_accepted = True
-			if nlp_summary.has_function('命令'):
+			elif nlp_summary.has_function('命令'):
 				if acceptability < 0.2:
 					is_accepted = True
 			if not is_accepted:
@@ -806,7 +789,7 @@ class StreamResponseFunctions(MyObject):
 			else:
 				if nlp_summary.value in {'尻取りする'} or nlp_summary.dativ in {'尻取り', None} or userinfo['mode'] == 'srtr':
 					userinfo['mode'] = 'srtr'
-					ans = game_functions.SRTR(text, screen_name)
+					ans = game_functions.Shiritori(text, user = screen_name).main()
 					if '\END' in ans:
 						ans = ans.replace('\END', '')
 						userinfo['mode'] = 'dialog'
@@ -818,9 +801,9 @@ class StreamResponseFunctions(MyObject):
 							userinfo['cnt'] = 0
 					else:
 						userinfo['cnt'] = 0
-		elif nlp_summary.value in {'戦う', '対戦する', '倒す', 'たたかう', '申し込む'} or userinfo['mode'] in {'mon', 'battle_game'}:
+		elif nlp_summary.value in {'戦う', '対戦する', '倒す', 'バトルする',  'たたかう', '申し込む'} or userinfo['mode'] in {'mon', 'battle_game'}:
 			is_accepted = False
-			if userinfo['mode']  in {'srtr'}:
+			if userinfo['mode']  in {'mon', 'battle_game'}:
 				is_accepted = True
 			if nlp_summary.has_function('希望', '要望', '勧誘'):
 				is_accepted = True
@@ -830,27 +813,27 @@ class StreamResponseFunctions(MyObject):
 			if not is_accepted:
 				ans = operate_sql.get_phrase(status =  'reject', character = character)
 			else:
-				try:
+				try: 
 					if userinfo['mode'] in {'mon', 'battle_game'}:
 						enemy_name = None
 					else:
 						enemy_name = nlp_summary.dativ
 					if not enemy_name:
 						enemy_name = nlp_summary.akkusativ
-					else:
-						userinfo['mode'] = 'battle_game'
-						intext = status['text'].replace(''.join(['@', self.bot_id, ' ']), '').replace('@', '')
-						battle_game = game_functions.BattleGame(screen_name, enemy_name)
-						ans = '\n' + battle_game.main(intext)
-						userinfo['cnt'] = 0
-						if '#END' in ans:
-							ans = ans.replace('#END', '')
-							userinfo['mode'] = 'dialog'
-						if '#MISS' in ans:
-							ans = ans.replace('#MISS', '')
-						if '#exp' in ans:
-							ans, exp = ans.split('#exp')
-							userinfo['exp'] += 20
+
+					userinfo['mode'] = 'battle_game'
+					intext = status['text'].replace(''.join(['@', self.bot_id, ' ']), '').replace('@', '')
+					battle_game = game_functions.BattleGame(screen_name, enemy_name)
+					ans = '\n' + battle_game.main(intext)
+					userinfo['cnt'] = 0
+					if '#END' in ans:
+						ans = ans.replace('#END', '')
+						userinfo['mode'] = 'dialog'
+					if '#MISS' in ans:
+						ans = ans.replace('#MISS', '')
+					if '#exp' in ans:
+						ans, exp = ans.split('#exp')
+						userinfo['exp'] += 20
 				except Exception as e:
 					d(e, 'battle_game')
 					ans = '工事中...'
@@ -931,7 +914,7 @@ class StreamResponseFunctions(MyObject):
 				ans = operate_sql.get_phrase(status =  'no', character = character)
 		else:
 			if nlp_summary.entity:
-				if acceptability < 0.8:
+				if acceptability > 0.85:
 					if nlp_summary.entity:
 						ans = ''.join([nlp_summary.entity, 'は', nlp_summary.value, '...覚えましたし'])
 					else:
@@ -988,7 +971,7 @@ class StreamResponseFunctions(MyObject):
 				return True
 			screen_name = status['user']['screen_name']
 			if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '定期', '【', 'ポストに到達', 'リプライ数']]):
-				if screen_name != self.manager_id:
+				if status['mode'] != 'dm':
 					return True
 			if screen_name == self.bot_id:
 				return True
@@ -1021,6 +1004,7 @@ class StreamResponseFunctions(MyObject):
 			return False
 	def on_status_main(self, status):
 		try:
+			status['mode'] = 'timeline'
 			if not self.is_ignore(status):
 				self.stats.TL_cnt += 1
 				np.random.seed()
@@ -1097,16 +1081,19 @@ class StreamResponseFunctions(MyObject):
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			kws = dialog_generator.DialogObject(clean_logtext).keywords
+			nega = 0
+			if 'NG' in textB:
+				nega = 10
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
-				'SID' : '/'.join([str(twlog['status_id']), status['id_str']]),
+				'SID' : '/'.join([str(twlog['status_id']), status['id_str'], datetime.strftime(self.sync_now() , '%Y%m%d%H%M%S%f')]),
 				'KWs' : '</>'.join(kws),
 				'nameA' : logname,
 				'textA' : clean_logtext,
 				'nameB' : status['user']['screen_name'],
 				'textB' : _.clean_text(status['text']),
-				'posi' : 1,
-				'nega' : 0,
+				'posi' : posi,
+				'nega' : nega,
 				'bot_id' : self.bot_id,
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
@@ -1119,6 +1106,7 @@ class StreamResponseFunctions(MyObject):
 	def on_direct_message_main(self, status):
 		try:
 			self.stats.DM_cnt += 1
+			status['mode'] = 'dm'
 			status = self.twf.convert_direct_message_to_tweet_status(status)
 			if not self.is_ignore(status):
 				try:
@@ -1254,16 +1242,15 @@ class StreamResponseFunctions(MyObject):
 			elif todo == 'teiki.MC':
 				try:
 					ans = ''
+					dialog_obj = dialog_generator.DialogObject('')
 					while True:
-						dialog_obj = dialog_generator.DialogObject(twlog_pool.timeline_twlog[0].replace(self.atmarked_bot_id, ''))
-						ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n = 5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = self.default_character, tools = 'WN,LOG,MC', username = '@〜〜')
+						ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n = 5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = self.default_character, tools = 'WN,LOG,¡MC', username = '@〜〜')
 						if not '<人名>' in ans:
 							break
 					ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
 					task_restart()
 				except Exception as e:
 					d(e, 'teiki.MC')
-
 			elif todo == 'teiki.trendword':
 				trendwords = self.twf.getTrendwords()
 				trendword = np.random.choice(trendwords)
@@ -1273,6 +1260,7 @@ class StreamResponseFunctions(MyObject):
 			elif todo == 'followback_check':
 				followers = self.twf.get_followers_all(self.bot_id)
 				not_followbacked_followers_objects = [obj for obj in ans if self.check_if_follow(obj) if obj._json['following'] != True and check_if_follow(obj)]
+				p(not_followbacked_followers_objects)
 				for userobject in not_followbacked_followers_objects:
 					target_name = userobject['screen_name']
 					p(target_name)
@@ -1314,9 +1302,10 @@ class StreamResponseFunctions(MyObject):
 				importlib.reload(game_functions)
 				# importlib.reload(twtr_functions)
 				task_restart()
-			# elif todo == 'restart_program':
-			# 	print('restrarting_program...')
-			# 	_.restart_program()
+			elif todo == 'restart_program':
+				print('restrarting_program...')
+				# _.restart_program()
+				raise KeyboardInterrupt
 			elif todo == 'update_userprofile':
 				# self.bot_profile = self.twf.twtr_api.me()
 				# if not 'まねっこ' in self.bot_profile.location:

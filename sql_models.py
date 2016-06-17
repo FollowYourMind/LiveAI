@@ -22,147 +22,139 @@ class CoreSQLModel(Model):
     class Meta:
         database = core_sql
 class Stats(CoreSQLModel):
-	whose = CharField(null = True)
-	status = CharField(null = True)
-	number = IntegerField(null=True)
-	time = DateTimeField(null=True, default = datetime.now())
-	class Meta:
-		db_table = 'stats'
+    whose = CharField(null = True)
+    status = CharField(null = True)
+    number = IntegerField(null=True)
+    time = DateTimeField(null=True, default = datetime.now())
+    class Meta:
+        db_table = 'stats'
 class CoreInfo(CoreSQLModel):
-	whose_info = CharField(null = True)
-	info_label= CharField(null = True)
-	Char1 = CharField(null=True)
-	Char2 = CharField(null=True)
-	Char3 = CharField(null=True)
-	Int1 = IntegerField(null=True)
-	Int2 = IntegerField(null=True)
-	Time1 = DateTimeField(null=True)
-	Time2 = DateTimeField(null=True)
-	class Meta:
-		db_table = 'core_info'
-		primary_key = CompositeKey('whose_info', 'info_label')
-class Srtrtemps(CoreSQLModel):
-	kanasstream = CharField(db_column='kanasStream', null=True)
-	lenrule = IntegerField(db_column='lenRule', null=True)
-	losecnt = IntegerField(null=True)
-	name = CharField(primary_key=True)
-	totalcnt = IntegerField(null=True)
-	wincnt = IntegerField(null=True)
-	wordsstream = CharField(db_column='wordsStream', null=True)
-	class Meta:
-		db_table = 'srtrtemps'
+    whose_info = CharField(null = True)
+    info_label= CharField(null = True)
+    Char1 = CharField(null=True)
+    Char2 = CharField(null=True)
+    Char3 = CharField(null=True)
+    Int1 = IntegerField(null=True)
+    Int2 = IntegerField(null=True)
+    Time1 = DateTimeField(null=True)
+    Time2 = DateTimeField(null=True)
+    class Meta:
+        db_table = 'core_info'
+        primary_key = CompositeKey('whose_info', 'info_label')
+class ShiritoriModel(CoreSQLModel):
+    name = CharField(primary_key=True)
+    mode = CharField(null=True)
+    kana_stream = CharField(null=True)
+    word_stream = CharField(null=True)
+    len_rule = IntegerField(null=True)
+    tmp = CharField(null=True)
+    tmp_cnt = IntegerField(null=True)
+    tmp_time = DateTimeField(null=True, default = datetime.now())
+    class Meta:
+        db_table = 'shiritori'
 class CharacterStatusModel(CoreSQLModel):
-	name = CharField(primary_key=True)
-	nickname= CharField(null=True)
-	mode = CharField(null=True)
-	exp = IntegerField(null=True)
-	character_level = IntegerField(null=True)
-	exp_to_level_up = IntegerField(null=True)
-	damage = IntegerField(null=True)
-	full_hp = IntegerField(null=True)
-	rest_hp = IntegerField(null=True)
-	hp_gage = CharField(null=True)
-	Atk = IntegerField(null=True)
-	Def = IntegerField(null=True)
-	SpA = IntegerField(null=True)
-	SpD = IntegerField(null=True)
-	Spe = IntegerField(null=True)
-	enemy_name = CharField(null=True)
-	class Meta:
-		 db_table = 'character_status'
+    name = CharField(primary_key=True)
+    nickname= CharField(null=True)
+    mode = CharField(null=True)
+    exp = IntegerField(null=True)
+    character_level = IntegerField(null=True)
+    exp_to_level_up = IntegerField(null=True)
+    damage = IntegerField(null=True)
+    full_hp = IntegerField(null=True)
+    rest_hp = IntegerField(null=True)
+    hp_gage = CharField(null=True)
+    Atk = IntegerField(null=True)
+    Def = IntegerField(null=True)
+    SpA = IntegerField(null=True)
+    SpD = IntegerField(null=True)
+    Spe = IntegerField(null=True)
+    enemy_name = CharField(null=True)
+    class Meta:
+         db_table = 'character_status'
 class Users(CoreSQLModel):
-	screen_name = CharField(primary_key=True)
-	user_id = CharField(null=True)
-	name = CharField(null=True)
-	nickname = CharField(null=True)
-	mode = CharField(null=True)
-	cnt = IntegerField(null=True)
-	reply_cnt = IntegerField(null=True)
-	total_cnt = IntegerField(null=True)
-	context = CharField(null=True)
-	exp = IntegerField(null=True)
-	reply_id = CharField(null=True)
-	select_chara = CharField(null=True)
-	status_id = CharField(null=True)
-	time = DateTimeField(null=True, default = datetime.utcnow())
-	tmp = CharField(null=True)
-	tmpFile = CharField(null=True)
-	tmpTime = DateTimeField(null=True)
-	class Meta:
-		db_table = 'users'
+    screen_name = CharField(primary_key=True)
+    user_id = CharField(null=True)
+    name = CharField(null=True)
+    nickname = CharField(null=True)
+    mode = CharField(null=True)
+    cnt = IntegerField(null=True)
+    reply_cnt = IntegerField(null=True)
+    total_cnt = IntegerField(null=True)
+    context = CharField(null=True)
+    exp = IntegerField(null=True)
+    reply_id = CharField(null=True)
+    select_chara = CharField(null=True)
+    status_id = CharField(null=True)
+    time = DateTimeField(null=True, default = datetime.utcnow())
+    tmp = CharField(null=True)
+    tmpFile = CharField(null=True)
+    tmpTime = DateTimeField(null=True)
+    class Meta:
+        db_table = 'users'
 
 class Phrases(CoreSQLModel):
-	phrase = CharField(null=True)
-	framework = CharField(null=True)
-	s_type = CharField(null=True)
-	status = CharField(null=True)
-	ok_cnt = IntegerField(null=True)
-	ng_cnt = IntegerField(null=True)
-	author = CharField(null = True)
-	character = CharField(null = True)
-	createdAt = DateTimeField(null=True, default = datetime.utcnow())
-	updatedAt = DateTimeField(null=True, default = datetime.utcnow())
-	class Meta:
-		db_table = 'phrases'
-
-class Words(CoreSQLModel):
-    head = CharField()
-    length = IntegerField()
-    tail = CharField()
-    word = CharField(primary_key=True)
-    yomi = CharField()
+    phrase = CharField(null=True)
+    framework = CharField(null=True)
+    s_type = CharField(null=True)
+    status = CharField(null=True)
+    ok_cnt = IntegerField(null=True)
+    ng_cnt = IntegerField(null=True)
+    author = CharField(null = True)
+    character = CharField(null = True)
+    createdAt = DateTimeField(null=True, default = datetime.utcnow())
+    updatedAt = DateTimeField(null=True, default = datetime.utcnow())
     class Meta:
-        db_table = 'words'
+        db_table = 'phrases'
 class Task(CoreSQLModel):
-	status = CharField(null=True, default = 'waiting')
-	when = DateTimeField(null=True)
-	who = CharField(null=True)
-	what = CharField(null=True)
-	to_whom = CharField(null=True)
-	createdAt = DateTimeField(null=True, default = datetime.utcnow()+timedelta(hours = 9))
-	updatedAt = DateTimeField(null=True, default = datetime.utcnow()+timedelta(hours = 9))
-	tmptext = CharField(null=True, default = '')
-	tmpfile = CharField(null=True, default = '')
-	tmpcnt = IntegerField(null=True, default = 0)
-	tmpid = CharField(null=True, default = '')
-	bot_id = CharField(null=True, default = '')
-	class Meta:
-		db_table = 'tasks'
+    status = CharField(null=True, default = 'waiting')
+    when = DateTimeField(null=True)
+    who = CharField(null=True)
+    what = CharField(null=True)
+    to_whom = CharField(null=True)
+    createdAt = DateTimeField(null=True, default = datetime.utcnow()+timedelta(hours = 9))
+    updatedAt = DateTimeField(null=True, default = datetime.utcnow()+timedelta(hours = 9))
+    tmptext = CharField(null=True, default = '')
+    tmpfile = CharField(null=True, default = '')
+    tmpcnt = IntegerField(null=True, default = 0)
+    tmpid = CharField(null=True, default = '')
+    bot_id = CharField(null=True, default = '')
+    class Meta:
+        db_table = 'tasks'
 ###################################################
 #
 # >>>>>>>>TWLOG_SQL>>>>>>>>>>>>>>>>>>>>>>>>>
 #
 ####################################################
 class twlog_sqlModel(Model):
-	class Meta:
-		database = twlog_sql
+    class Meta:
+        database = twlog_sql
 class Tweets(twlog_sqlModel):
-	status_id = IntegerField(primary_key=True)
-	screen_name = CharField(null=True)
-	name = CharField(null=True)
-	user_id = CharField(null=True)
-	text = CharField(null=True)
-	in_reply_to_status_id_str = CharField(null=True)
-	bot_id = CharField(null=True)
-	createdAt = DateTimeField(null=True)
-	updatedAt = DateTimeField(null=True)
-	class Meta:
-		db_table = 'tweets'
+    status_id = IntegerField(primary_key=True)
+    screen_name = CharField(null=True)
+    name = CharField(null=True)
+    user_id = CharField(null=True)
+    text = CharField(null=True)
+    in_reply_to_status_id_str = CharField(null=True)
+    bot_id = CharField(null=True)
+    createdAt = DateTimeField(null=True)
+    updatedAt = DateTimeField(null=True)
+    class Meta:
+        db_table = 'tweets'
 
 class TwDialog(twlog_sqlModel):
-	SID = CharField(primary_key=True)
-	KWs = CharField(null=True)
-	nameA = CharField(null=True)
-	textA = CharField(null=True)
-	nameB = CharField(null=True)
-	textB = CharField(null=True)
-	posi = IntegerField(null=True)
-	nega = IntegerField(null=True)
-	bot_id = CharField(null=True)
-	createdAt = DateTimeField(null=True)
-	updatedAt = DateTimeField(null=True)
-	class Meta:
-		db_table = 'dialog'
+    SID = CharField(primary_key=True)
+    KWs = CharField(null=True)
+    nameA = CharField(null=True)
+    textA = CharField(null=True)
+    nameB = CharField(null=True)
+    textB = CharField(null=True)
+    posi = IntegerField(null=True)
+    nega = IntegerField(null=True)
+    bot_id = CharField(null=True)
+    createdAt = DateTimeField(null=True)
+    updatedAt = DateTimeField(null=True)
+    class Meta:
+        db_table = 'dialog'
 ###################################################
 #
 # >>>>>>>>TALK_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -173,16 +165,15 @@ class TalkSQLModel(Model):
     class Meta:
         database = talk_sql
 class TFIDFModel(TalkSQLModel):
-    word = CharField()
+    word = CharField(null=True)
     yomi = CharField(null=True)
     hinshi = CharField(null=True)
     hinshi2  = CharField(null=True)
     info3  = CharField(null=True)
-    termcnt = IntegerField(null=True)
-    tf = IntegerField(null=True)
     df = IntegerField(null=True)
     class Meta:
         db_table = 'df'
+        primary_key = CompositeKey('word', 'hinshi')
 
 class TrigramModel(TalkSQLModel):
     character = CharField(null=True)
@@ -346,6 +337,6 @@ class Xlink(WordNetModel):
             (('synset', 'resource'), False),
         )
 if __name__ == '__main__':
-	s = ''
+    s = ''
 
 

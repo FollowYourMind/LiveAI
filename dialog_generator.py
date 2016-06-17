@@ -104,83 +104,44 @@ def getBoomWords(username = '_umiA', n = 400):
                 db.rollback()
 
 
-class TFIDF():
+class TFIDF(MyObject):
         def __init__(self, option = ''):
                 self.option = option
-        def increase_document_frequency(self, word):
-                try:
-                        # talk_sql.create_tables([managementInfos, tf_idf], True)
-                        with talk_sql.transaction():
-                                try:
-                                        wdb, created = TFIDFModel.get_or_create(word = word)
-                                        if not created:
-                                                try:
-                                                        wdb.df +=    1
-                                                except:
-                                                        wdb.df = 1
-                                                wdb.save()
-                                except Exception as e:
-                                        d(e)
-                                talk_sql.commit()
-                except Exception as e:
-                    talk_sql.rollback()
-                # print(e)
-
         def upsert_word(self, ma, is_learn = False, retry_cnt = 0):
                 genkei = ma[7]
                 hinshi = ma[1]
                 hinshi2 = ma[2]
-                document_frequency = 1;
-                is_created = False
+                document_frequency = 1
                 try:
                         with talk_sql.transaction():
-                                wdb, is_created = TFIDFModel.get_or_create(word = genkei, hinshi = hinshi, hinshi2 = hinshi2)
-                                if not is_learn:
-                                        document_frequency = 1
-                                elif is_created:
-                                        wdb.word = genkei
-                                        wdb.yomi = ma[8]
-                                        wdb.hinshi = ma[1]
-                                        wdb.hinshi2    = ma[2]
-                                        wdb.info3    = ma[3]
-                                        wdb.termcnt = 1
-                                        wdb.df = 1
-                                        wdb.term_frequency = 1
-                                        wdb.save()
-                                        document_frequency = 1
-                                else:
-                                        try:
-                                            wdb.df +=    1
-                                        except:
-                                                wdb.df = 1
+                                wdb, is_created = TFIDFModel.get_or_create(word = genkei, hinshi = hinshi, defaults = {'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 0})
+                                wdb.df +=  1
                                 document_frequency = wdb.df
                                 if is_learn:
                                         wdb.save()
                                         talk_sql.commit()
-                except DoesNotExist as e:
-                     return None, is_created
                 except OperationalError as e:
                      retry_cnt += 1
                      time.sleep(0.1*retry_cnt)
                      d(e, retry_cnt, 'tfidf_upsert')
                      return self.upsert_word(ma, is_learn, retry_cnt)
                 except IntegrityError as e:
-                     d(e)
+                     d(e, 'tfidf.upsert')
                      wordnet_sql.rollback()
                      raise Exception
                 except Exception as e:
-                     p(e)
+                     d(e, 'tfidf.upsert')
+                     return 0, False
                 else:
                     return document_frequency, is_created
 
-        def calc_tf_idf(self, w, term_frequency_dic, cnt = 5, total_documents = 30000, is_debug = False):
+        def calc_tf_idf(self, w, term_frequency_dic, total_documents = 30000, is_debug = False, is_learn = False):
                 word = w[7]
-                word_cnt = term_frequency_dic[word]
-                term_frequency =    word_cnt / cnt
+                term_frequency = term_frequency_dic[word]
                 if word == '*':
                         return ''
                 else:
-                        document_frequency, is_created = self.upsert_word(w)
+                        document_frequency, is_created = self.upsert_word(w, is_learn)
                 try:
                         base_inversed_document_frequency = total_documents / document_frequency
                         inversed_document_frequency = 1 + np.log2(base_inversed_document_frequency)
@@ -194,28 +155,23 @@ class TFIDF():
                 return w
 
         def append_tf_idf_on_ma_result(self, ma, total_documents = 420000, is_learn = False, is_debug = False):
-                        # ma = natural_language_processing.MA.get_mecab_coupled(s)
-                word_cnt = len(ma)
                 word_ls = [w[7] for w in ma]
                 counter = Counter(word_ls)
                 term_frequency_dic = {}
-                for word, cnt in counter.most_common():
-                        term_frequency_dic[word] = cnt
-                result = [self.calc_tf_idf(w, term_frequency_dic, cnt = 5, total_documents = total_documents, is_debug = is_debug) for w in ma]
-                if is_learn:
-                        [self.increase_document_frequency(key) for key in term_frequency_dic.keys()]
+                def word_counter(word, cnt):
+                    term_frequency_dic[word] = cnt
+                [word_counter(word, cnt) for word, cnt in counter.most_common()]
+                result = [self.calc_tf_idf(w, term_frequency_dic, total_documents = total_documents, is_debug = is_debug, is_learn = is_learn) for w in ma]
                 return result
 
         def learn_tf_idf(self, sList):
-                # result = [Main(s, 1, True, True) for s in sList]
-                # print(len(result))
                 i = 1;
                 for s in sList:
-                        print('++++++++++++++++++++++++++++++++++++++++++++++++++')
-                        print(i, s)
+                        p('++++++++++++++++++++++++++++++++++++++++++++++++++')
+                        p(i, s)
                         try:
-                                ma = natural_language_processing.MA.get_mecab_coupled(s)
-                                mas = self.append_tf_idf_on_ma_result(ma, i, True, True)
+                                ma = natural_language_processing.MA.get_mecab_coupled(s, couple_target = {'記号', '助動詞', '助詞' ,'名詞'}, cp_kakoi = '{}', cp_splitter = '', masking_format = '{original}',    is_mask_on = 1)
+                                self.append_tf_idf_on_ma_result(ma, total_documents = i, is_learn = True, is_debug = False)
                         except Exception as e:
                                 print(e)
                         i += 1
@@ -484,7 +440,7 @@ class TrigramMarkovChain(MyObject):
                                 W = ['...']
                         ans += W
                         i+= 1
-                        p(ans)
+                        # p(ans)
                 while True:
                         pre1 = ans[i]
                         i1 = i+1
@@ -651,58 +607,6 @@ def trigram_main(s, is_debug = False, character = 'sys'):
     except Exception as e:
         d(e, 'trigram_main')
         return None
-# def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
-#     i = 1
-#     proc = 2
-    # def _learn_trigram(target_ls, process_id, lc):
-    #     time.sleep(process_id)
-    #     try:
-    #         with talk_sql.transaction():
-    #             target_length = len(target_ls)
-    #             ini = target_length * process_id // proc
-    #             fin = target_length * (process_id+1) // proc
-    #             split_target_ls = target_ls[ini:fin]
-    #             cnt = 0
-    #             for s in split_target_ls:
-    #                 p('_______', ''.join(['Process:', str(process_id),'] ', str(over + ini + cnt),'/', str(fin)]), '____________________')
-    #                 p(s)
-    #                 try:
-    #                     trigrams = trigram_main(s, is_debug = False, character = 'sys')
-    #                     for trigram in trigrams:
-    #                         lc.acquire()
-    #                         save_trigram_in_transaction(trigram, character = character)
-    #                         lc.release()
-    #                 except Exception as e:
-    #                     d(e, '_learn_trigram1')
-    #                     pass
-    #                 else:
-    #                     talk_sql.commit()
-    #                     cnt += 1
-    #     except IntegrityError as e:
-    #         d(e, '_learn_trigram2')
-    #         talk_sql.rollback()
-    #         raise Exception
-    #     except Exception as e:
-    #         d(e)
-    #         return None
-#     try:
-#         # talk_sql.create_tables([TrigramModel], True)
-#         lc = multiprocessing.Lock()
-#         target_ls = s_ls[over:]
-#         processes = [ 
-#             multiprocessing.Process(target=_learn_trigram, args=(target_ls, 0, lc)),
-#             multiprocessing.Process(target=_learn_trigram, args=(target_ls, 1, lc)),
-#             # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 2, lc)),
-#             # multiprocessing.Process(target=_learn_trigram, args=(target_ls, 3, lc)),
-#         ]
-#         for process in processes:
-#             process.start()
-#     except Exception as e:
-#         # talk_sql.rollback()
-#         return False
-#     else:
-#         p('complete!! all trigram-learning')
-#         return True
 def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     i = 1
     proc = 4
@@ -741,12 +645,7 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
                         d(e, '_learn_trigram1')
                         pass
                     else:
-                        # talk_sql.commit()
                         cnt += 1
-        # except IntegrityError as e:
-        #     d(e, '_learn_trigram2')
-        #     talk_sql.rollback()
-        #     raise Exception
         except Exception as e:
             d(e)
             return None
@@ -783,7 +682,6 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     process = multiprocessing.Process(target=receiver, args=(q, i), name='Receiver1')
     receivers.append(process)
     process.start()
-    # for i in range(1):
     for s_r_process in senders + receivers:
         s_r_process.join()
 def save_trigram_in_transaction(tri, character = 'sys', retry_cnt = 0):
@@ -844,7 +742,7 @@ def learnLang(sList, character = 'U'):
         p('++++++++++++++++++++++++++++++++++++++++++++++++++')
         p(i, s)
         try:
-            TrigramModel = trigram_main(s, 1, 0, character)
+            # TrigramModel = trigram_main(s, 1, 0, character)
             tfidf = TFIDF.append_tf_idf_on_ma_result(s, i, True, 0)
         except Exception as e:
             print('')
@@ -889,10 +787,14 @@ def extractKeywords(ma, exp = {'助詞', '助動詞', '記号', '接続詞', '�
 
 def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], n = 20, min_similarity = 0.2, retry_cnt = 0):
     try:
-        if not kws[0]:
+        if not text:
             return ''
         with twlog_sql.transaction():
-            if not UserList:
+            if not kws[0]:
+                ma = natural_language_processing.MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
+                word = np.random.choice(ma)
+                dialogs = TwDialog.select().where(TwDialog.textA.contains(word), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
+            elif not UserList:
                 dialogs = TwDialog.select().where(TwDialog.KWs.contains(kws[0]), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
             else:
                 dialogs = TwDialog.select().where(TwDialog.KWs.contains(kws[0]), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
@@ -901,9 +803,11 @@ def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pok
             if not d_listS[0][1]:
                 return ''
             if d_listS[0][0] > min_similarity:
-                return ''.join([d_listS[0][1], '\n(Log合致度:', str(d_listS[0][0]), ')'])
+                return ''.join([d_listS[0][1], '\n(', str(d_listS[0][0]), ')'])
             else:
                 return ''
+    except DoesNotExist as e:
+        return ''
     except OperationalError as e:
         retry_cnt += 1
         time.sleep(0.2*retry_cnt)
@@ -1020,9 +924,16 @@ class DialogObject(MyObject):
                 fact_dict = self.nlp_data.summary
                 fact = FactModel.get(entity = fact_dict.entity, value = fact_dict.value, akkusativ = fact_dict.akkusativ, dativ = fact_dict.dativ)
                 return fact
-        except Exception as e:
-            p(e)
+        except DoesNotExist as e:
+            return None
+        except OperationalError as e:
+            return None
+        except IntegrityError as e:
+            d(e)
             talk_sql.rollback()
+            raise Exception
+        except Exception as e:
+            d(e)
             return False
     def save_fact(self):
         # talk_sql.create_tables([FactModel], True)
@@ -1073,7 +984,7 @@ class DialogObject(MyObject):
                 s = context.split('</>')[-1] + s
             except:
                 pass
-        s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
+        s = _.clean_text(s, isKaigyouOFF = False)
         generated_by = 'nod'
         try:
             if not self.keywords:
@@ -1168,11 +1079,7 @@ if __name__ == '__main__':
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    # command = ''
     text = '''みなさんお久しぶりですニコッまたこれからもよろしくお願いします☺️''' 
-    # UserList = ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico']
-    # UserList = ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
-    # UserList = ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin', ]
     UserLists = {
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
@@ -1190,22 +1097,9 @@ if __name__ == '__main__':
     #     p(chara, userlist)
     #     s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
     #     learn_trigram(s_ls, character = chara, over = 0)
-    # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'MC', username = '@〜〜')
-    # p(ans)
-    ans = DialogObject(text).nlp_data.summary
+    ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'LOGMC', username = '@〜〜')
     p(ans)
-    # trigram_main(s_ls, is_debug = True, character = 'にこ')
-    # p(TFIDF.ebxtract_keywords_from_text(text))
-    # dialog_obj = DialogObject(text)
-    # # reg = RegexTools.main(text)
-    # # # p(reg)
-    # # p(MA.get_mecab_coupled(text))
-    # # # p(NLPdata(text).regex_analysis.__dict__)
-    # nlp_data = dialog_obj.nlp_data
-    # # p(nlp_data.summary)
-    # p(dialog_obj.keywords)
-    # p(nlp_data.summary.has_function('疑問'))
-    # ans = operate_sql.get_phrase(status =    'yes', character = character)
-    # p(dialog_obj.save_facts())
-    # ans = dialog(s = text, context = 'この世をば我が世とぞ思う', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = ['hsw37', 'ry72321', 'MANI_CHO_8', 'HONO_HONOKA_1', 'MOEKYARA_SAIKOU', 'megmilk_0308'], min_similarity = 0.3, character = '海未', tools = 'SYA')
-    # p(wordnet_dialog(kw = 'テスト'))
+
+    # talk_sql.create_tables([TFIDFModel], True)
+    # s_ls = operate_sql.get_twlog_list(n = 100000, UserList = [], contains = '')
+    # TFIDF.learn_tf_idf(s_ls)

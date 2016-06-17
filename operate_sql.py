@@ -8,7 +8,7 @@ from _ import p, d, MyObject, MyException
 import threading
 def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}, retry_cnt = 0):
 	try:
-		core_sql.create_tables([Stats], True)
+		# core_sql.create_tables([Stats], True)
 		with core_sql.transaction():
 			t = Stats(**stats_dict)
 			t.save()
@@ -76,7 +76,7 @@ def get_core_info(whose_info = 'LiveAI_Umi', info_label = 'test', standard_dic =
 		return CoreInfo(**standard_dic)
 def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()+timedelta(hours = 9)}):
 	try:
-		core_sql.create_tables([Task], True)
+		# core_sql.create_tables([Task], True)
 		with core_sql.transaction():
 			t = Task(**taskdict)
 			t.save()
@@ -311,7 +311,7 @@ def savePhrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', c
 	return save_phrase(s_type = s_type, author = author, phrase = phrase, status = status, n = n, character = character)
 def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys', retry_cnt = 0):
 	try:
-		core_sql.create_tables([Phrases], True)# 第二引数がTrueの場合、存在している場合は、作成しない
+		# core_sql.create_tables([Phrases], True)# 第二引数がTrueの場合、存在している場合は、作成しない
 		with core_sql.transaction():
 			P, is_created = Phrases.get_or_create(phrase = phrase)
 			if is_created:

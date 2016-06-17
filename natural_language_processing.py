@@ -108,7 +108,7 @@ class RegexTools(MyObject):
             #
             dantei = '(?P<断定>(の|ん|なん)*(です|でしょ|ます|である|だ|なり|じゃ|や|にゃ))'
             gimon = '(?P<疑問>[?？]|((でしょう|ん|の)*(の|か|かい|かな|かね|かしら|かの)[?？。]*))'
-            kanyu = '(?P<勧誘>(しましょう|ませんか)[?？。]*)'
+            kanyu = '(?P<勧誘>(しましょう|ませんか|う)[?？。]*)'
             #
             deny = '(?P<否定>(ねえ|ない))'
             ban = '(?P<禁止>(するな|いけない|ねえ))'
@@ -273,18 +273,17 @@ class MorphologicalAnalysis(MyObject):#MeCab
                                 break
                             loop_cursor += 1
                         except Exception as e:
-                            p(e)
+                            d(e, 'get_mecab_coupled loop')
                             break
                     ma[loop_cursor] = [cp_kakoi.format(cp_splitter.join([joint_ma[k] for joint_ma in joint_mas])) for k in range(10)]
                     ma[loop_cursor][1] = ma11
-                    # ma[loop_cursor][]
                     [make_none(erase_cursor) for erase_cursor in range(cursor, loop_cursor)]
                 if is_joint:
                     ma[cursor] = [cp_kakoi.format(cp_splitter.join([ma[cursor-1][k], ma[cursor][k]])) for k in range(10)]
                     ma[cursor-1][0] = None
                 return ma[cursor]
             except Exception as e:
-                p(e)
+                d(e, 'mecab couple')
                 return None
         ###ここから関数
         if not s:
@@ -1104,12 +1103,15 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''みなさんは変態かな'''    # text = 'したい'
+    text = '''淫夢'''    # text = 'したい'
+    # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
+    # p(np.random.choice(a))
     # reg = RegexTools.main(text)
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
     nlp_data = NLPdatas(text).main
-    p(nlp_data.summary.has_function('疑問'))
+    p(nlp_data.summary)
+    # p(nlp_data.summary.has_function('希望', '要望', '勧誘'))
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =  'yes', character = character)
     # p(ans)
