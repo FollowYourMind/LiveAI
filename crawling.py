@@ -4,15 +4,47 @@ from setup import *
 import _
 from _ import p, d, MyObject, MyException
 import urllib
+import os
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 import bs4
 # MY PROGRAMs
 
-def get_bs4soup(url):
+def get_bs4soup_old(url):
 	header = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
 	html = urllib.request.urlopen(url)
 	soup = bs4.BeautifulSoup(html, 'lxml')
 	return soup
-
+def get_bs4soup(url):
+	USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+	# Selenium settings
+	phantomjs_path = '/usr/local/bin/phantomjs'
+	# phantomjs_args = [ '--proxy=proxy.server.no.basho:0000', '--cookie-file={}'.format("cookie.txt") ] service_args=phantomjs_args
+	driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
+	# get a HTML response
+	driver.get(url)
+	html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+	soup = bs4.BeautifulSoup(html, 'lxml')
+	# ss = driver.execute_script('return loadDisqus();')
+	# p(ss)
+	return soup
+def extract_ss(url = 'http://www.lovelive-ss.com/?p={}'):
+	soup = get_bs4soup(url)
+	title = soup.find('h1', class_="entry-title")
+	if title is None:
+		return None
+	else:
+		p(title.get_text(), url)
+	try:
+		ss_contents = soup.find("div", class_ = "entry-content").find_all("dd", class_ ="t_b")
+	except:
+		return None
+	def op_soup(content):
+		a_conts = content.find_all('a')
+		[a_cont.extract() for a_cont in a_conts if not a_cont is None]
+		return content.get_text()
+	s_ls = [op_soup(ss_content) for ss_content in ss_contents]
+	return s_ls
 def search_weblioEJJE(word = 'ask'):
 	try:
 		converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
@@ -94,8 +126,31 @@ if __name__ == '__main__':
 		user = 'p_eval'
 		text = "皇居"
 	url = 'http://www.lovelive-ss.com/?p=8560'
-	soup = get_bs4soup(url)
-	p(soup)
+	# soup = get_bs4soup(url)
+	# p(soup)
+	import operate_sql
+	import natural_language_processing
+	site_url = 'http://www.lovelive-ss.com/?p={}'
+	# range(4538, 8000):
+	reg = natural_language_processing.RegexTools()
+	for ss_number in range(4538):
+		p(ss_number)
+		try:
+			url = site_url.format(ss_number)
+			# ss_ls = extract_ss(url = url)
+			# if ss_ls:
+			# 	operate_sql.save_ss(url = url, texts = ss_ls, retry_cnt = 0)
+			# datas = operate_sql.get_ss(url = url)
+			# text = ''.join([data.text for data in datas])
+			# p(reg.extract_discorse(text))
+			operate_sql.save_ss_dialog(url)
+		except Exception as e:
+			d(e)
+		# time.sleep(1+np.random.rand()*3)
+
+	# p(1+np.random.rand()*3)
+	# extract_ss(url = 'http://www.lovelive-ss.com/?p=22')
+	# p(os.environ['PATH'])
 	# print(search_wiki(word = '官僚制'))
 	# get_dl_links('http://www.fsa.go.jp/news/newsj/16/ginkou/f-20050629-3.html', extention = 'pdf', DIR = '/Users/masaMikam/Dropbox/Research/金融庁分析', sleep_time = 1)
 # 	while len(ans) > 130:

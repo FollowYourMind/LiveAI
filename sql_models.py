@@ -7,12 +7,43 @@ twlog_sql_PLACE = DATADIR + '/SQL/sys.twlog'
 core_sql_PLACE = DATADIR + '/SQL/sys.info'
 talk_sql_PLACE = DATADIR + '/SQL/sys.talk'
 wordnet_sql_PLACE = DATADIR + '/lib/wnjpn.db'
+webdata_sql_PLACE = DATADIR + '/SQL/webdata.db'
 
 from playhouse.sqlite_ext import SqliteExtDatabase
 core_sql = SqliteExtDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist')
 talk_sql = SqliteExtDatabase(talk_sql_PLACE, autocommit=False, journal_mode='persist')
 twlog_sql = SqliteExtDatabase(twlog_sql_PLACE, autocommit=False, journal_mode='persist')
 wordnet_sql =  SqliteExtDatabase(wordnet_sql_PLACE, autocommit=False, journal_mode='persist')
+webdata_sql =  SqliteExtDatabase(webdata_sql_PLACE, autocommit=False, journal_mode='persist')
+###################################################
+#
+# >>>>>>>>WEBDATA_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#
+####################################################
+class WebdataSQLModel(Model):
+    class Meta:
+        database = webdata_sql
+class SS(WebdataSQLModel):
+    url = CharField(null = True)
+    text = CharField(null = True)
+    time = DateTimeField(null=True, default = datetime.now())
+    class Meta:
+        db_table = 'ss'
+class SSdialog(WebdataSQLModel):
+    url = CharField(null = True)
+    person = CharField(null = True)
+    text = CharField(null = True)
+    reaction = CharField(null = True)
+    time = DateTimeField(null=True, default = datetime.now())
+    class Meta:
+        db_table = 'ss_dialog'
+class SSdialog_relation(WebdataSQLModel):
+    id1 = IntegerField(null = True)
+    id2 = IntegerField(null = True)
+    id3 = IntegerField(null = True)
+    class Meta:
+        db_table = 'ss_dialog_relation'
+        primary_key = CompositeKey('id1', 'id2', 'id3')
 ###################################################
 #
 # >>>>>>>>CORE_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -338,5 +369,6 @@ class Xlink(WordNetModel):
         )
 if __name__ == '__main__':
     s = ''
+    webdata_sql.create_tables([SS, SSdialog_relation, SSdialog], True)
 
 

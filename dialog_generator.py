@@ -5,6 +5,7 @@ from sql_models import *
 import _
 from _ import p, d, MyObject, MyException
 import operate_sql
+import queue
 
 # from sklearn.cluster import KMeans
 # def kmeans(features, k=10):
@@ -103,19 +104,25 @@ def getBoomWords(username = '_umiA', n = 400):
                 print(ex)
                 db.rollback()
 
-
 class TFIDF(MyObject):
         def __init__(self, option = ''):
                 self.option = option
+                self.fix_s1_tfidf = None
         def upsert_word(self, ma, is_learn = False, retry_cnt = 0):
                 genkei = ma[7]
                 hinshi = ma[1]
                 hinshi2 = ma[2]
                 document_frequency = 1
+                is_created = False
                 try:
                         with talk_sql.transaction():
-                                wdb, is_created = TFIDFModel.get_or_create(word = genkei, hinshi = hinshi, defaults = {'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 0})
-                                wdb.df +=  1
+                                try:
+                                    wdb = TFIDFModel.get(word = genkei, hinshi = hinshi)
+                                    wdb.df +=  1
+                                except DoesNotExist as e:
+                                    # wdb = TFIDFModel({'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 0})
+                                    wdb = TFIDFModel(**{'word': genkei, 'hinshi': hinshi, 'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 1})
+                                    is_created = True
                                 document_frequency = wdb.df
                                 if is_learn:
                                         wdb.save()
@@ -211,7 +218,7 @@ class TFIDF(MyObject):
                 try:
                         return np.random.choice([x[0] for x in keywords], random_cnt, replace=False, p = p)
                 except:
-                        return ['']
+                        return []
         def extract_keywords_from_text(self, s, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
                 ma = natural_language_processing.MA.get_mecab_coupled(s)
                 return self.extract_keywords_from_ma(ma = ma, threshold = threshold, n = n, length = length, is_print = is_print, needs = needs, random_cnt = random_cnt)
@@ -227,7 +234,7 @@ class TFIDF(MyObject):
                 if kwcnt == 0:
                         if is_print:
                                 p('=> キーワードは見つかりませんでした。')
-                        return ['']
+                        return []
                 else:
                         if is_print:
                                 if kwcnt < n:
@@ -238,17 +245,18 @@ class TFIDF(MyObject):
                         print(mostImptf_idf)
                         convImpRate = 100 / float(mostImptf_idf)
                         return impkey
+        def precalc_s1_tfidf(self, s):
+                # p(s)
+                self.fix_s1_tfidf =  {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
         def calc_cosine_similarity(self, s1, s2):
                 try:
-                        if not s1:
+                        if not s1 or not s2:
                             return 0
-                        if not s2:
-                            return 0
-                        intexts = [s1, s2]
-                        tf_idf_ls = [{ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(text)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}} for text in intexts]
-                        vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls[0].keys()] + [tf_idf_ls[1].keys()]))))
-                        tf_idf_ls0 = tf_idf_ls[0]
-                        tf_idf_ls1 = tf_idf_ls[1]
+                        if not self.fix_s1_tfidf:
+                            self.precalc_s1_tfidf(s1)
+                        tf_idf_ls0 = self.fix_s1_tfidf
+                        tf_idf_ls1 = {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s2)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
+                        vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls0.keys()] + [tf_idf_ls1.keys()]))))
                         v1 = np.array([tf_idf_ls0[w] if w in set(tf_idf_ls0) else 0 for w in vecF])
                         v2 = np.array([tf_idf_ls1[w] if w in set(tf_idf_ls1) else 0 for w in vecF])
                         bunbo = (np.linalg.norm(v1) * np.linalg.norm(v2))
@@ -257,9 +265,8 @@ class TFIDF(MyObject):
                         else:
                                 return 0
                 except Exception as e:
-                        print(e)
+                        d(e, 'calc_cosine_similarity')
                         return 0
-TFIDF = TFIDF()
 class TrigramMarkovChain(MyObject):
         def __init__(self, character = 'sys'):
                 self.character = character
@@ -743,7 +750,8 @@ def learnLang(sList, character = 'U'):
         p(i, s)
         try:
             # TrigramModel = trigram_main(s, 1, 0, character)
-            tfidf = TFIDF.append_tf_idf_on_ma_result(s, i, True, 0)
+            tfidf = TFIDF()
+            tfidf.append_tf_idf_on_ma_result(s, i, True, 0)
         except Exception as e:
             print('')
         i += 1
@@ -784,42 +792,6 @@ def extractKeywords(ma, exp = {'助詞', '助動詞', '記号', '接続詞', '�
 #     anal = getSimilarWords(w = word, cnt = 3, dockerIP = '192.168.59.103')
 #     ans = ''.join([word, 'といえば', anal[0], 'とか', anal[1], 'ですよね。'])
 #     return ans
-
-def get_tweet_log(text = '', kws = [''], UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], n = 20, min_similarity = 0.2, retry_cnt = 0):
-    try:
-        if not text:
-            return ''
-        with twlog_sql.transaction():
-            if not kws[0]:
-                ma = natural_language_processing.MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
-                word = np.random.choice(ma)
-                dialogs = TwDialog.select().where(TwDialog.textA.contains(word), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
-            elif not UserList:
-                dialogs = TwDialog.select().where(TwDialog.KWs.contains(kws[0]), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
-            else:
-                dialogs = TwDialog.select().where(TwDialog.KWs.contains(kws[0]), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
-            d_list = [(TFIDF.calc_cosine_similarity(s1 = text, s2 = d.textA), d.textB) for d in dialogs]
-            d_listS = sorted(d_list, key = lambda x: x[0], reverse = True)
-            if not d_listS[0][1]:
-                return ''
-            if d_listS[0][0] > min_similarity:
-                return ''.join([d_listS[0][1], '\n(', str(d_listS[0][0]), ')'])
-            else:
-                return ''
-    except DoesNotExist as e:
-        return ''
-    except OperationalError as e:
-        retry_cnt += 1
-        time.sleep(0.2*retry_cnt)
-        d(e, retry_cnt, "get_tweet_log")
-        return get_tweet_log(text, kws, UserList, BlackList, n, min_similarity, retry_cnt)
-    except IntegrityError as e:
-        d(e)
-        twlog_sql.rollback()
-        raise Exception
-    except Exception as e:
-        d(e)
-        return ''
 def reform_info(info, username = '@username'):
         try:
                 if info['is_collapsed']:
@@ -913,10 +885,14 @@ class DialogObject(MyObject):
         #TODO]分離
         self.nlp_datas = natural_language_processing.NLPdatas(s)
         ##
+        self.s = s
         self.nlp_data = self.nlp_datas.main
-        self.keywords = self._get_keywords(s)
+        self.cleaned_s = _.clean_text(self.nlp_data.text, isKaigyouOFF = False)
+        self.keygen = self.keywords_gen()
+        # self.keywords = self._get_keywords(s)
         if self.nlp_data.summary.function == '断定':
             self.save_fact()
+        self.tfidf = TFIDF()
     def is_fact(self):
         # talk_sql.create_tables([FactModel], True)
         try:
@@ -963,11 +939,31 @@ class DialogObject(MyObject):
                 return s
         except:
                 return s
+    def keywords_gen(self, needs= {'名詞', '固有名詞'}):
+        keywords = ''
+        if not keywords:
+            s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', self.s)
+            tfidf_kws = self.tfidf.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
+            keywords = [kw for kw in tfidf_kws if not '@' in kw]
+        if not keywords:
+            keywords = natural_language_processing.MA.get_mecab(s, mode = 7, form = {'名詞'}, exception = {'記号'}, is_debug = False)
+        if not keywords:
+            keywords = natural_language_processing.MA.get_mecab(s, mode = 7, form = None, exception = {'記号'}, is_debug = False)
+        if keywords:
+            for keyword in keywords:
+                yield keyword
+            for keyword in keywords:
+                wn_dic = operate_sql.get_wordnet_result(lemma = keyword)
+                if wn_dic:
+                    wn_keywords = _.flatten(wn_dic.values())
+                    for keyword in wn_keywords:
+                        yield keyword
+        # return keywords
     def _get_keywords(self, s, needs= {'名詞', '固有名詞'}):
         keywords = ''
         if not keywords:
             s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
-            keywords = TFIDF.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
+            keywords = self.tfidf.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
             keywords = [kw for kw in keywords if not '@' in kw]
         if keywords:
             kw = keywords[0]
@@ -975,64 +971,104 @@ class DialogObject(MyObject):
             if wn_dic:
                 keywords = _.flatten(wn_dic.values())
         return keywords
-    def dialog(self, context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], min_similarity = 0.3, character = 'sys', tools = 'SYA,WN,LOG,MC', username = '@〜〜'):
-        #URL除去
-        s = self.nlp_data.text
-        ans = ''
-        if context:
-            try:
-                s = context.split('</>')[-1] + s
-            except:
-                pass
-        s = _.clean_text(s, isKaigyouOFF = False)
-        generated_by = 'nod'
+    def ss_log_sender(self, q, person = '', n = 100, retry_cnt = 0):
+        dialogs = None
+        d_ls = []
         try:
-            if not self.keywords:
-                    kw = '私'
-            else:
-                    kw = np.random.choice(self.keywords)
-            # mas = natural_language_processing.MA.get_mecab_coupled(s)
-            # p(mas)
-            if not ans:
-                if 'LOG' in tools:
-                    ans = get_tweet_log(text = s, kws = self.keywords, UserList = UserList, BlackList = BlackList, min_similarity = min_similarity)
-                    generated_by = 'LOG'
-            # if not ans:
-            #     if np.random.rand() < 0.8:
-            #         pass
-            #     elif 'WN' in tools:
-            #         ans = wordnet_dialog(kw = kw)
-            #         generated_by = 'WN'
-            #         if ans:
-            #             character = '海未'
-            if not ans:
-                if 'MC' in tools:
-                    trigram_markov_chain_instance = TrigramMarkovChain(character)
-                    ans = trigram_markov_chain_instance.generate(word = kw, is_randomize_metasentence = is_randomize_metasentence)
-                    # d_list = [(TFIDF.calc_cosine_similarity(s1 = s, s2 = trians), trians) for trians in ans_ls]
-                    # d_listS = sorted(d_list, key = lambda x: x[0], reverse = True)
-                    # p(d_listS)
-                    # if not d_listS[0][1]:
-                    #     ans = ''
-                    # if d_listS[0][0] > 0:
-                    #     ans = ''.join([d_listS[0][1], '\n(Log合致度:', str(d_listS[0][0]), ')'])
-                    # else:
-                    #     ans = ''
-                    generated_by = 'MC'
-            if not ans:
-                if 'MC' in tools:
-                    trigram_markov_chain_instance = TrigramMarkovChain(character)
-                    ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = is_randomize_metasentence)
-                    generated_by = 'MC_'
-            if not ans:
-                raise Exception
+            with webdata_sql.transaction():
+                for i in range(3):
+                    try:
+                        kw = next(self.keygen)
+                    except StopIteration as e:
+                        return d_ls
+                    try:
+                        dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
+                    except DoesNotExist as e:
+                        d(e)
+                        pass
+                    except StopIteration as e:
+                        d(e)
+                    except Exception as e:
+                        d(e, 'get_sslog_loop')
+                        # d_ls.extend([(d[0][1:-1], d[1][1:-1]) for d in dialogs])
+                    try:
+                        if dialogs:
+                            try:
+                                for d in dialogs:
+                                    msg = [d[0][1:-1], d[1][1:-1]]
+                                    q.put(msg, timeout = 5)
+                            except queue.Full:
+                               d('put() timed out. Queue is Full')
+                            except Exception as e:
+                               d(e, 'q.put()')
+                    except Exception as e:
+                        d(e, 'get_sslog1')
+                        pass
+        except OperationalError as e:
+            retry_cnt += 1
+            time.sleep(0.2*retry_cnt)
+            d(e, retry_cnt, 'ss_log_sender')
+            return self.ss_log_sender(person, n, min_similarity, retry_cnt)
+        except IntegrityError as e:
+            d(e)
+            webdata_sql.rollback()
+            raise Exception
         except Exception as e:
-            d(e, 'dialog')
-            ans = operate_sql.get_phrase(status = 'nod', character = character)
-            generated_by = 'nod'
-            if '...:[' in ans:
-                BA = operate_sql.get_phrase(status = 'nod')
-        # p(ans)
+            d(e, 'ss_log_sender')
+            return ''
+        else:
+            q.close()
+            q.join_thread()
+    def tweet_log_sender(self, q, UserList = [], BlackList = [], n = 100,  retry_cnt = 0):
+        dialogs = None
+        d_ls = []
+        try:
+            with twlog_sql.transaction():
+                for i in range(10):
+                    try:
+                        kw = next(self.keygen)
+                    except StopIteration as e:
+                        return d_ls
+                    try:
+                        if not UserList:
+                            dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
+                        else:
+                            dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
+                    except DoesNotExist:
+                        pass
+                    except Exception as e:
+                        d(e, 'tweet_log_sender_loop')
+                    else:
+                        # d_ls.extend([(d.textA, d.textB) for d in dialogs])
+                        try:
+                            if dialogs:
+                                try:
+                                    for d in dialogs:
+                                        msg = [d.textA, d.textB]
+                                        q.put(msg, timeout = 5)
+                                except queue.Full:
+                                   d('tweet_log_sender put() timed out. Queue is Full')
+                                except Exception as e:
+                                   d(e, 'tweet_log_sender q.put()')
+                        except Exception as e:
+                            d(e, 'tweet_log_sender1')
+                            pass
+        except OperationalError as e:
+            retry_cnt += 1
+            time.sleep(0.2*retry_cnt)
+            d(e, retry_cnt, 'tweet_log_sender')
+            return self.tweet_log_sender(q, UserList, BlackList, n,  retry_cnt)
+        except IntegrityError as e:
+            d(e)
+            twlog_sql.rollback()
+            raise Exception
+        except Exception as e:
+            d(e, 'tweet_log_sender')
+            return ''
+        else:
+            q.close()
+            q.join_thread()
+    def adjust_ans(self, ans):
         ans = self._get_longest_split(ans, split_word = '」')
         ans = self._get_longest_split(ans, split_word = '「')
         ans = self._get_longest_split(ans, split_word = '。')
@@ -1070,16 +1106,96 @@ class DialogObject(MyObject):
             ans = operate_sql.get_phrase(status = 'nod')
         if not ans[-1] in {'。', '!', '?', '！', '？'}:
             ans = ''. join([ans, '。'])
-        # if character != 'sys':
-        #     ans = ''.join([character, '「', ans, '」'])
         return ans
+    def dialog(self, context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = ['sousaku_umi', 'umi0315_pokemon'], BlackList = [], min_similarity = 0.2, character = 'sys', tools = 'SS,WN,LOG,MC', username = '@〜〜'):
+        #URL除去
+        s = self.nlp_data.text
+        ans = ''
+        if context:
+            try:
+                s = context.split('</>')[-1] + s
+            except:
+                pass
+        s = _.clean_text(s, isKaigyouOFF = False)
+        self.cleaned_s = s
+        d_ls = []
+        senders = []
+        receivers = []
+        try:
+            self.tfidf.precalc_s1_tfidf(self.cleaned_s)
+            q = multiprocessing.Queue(maxsize = 0)
+            parent_conn, child_conn = multiprocessing.Pipe()
+            if 'SS' in tools:
+                if character == 'sys':
+                    person = ''
+                else:
+                    person = character
+                process = multiprocessing.Process(target = self.ss_log_sender, args=(q, person, 400), name='Sender-SS')
+                senders.append(process)
+                process.start()
+            if 'LOG' in tools:
+                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList,20), name='Sender-Twlog')
+                senders.append(process)
+                process.start()
+            #Receiver
+            ans  = self.receiver(q, min_similarity = min_similarity)
+            for s_r_process in senders + receivers:
+                s_r_process.join()
+            if not ans:
+                if 'MC' in tools:
+                    trigram_markov_chain_instance = TrigramMarkovChain(character)
+                    ans = trigram_markov_chain_instance.generate(word = next(self.keygen), is_randomize_metasentence = is_randomize_metasentence)
+            if not ans:
+                if 'MC' in tools:
+                    trigram_markov_chain_instance = TrigramMarkovChain(character)
+                    ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = is_randomize_metasentence)
+            if not ans:
+                raise Exception
+        except StopIteration as e:
+            raise Exception
+        except Exception as e:
+            d(e, 'dialog')
+            ans = operate_sql.get_phrase(status = 'nod', character = character)
+            if '...:[' in ans:
+                BA = operate_sql.get_phrase(status = 'nod')
+        ans = self.adjust_ans(ans)
+        return ans
+
+    def receiver(self, q, min_similarity = 0):
+        d_ls = []
+        while True:
+            try:
+                d_msg = q.get(timeout = 5)
+                if d_msg:
+                    cos_sim = self.tfidf.calc_cosine_similarity(s1 = self.cleaned_s, s2 = d_msg[0])
+                    d_ls.append((cos_sim, d_msg[1]))
+            except queue.Empty:
+                d('get() timed out. Queue is Empty')
+                break
+            except Exception as e:
+                d(e, 'receiver')
+        if d_ls:
+            sorted_d_ls = sorted(d_ls, key = lambda x: x[0], reverse = True)
+            if not sorted_d_ls:
+                return ''
+            sorted_d_ls = [(sim+0.02, s) for sim, s in sorted_d_ls if sim >= min_similarity]
+            if not sorted_d_ls:
+                return ''
+            sorted_d_ls = _.f7(sorted_d_ls)
+            kwcnt = len(sorted_d_ls)
+            tf_idf = np.array([float(x[0]) for x in sorted_d_ls])
+            per = np.sum(tf_idf)
+            rand_p = tf_idf / per
+            d_dic = {text: sim for sim, text in sorted_d_ls}
+            ans = np.random.choice([x[1] for x in sorted_d_ls], 1, replace = False, p = rand_p)[0]
+            return ''.join([ans, ' \n(', str(d_dic[ans]), ')'])
 if __name__ == '__main__':
     import sys
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''みなさんお久しぶりですニコッまたこれからもよろしくお願いします☺️''' 
+    text = '''穂乃果のふともも破廉恥です''' 
     UserLists = {
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
@@ -1097,8 +1213,21 @@ if __name__ == '__main__':
     #     p(chara, userlist)
     #     s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
     #     learn_trigram(s_ls, character = chara, over = 0)
-    ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'LOGMC', username = '@〜〜')
-    p(ans)
+    # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
+    # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
+    # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
+    while True:
+        d_obj = DialogObject(text)
+        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '花陽', tools = 'SSLOGMC', username = '@〜〜')
+        p('海未', ansu)
+        break
+        # d_obj = DialogObject(ansu)
+        # ansh = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '穂乃果', tools = 'SSMC', username = '@〜〜')
+        # p('穂乃果「', ansh)
+        # time.sleep(3)
+    # keygen = d_obj.keywords_gen()
+    # for key in keygen:
+    #     p(key)s
 
     # talk_sql.create_tables([TFIDFModel], True)
     # s_ls = operate_sql.get_twlog_list(n = 100000, UserList = [], contains = '')

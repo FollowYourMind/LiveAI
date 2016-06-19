@@ -89,7 +89,20 @@ class RegexTools(MyObject):
             else:
                 reg_ls_groupdict = {}
             return reg_ls_groupdict
-
+    def complie_and_get_groupdict_all(self, reg, text = None):
+            if text is None:
+                text = ''
+            compiled_reg = re.compile(reg, re.M)
+            # reg_tuples = compiled_reg.findall(text)
+            iterator = compiled_reg.finditer(text)
+            groupdict = []
+            for match in iterator:
+                groupdict.append(match.groupdict())
+            return groupdict
+    def extract_discorse(self, text):
+            reg =  '(?P<person>\w{0,10}?)\s{0,3}(?P<text>((『[^『』]*?』)|(＜[^＜＞]*?＞)|(（[^（）]*?）)|(「[^「」｣]*?[」｣])|(\([^\(\)]*?\))))(?P<reaction>[ｦ-ﾟ…\.!?ｰ]+)*'
+            reg_dic = self.complie_and_get_groupdict_all(reg, text)
+            return reg_dic
     def construct_coupled_ma(self, text):
         try:
             ex_str = '[^\(\)\<\>]'
@@ -303,7 +316,7 @@ class MorphologicalAnalysis(MyObject):#MeCab
                 return False
             elif w[0] == '*':
                 return False
-            elif w[1] in form:
+            elif form is None or w[1] in form:
                 return True
             else:
                 return False
@@ -1103,14 +1116,15 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''淫夢'''    # text = 'したい'
+    text = '''にこ「ちょちょちょっと待ちなさい！食い気味に飛びついてこないで！｣ｸﾞｲｸﾞｲ   凛「えええ？そんなぁ、ここまで来てオアズケなんてひどいにゃーっ！」希「んっふっふ、それはね…」   真姫「それは…？」   希「…うちも聞かされてないから、えりちにパスするわ」   絵里「…」  '''    # text = 'したい'
     # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
     # p(np.random.choice(a))
-    # reg = RegexTools.main(text)
+    reg = RegexTools()
+    p(reg.extract_discorse(text))
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
-    nlp_data = NLPdatas(text).main
-    p(nlp_data.summary)
+    # nlp_data = NLPdatas(text).main
+    # p(nlp_data.summary)
     # p(nlp_data.summary.has_function('希望', '要望', '勧誘'))
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =  'yes', character = character)

@@ -920,7 +920,7 @@ class StreamResponseFunctions(MyObject):
 					else:
 						ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'LOG,MC', username = '@〜〜')
+			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
 			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
 			if not ans:
 				ans = '...'
@@ -1080,14 +1080,13 @@ class StreamResponseFunctions(MyObject):
 			#save
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
-			kws = dialog_generator.DialogObject(clean_logtext).keywords
 			nega = 0
 			if 'NG' in textB:
 				nega = 10
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
 				'SID' : '/'.join([str(twlog['status_id']), status['id_str'], datetime.strftime(self.sync_now() , '%Y%m%d%H%M%S%f')]),
-				'KWs' : '</>'.join(kws),
+				'KWs' : '',
 				'nameA' : logname,
 				'textA' : clean_logtext,
 				'nameB' : status['user']['screen_name'],
@@ -1396,7 +1395,7 @@ def main(is_experience = False):
 				worker.join()
 
 if __name__ == '__main__':
-	main(1)
+	main(0)
 	# np.random.seed()
 	# p(np.random.randint(100))
 

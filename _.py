@@ -205,6 +205,11 @@ def getDeepPathDic(DIR):
   clsdirs = [clsdir for clsdir in clsdirs if not clsdir in {'.DS_Store'}]
   imgdics = list(chain.from_iterable([[(''.join([clsdirs[i],'/', jpg]), i)  for jpg in os.listdir(DIR + clsdirs[i]) if _filebool(jpg)] for i in range(len(clsdirs))]))
   return imgdics
+def convert_gram(ls, n_gram = 3):
+    len_ls = len(ls)
+    max_i = len_ls - n_gram +1
+    ans =  [[ls[i+k] for k in range(n_gram)] for i in range(len_ls) if -1 < i < max_i]
+    return ans
 
 def crowlDic(text = 'test', dic = {}):
   def _func(A):
