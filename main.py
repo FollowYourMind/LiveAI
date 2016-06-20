@@ -813,7 +813,7 @@ class StreamResponseFunctions(MyObject):
 			if not is_accepted:
 				ans = operate_sql.get_phrase(status =  'reject', character = character)
 			else:
-				try: 
+				try:
 					if userinfo['mode'] in {'mon', 'battle_game'}:
 						enemy_name = None
 					else:
@@ -897,30 +897,30 @@ class StreamResponseFunctions(MyObject):
 		##############
 		# Rest Functions
 		##############
-		elif nlp_summary.has_function('要望', '希望', '勧誘'):
-			if acceptability < 0.7:
-				ans = operate_sql.get_phrase(status =  'ok', character = character)
-			else:
-				ans = operate_sql.get_phrase(status =  'reject', character = character)
-		elif nlp_summary.has_function('命令'):
-			if acceptability < 0.2:
-				ans = operate_sql.get_phrase(status =  'ok', character = character)
-			else:
-				ans = operate_sql.get_phrase(status =  'reject', character = character)
-		elif nlp_summary.has_function('疑問'):
-			if dialog_obj.is_fact():
-				ans = operate_sql.get_phrase(status =  'yes', character = character)
-			else:
-				ans = operate_sql.get_phrase(status =  'no', character = character)
-		else:
-			if nlp_summary.entity:
-				if acceptability > 0.85:
-					if nlp_summary.entity:
-						ans = ''.join([nlp_summary.entity, 'は', nlp_summary.value, '...覚えましたし'])
-					else:
-						ans = ''.join(['なにが', nlp_summary.value, '...???'])
+		# elif nlp_summary.has_function('要望', '希望', '勧誘'):
+		# 	if acceptability < 0.7:
+		# 		ans = operate_sql.get_phrase(status =  'ok', character = character)
+		# 	else:
+		# 		ans = operate_sql.get_phrase(status =  'reject', character = character)
+		# elif nlp_summary.has_function('命令'):
+		# 	if acceptability < 0.2:
+		# 		ans = operate_sql.get_phrase(status =  'ok', character = character)
+		# 	else:
+		# 		ans = operate_sql.get_phrase(status =  'reject', character = character)
+		# elif nlp_summary.has_function('疑問'):
+		# 	if dialog_obj.is_fact():
+		# 		ans = operate_sql.get_phrase(status =  'yes', character = character)
+		# 	else:
+		# 		ans = operate_sql.get_phrase(status =  'no', character = character)
+		# else:
+		# 	if nlp_summary.entity:
+		# 		if acceptability > 0.85:
+		# 			if nlp_summary.entity:
+		# 				ans = ''.join([nlp_summary.entity, 'は', nlp_summary.value, '...覚えましたし'])
+		# 			else:
+		# 				ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
+			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.2, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
 			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
 			if not ans:
 				ans = '...'
@@ -1081,7 +1081,7 @@ class StreamResponseFunctions(MyObject):
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			nega = 0
-			if 'NG' in textB:
+			if 'NG' in status['text']:
 				nega = 10
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
@@ -1091,14 +1091,14 @@ class StreamResponseFunctions(MyObject):
 				'textA' : clean_logtext,
 				'nameB' : status['user']['screen_name'],
 				'textB' : _.clean_text(status['text']),
-				'posi' : posi,
+				'posi' : 1,
 				'nega' : nega,
 				'bot_id' : self.bot_id,
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}, retry_cnt = 0)
 		except Exception as e:
-			d(e, 'save_tweet status')
+			d(e, 'save_tweet dialog')
 			return False
 		else:
 			return True
@@ -1385,7 +1385,7 @@ def main(is_experience = False):
 			manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
 			manage_processes.append(manage_process)
 			manage_process.start()
-		try:        
+		try:
 			for process in manage_processes + bot_processes:
 				process.join()
 		except KeyboardInterrupt:

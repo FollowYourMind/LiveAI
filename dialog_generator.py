@@ -976,7 +976,7 @@ class DialogObject(MyObject):
         d_ls = []
         try:
             with webdata_sql.transaction():
-                for i in range(3):
+                for i in range(10):
                     try:
                         kw = next(self.keygen)
                     except StopIteration as e:
@@ -1130,15 +1130,16 @@ class DialogObject(MyObject):
                     person = ''
                 else:
                     person = character
-                process = multiprocessing.Process(target = self.ss_log_sender, args=(q, person, 400), name='Sender-SS')
+                process = multiprocessing.Process(target = self.ss_log_sender, args=(q, person, 40), name='Sender-SS')
                 senders.append(process)
                 process.start()
             if 'LOG' in tools:
-                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList,20), name='Sender-Twlog')
+                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList, 10), name='Sender-Twlog')
                 senders.append(process)
                 process.start()
             #Receiver
             ans  = self.receiver(q, min_similarity = min_similarity)
+            p(ans)
             for s_r_process in senders + receivers:
                 s_r_process.join()
             if not ans:
@@ -1195,7 +1196,7 @@ if __name__ == '__main__':
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''穂乃果のふともも破廉恥です''' 
+    text = '''穂乃果のふともも破廉恥です'''
     UserLists = {
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
@@ -1203,7 +1204,7 @@ if __name__ == '__main__':
     'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
     '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
     '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
-    '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
+    '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'],
     '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
     '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
     '雪穂': ['yukiho_h_bot_', 'haijin_yukiho'],
