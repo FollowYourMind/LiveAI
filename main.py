@@ -36,6 +36,8 @@ def is_kusoripu(s):
     if emoji_cnt > 5:
         return True
     kigou_cnt = len(re.findall('[!-/:-@[-`{-~]', s))
+    if kigou_cnt < 5:
+    	return False
     if kigou_cnt > 20:
         return True
     hankaku_katakana_cnt = len(re.findall('[ｦ-ﾟ]', s))
@@ -316,7 +318,8 @@ class StreamResponseFunctions(MyObject):
 		else:
 			return word
 	#MAIN FUNCTION
-	def main(self, status, mode = 'dm', userinfo = '', is_new_user = False):
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
+	def main(self, status, mode = 'dm', userinfo = ''):
 		ans = ''
 		IMGfile = ''
 		tweet_status = ''
@@ -326,8 +329,7 @@ class StreamResponseFunctions(MyObject):
 		status_id = status['id_str']
 		screen_name = status['user']['screen_name']
 		bot_id = self.bot_id
-		if not userinfo:
-			userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
+		is_new_user = userinfo['is_created']
 		self.sync_now()
 		if not 'select_chara' in userinfo:
 			userinfo['select_chara'] = self.default_character
@@ -957,10 +959,6 @@ class StreamResponseFunctions(MyObject):
 			userinfo['exp'] += 10
 		except:
 			userinfo['exp'] = 0
-		try:
-			operate_sql.save_userinfo(userinfo)
-		except:
-			p('userinfo save error')
 		return tweet_status
 
 	def is_ignore(self, status):
@@ -1025,7 +1023,8 @@ class StreamResponseFunctions(MyObject):
 					return True
 				# リアクション
 				if self.is_react(status):
-					tweet_status = self.main(status, mode = 'tweet')
+					with operate_sql.userinfo_with(screen_name) as userinfo:
+						tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
 				# 記憶部
 				if not text in set(twlog_pool.timeline_twlog):
 					try:
@@ -1116,13 +1115,9 @@ class StreamResponseFunctions(MyObject):
 					#ツイートステータス情報追加処理
 					status['now'] = self.now
 					screen_name = status['user']['screen_name']
-					userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
-					try:
-						context = userinfo['context'].split('</>')[-1]
-					except Exception as e:
-						d(e, 'on_direct_message_main context splitter')
-						context = ''
-					tweet_status = self.main(status, mode = 'dm', userinfo = userinfo, is_new_user = is_new_user)
+					# userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
+					with operate_sql.userinfo_with(screen_name) as userinfo:
+						tweet_status = self.main(status, mode = 'dm', userinfo = userinfo)
 					# save
 					operate_sql.save_tweet_status(self.status_dic(status))
 					kws = dialog_generator.DialogObject(context).keywords
@@ -1180,7 +1175,7 @@ class StreamResponseFunctions(MyObject):
 					self.bot_profile.save()
 		except Exception as e:
 			d(e, '++++event++++++')
-		else:
+		finally:
 			return True
 
 	def check_if_follow(self, userobject):

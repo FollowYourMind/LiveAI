@@ -108,39 +108,27 @@ class TFIDF(MyObject):
         def __init__(self, option = ''):
                 self.option = option
                 self.fix_s1_tfidf = None
-        def upsert_word(self, ma, is_learn = False, retry_cnt = 0):
+
+        @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+        @talk_sql.atomic()
+        def upsert_word(self, ma, is_learn = False):
                 genkei = ma[7]
                 hinshi = ma[1]
                 hinshi2 = ma[2]
                 document_frequency = 1
                 is_created = False
                 try:
-                        with talk_sql.transaction():
-                                try:
-                                    wdb = TFIDFModel.get(word = genkei, hinshi = hinshi)
-                                    wdb.df +=  1
-                                except DoesNotExist as e:
-                                    # wdb = TFIDFModel({'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 0})
-                                    wdb = TFIDFModel(**{'word': genkei, 'hinshi': hinshi, 'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 1})
-                                    is_created = True
-                                document_frequency = wdb.df
-                                if is_learn:
-                                        wdb.save()
-                                        talk_sql.commit()
-                except OperationalError as e:
-                     retry_cnt += 1
-                     time.sleep(0.1*retry_cnt)
-                     d(e, retry_cnt, 'tfidf_upsert')
-                     return self.upsert_word(ma, is_learn, retry_cnt)
-                except IntegrityError as e:
-                     d(e, 'tfidf.upsert')
-                     wordnet_sql.rollback()
-                     raise Exception
-                except Exception as e:
-                     d(e, 'tfidf.upsert')
-                     return 0, False
-                else:
-                    return document_frequency, is_created
+                    wdb = TFIDFModel.get(word = genkei, hinshi = hinshi)
+                    wdb.df +=  1
+                except DoesNotExist as e:
+                    wdb = TFIDFModel(**{'word': genkei, 'hinshi': hinshi, 'hinshi2': hinshi2, 'info3' : ma[3], 'yomi' : ma[8], 'df': 1})
+                    is_created = True
+                except:
+                    raise
+                document_frequency = wdb.df
+                if is_learn:
+                    wdb.save()
+                return document_frequency, is_created
 
         def calc_tf_idf(self, w, term_frequency_dic, total_documents = 30000, is_debug = False, is_learn = False):
                 word = w[7]
@@ -246,7 +234,6 @@ class TFIDF(MyObject):
                         convImpRate = 100 / float(mostImptf_idf)
                         return impkey
         def precalc_s1_tfidf(self, s):
-                # p(s)
                 self.fix_s1_tfidf =  {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
         def calc_cosine_similarity(self, s1, s2):
                 try:
@@ -624,7 +611,6 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     def sender(q, target_ls, process_id):
         time.sleep(process_id)
         try:
-            # with talk_sql.transaction():
             target_length = len(target_ls)
             ini = target_length * process_id // proc
             fin = target_length * (process_id+1) // proc
@@ -665,9 +651,8 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
                 trigram = q.get(timeout = 5)
                 p(trigram)
                 if trigram:
-                    with talk_sql.transaction():
+                    with talk_sql.atomic():
                         save_trigram_in_transaction(trigram, character = character)
-                        talk_sql.commit()
                         p('____Receiver-', str(process_id), 'saved!!')
                 # time.sleep(random.random())
             except queue.Empty:
@@ -691,26 +676,12 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
     process.start()
     for s_r_process in senders + receivers:
         s_r_process.join()
-def save_trigram_in_transaction(tri, character = 'sys', retry_cnt = 0):
-    ma1 = tri[0]
-    ma2 = tri[1]
-    ma3 = tri[2]
-    try:
-        T, is_created = TrigramModel.get_or_create(character = character, W1 = ma1[0], W2 = ma2[0], W3 = ma3[0], P1 = ma1[1], P2 = ma2[1], P3 = ma1[1], defaults={'cnt' : 0, 'posi':1 , 'nega':0})
-        T.cnt += 1
-        T.save()
-    except OperationalError as e:
-        retry_cnt += 1
-        time.sleep(0.1)
-        d(e, retry_cnt, 'save_trigram_in_transaction, op')
-        return save_trigram_in_transaction(tri, character, retry_cnt)
-    except IntegrityError as e:
-        d(e, 'save_trigram_in_transaction_ie')
-        talk_sql.rollback()
-        raise Exception
-    except Exception as e:
-        d(e)
-        return None
+
+@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+def save_trigram_in_transaction(tri, character = 'sys'):
+    T, is_created = TrigramModel.get_or_create(character = character, W1 = tri[0][0], W2 = tri[1][0], W3 = tri[2][0], P1 = tri[0][1], P2 = tri[1][1], P3 = tri[2][1], defaults={'cnt' : 0, 'posi':1 , 'nega':0})
+    T.cnt += 1
+    T.save()
 # def learn_trigram(s_ls, character = 'sys', over = 0):
 #     i = 1;
 #     for s in s_ls:
@@ -958,7 +929,6 @@ class DialogObject(MyObject):
                     wn_keywords = _.flatten(wn_dic.values())
                     for keyword in wn_keywords:
                         yield keyword
-        # return keywords
     def _get_keywords(self, s, needs= {'名詞', '固有名詞'}):
         keywords = ''
         if not keywords:
@@ -971,101 +941,47 @@ class DialogObject(MyObject):
             if wn_dic:
                 keywords = _.flatten(wn_dic.values())
         return keywords
-    def ss_log_sender(self, q, person = '', n = 100, retry_cnt = 0):
+    @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+    @webdata_sql.atomic()
+    def ss_log_sender(self, q, person = '', n = 100):
         dialogs = None
-        d_ls = []
         try:
-            with webdata_sql.transaction():
-                for i in range(3):
-                    try:
-                        kw = next(self.keygen)
-                    except StopIteration as e:
-                        return d_ls
-                    try:
-                        dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
-                    except DoesNotExist as e:
-                        d(e)
-                        pass
-                    except StopIteration as e:
-                        d(e)
-                    except Exception as e:
-                        d(e, 'get_sslog_loop')
-                        # d_ls.extend([(d[0][1:-1], d[1][1:-1]) for d in dialogs])
-                    try:
-                        if dialogs:
-                            try:
-                                for d in dialogs:
-                                    msg = [d[0][1:-1], d[1][1:-1]]
-                                    q.put(msg, timeout = 5)
-                            except queue.Full:
-                               d('put() timed out. Queue is Full')
-                            except Exception as e:
-                               d(e, 'q.put()')
-                    except Exception as e:
-                        d(e, 'get_sslog1')
-                        pass
-        except OperationalError as e:
-            retry_cnt += 1
-            time.sleep(0.2*retry_cnt)
-            d(e, retry_cnt, 'ss_log_sender')
-            return self.ss_log_sender(person, n, min_similarity, retry_cnt)
-        except IntegrityError as e:
-            d(e)
-            webdata_sql.rollback()
-            raise Exception
-        except Exception as e:
-            d(e, 'ss_log_sender')
-            return ''
-        else:
+            for i in range(3):
+                try:
+                    kw = next(self.keygen)
+                except StopIteration:
+                    break
+                dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
+                if not dialogs is None:
+                    for d in dialogs:
+                        msg = [d[0][1:-1], d[1][1:-1]]
+                        _.queue_put(q, msg, timeout = 5)
+        finally:
             q.close()
             q.join_thread()
+    @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+    @twlog_sql.atomic()
     def tweet_log_sender(self, q, UserList = [], BlackList = [], n = 100,  retry_cnt = 0):
         dialogs = None
-        d_ls = []
         try:
-            with twlog_sql.transaction():
-                for i in range(10):
-                    try:
-                        kw = next(self.keygen)
-                    except StopIteration as e:
-                        return d_ls
-                    try:
-                        if not UserList:
-                            dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
-                        else:
-                            dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
-                    except DoesNotExist:
-                        pass
-                    except Exception as e:
-                        d(e, 'tweet_log_sender_loop')
+            for i in range(10):
+                try:
+                    kw = next(self.keygen)
+                except StopIteration:
+                    break
+                try:
+                    if not UserList:
+                        dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
                     else:
-                        # d_ls.extend([(d.textA, d.textB) for d in dialogs])
-                        try:
-                            if dialogs:
-                                try:
-                                    for d in dialogs:
-                                        msg = [d.textA, d.textB]
-                                        q.put(msg, timeout = 5)
-                                except queue.Full:
-                                   d('tweet_log_sender put() timed out. Queue is Full')
-                                except Exception as e:
-                                   d(e, 'tweet_log_sender q.put()')
-                        except Exception as e:
-                            d(e, 'tweet_log_sender1')
-                            pass
-        except OperationalError as e:
-            retry_cnt += 1
-            time.sleep(0.2*retry_cnt)
-            d(e, retry_cnt, 'tweet_log_sender')
-            return self.tweet_log_sender(q, UserList, BlackList, n,  retry_cnt)
-        except IntegrityError as e:
-            d(e)
-            twlog_sql.rollback()
-            raise Exception
-        except Exception as e:
-            d(e, 'tweet_log_sender')
-            return ''
-        else:
+                        dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
+                except DoesNotExist:
+                    continue
+                else:
+                    if not dialogs is None:
+                        for d in dialogs:
+                            msg = [d.textA, d.textB]
+                            _.queue_put(q, msg, timeout = 5)
+        finally:
             q.close()
             q.join_thread()
     def adjust_ans(self, ans):
@@ -1134,14 +1050,13 @@ class DialogObject(MyObject):
                 senders.append(process)
                 process.start()
             if 'LOG' in tools:
-                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList,20), name='Sender-Twlog')
+                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList, 20), name='Sender-Twlog')
                 senders.append(process)
                 process.start()
             #Receiver
             ans  = self.receiver(q, min_similarity = min_similarity)
-            p(ans)
-            for s_r_process in senders + receivers:
-                s_r_process.join()
+            for rest_process in senders + receivers:
+                rest_process.join()
             if not ans:
                 if 'MC' in tools:
                     trigram_markov_chain_instance = TrigramMarkovChain(character)
@@ -1151,35 +1066,36 @@ class DialogObject(MyObject):
                     trigram_markov_chain_instance = TrigramMarkovChain(character)
                     ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = is_randomize_metasentence)
             if not ans:
-                raise Exception
+                raise
         except StopIteration as e:
-            raise Exception
+            pass
         except Exception as e:
-            d(e, 'dialog')
+            _.log_err(is_print = True, is_logging = True)
             ans = operate_sql.get_phrase(status = 'nod', character = character)
             if '...:[' in ans:
-                BA = operate_sql.get_phrase(status = 'nod')
-        ans = self.adjust_ans(ans)
-        return ans
+                ans = operate_sql.get_phrase(status = 'nod')
+            if '...:[' in ans:
+                ans = ''
+        finally:
+            ans = self.adjust_ans(ans)
+            return ans
 
-    def receiver(self, q, min_similarity = 0):
+    def receiver(self, q, min_similarity = 0, laplace = 0.02):
         d_ls = []
         while True:
             try:
                 d_msg = q.get(timeout = 5)
+            except queue.Empty:
+                break
+            else:
                 if d_msg:
                     cos_sim = self.tfidf.calc_cosine_similarity(s1 = self.cleaned_s, s2 = d_msg[0])
                     d_ls.append((cos_sim, d_msg[1]))
-            except queue.Empty:
-                d('get() timed out. Queue is Empty')
-                break
-            except Exception as e:
-                d(e, 'receiver')
         if d_ls:
             sorted_d_ls = sorted(d_ls, key = lambda x: x[0], reverse = True)
             if not sorted_d_ls:
                 return ''
-            sorted_d_ls = [(sim+0.02, s) for sim, s in sorted_d_ls if sim >= min_similarity]
+            sorted_d_ls = [(sim+laplace, s) for sim, s in sorted_d_ls if sim >= min_similarity]
             if not sorted_d_ls:
                 return ''
             sorted_d_ls = _.f7(sorted_d_ls)
@@ -1189,14 +1105,14 @@ class DialogObject(MyObject):
             rand_p = tf_idf / per
             d_dic = {text: sim for sim, text in sorted_d_ls}
             ans = np.random.choice([x[1] for x in sorted_d_ls], 1, replace = False, p = rand_p)[0]
-            return ''.join([ans, ' \n(', str(d_dic[ans]), ')'])
+            return ''.join([ans, ' \n(', str(d_dic[ans]-laplace), ')'])
 if __name__ == '__main__':
     import sys
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''穂乃果のふともも破廉恥です''' 
+    text = '''暑い''' 
     UserLists = {
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
@@ -1219,7 +1135,7 @@ if __name__ == '__main__':
     # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
     while True:
         d_obj = DialogObject(text)
-        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '花陽', tools = 'SSLOGMC', username = '@〜〜')
+        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '花陽', tools = 'SSMC', username = '@〜〜')
         p('海未', ansu)
         break
         # d_obj = DialogObject(ansu)

@@ -10,11 +10,11 @@ wordnet_sql_PLACE = DATADIR + '/lib/wnjpn.db'
 webdata_sql_PLACE = DATADIR + '/SQL/webdata.db'
 
 from playhouse.sqlite_ext import SqliteExtDatabase
-core_sql = SqliteExtDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist')
-talk_sql = SqliteExtDatabase(talk_sql_PLACE, autocommit=False, journal_mode='persist')
-twlog_sql = SqliteExtDatabase(twlog_sql_PLACE, autocommit=False, journal_mode='persist')
-wordnet_sql =  SqliteExtDatabase(wordnet_sql_PLACE, autocommit=False, journal_mode='persist')
-webdata_sql =  SqliteExtDatabase(webdata_sql_PLACE, autocommit=False, journal_mode='persist')
+core_sql = SqliteExtDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+talk_sql = SqliteExtDatabase(talk_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+twlog_sql = SqliteExtDatabase(twlog_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+wordnet_sql =  SqliteExtDatabase(wordnet_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+webdata_sql =  SqliteExtDatabase(webdata_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
 ###################################################
 #
 # >>>>>>>>WEBDATA_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>

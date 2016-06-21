@@ -3,6 +3,7 @@
 # from setup import *
 import os
 import sys
+import traceback
 import io
 import subprocess
 import multiprocessing
@@ -18,9 +19,80 @@ import pprint
 from datetime import datetime, timedelta
 from collections import Counter, deque
 from itertools import chain
+
+import functools
+from functools import partial
+try:
+    from decorator import decorator
+except ImportError:
+    def decorator(caller):
+        """ Turns caller into a decorator.
+        Unlike decorator module, function signature is not preserved.
+        :param caller: caller(f, *args, **kwargs)
+        """
+        def decor(f):
+            @functools.wraps(f)
+            def wrapper(*args, **kwargs):
+                return caller(f, *args, **kwargs)
+            return wrapper
+        return decor
+
+def timeit(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kw):
+        stime = time.clock()
+        ret = func(*args, **kw)
+        etime = time.clock()
+        print('{0}: {1:,f}ms'.format(func.__name__, (etime-stime)*1000))
+        return ret
+    return wrapper
+
+def forever(exceptions = Exception, is_print = True, is_logging = True):
+    def _forever(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kw):
+            try:
+                ret = func(*args, **kw)
+            except exceptions:
+                log_err(is_print, is_logging)
+                ret = True
+            finally:
+                return ret
+        return wrapper
+    return _forever
+
+def deco_tag(tag):
+    def _deco_tag(func):
+        @functools.wraps(func)
+        def wrapper(*args,**kwargs):
+            res = '<'+tag+'>'
+            res = res + func(*args,**kwargs)
+            res = res + '</'+tag+'>'
+            return res
+        return wrapper
+    return _deco_tag
+def deco_sql(db):
+    def _deco_sql(func):
+        @functools.wraps(func)
+        def wrapper(*args,**kwargs):
+            try:
+                with db.transaction():
+                    res = func(*args,**kwargs)
+            except IntegrityError as e:
+                db.rollback()
+                raise
+            except Exception as e:
+                err_msg,  traceback_ls = _.log_err(is_print = True, is_logging = True)
+            else:
+                return res
+        return wrapper
+    return _deco_sql
 #logging
-from logging import getLogger,StreamHandler,DEBUG
+from logging import basicConfig, getLogger,StreamHandler,DEBUG
+import logging.config
+logging.config.fileConfig('log_config.ini')
 logger = getLogger(__name__)
+# basicConfig(filename='log.txt')
 handler = StreamHandler()
 handler.setLevel(DEBUG)
 logger.setLevel(DEBUG)
@@ -32,6 +104,22 @@ def p(*elements, is_print = True):
       pprint.pprint(elements)
 def d(*elements):
     logger.debug(elements)
+def log_err(is_print = True, is_logging = True):
+      # エラーの情報をsysモジュールから取得
+    info = sys.exc_info()
+    if info[0] is None:
+      return
+    # tracebackモジュールのformat_tbメソッドで特定の書式に変換
+    tbinfo = traceback.format_tb(info[2])
+    # 収集した情報を読みやすいように整形して出力する----------------------------
+    err_info = ''.join(['\n'.join(tbinfo), str(info[1])])
+    err = '\n'.join(['PythonError.'.ljust( 80, '=' ), err_info, '\n'.rjust( 80, '=' )])
+    if is_print:
+      print(err)
+    if is_logging:
+      logger.debug(err_info)
+    return info[1], tbinfo
+
 class MyObject(object):
     def __len__(self):
         return len(self.__dict__)
@@ -48,6 +136,88 @@ class MyObject(object):
     def is_in(self, key):
       return key in dir(self)
 class MyException(Exception): pass
+
+def __retry_internal(f, exceptions=Exception, tries=-1, delay=0, max_delay=None, backoff=1, jitter=0,
+                     logger=logger):
+    """
+    Executes a function and retries it if it failed.
+    :param f: the function to execute.
+    :param exceptions: an exception or a tuple of exceptions to catch. default: Exception.
+    :param tries: the maximum number of attempts. default: -1 (infinite).
+    :param delay: initial delay between attempts. default: 0.
+    :param max_delay: the maximum value of delay. default: None (no limit).
+    :param backoff: multiplier applied to delay between attempts. default: 1 (no backoff).
+    :param jitter: extra seconds added to delay between attempts. default: 0.
+                   fixed if a number, random if a range tuple (min, max)
+    :param logger: logger.warning(fmt, error, delay) will be called on failed attempts.
+                   default: retry.logger. if None, logging is disabled.
+    :returns: the result of the f function.
+    """
+    _tries, _delay = tries, delay
+    while _tries:
+        try:
+            return f()
+        except exceptions as e:
+            _tries -= 1
+            if not _tries:
+                raise
+
+            if logger is not None:
+                logger.warning('%s, retrying in %s seconds...', e, _delay)
+
+            time.sleep(_delay)
+            _delay *= backoff
+
+            if isinstance(jitter, tuple):
+                _delay += random.uniform(*jitter)
+            else:
+                _delay += jitter
+
+            if max_delay is not None:
+                _delay = min(_delay, max_delay)
+
+def retry(exceptions=Exception, tries=-1, delay=0, max_delay=None, backoff=1, jitter=0, logger=logger):
+    """Returns a retry decorator.
+    :param exceptions: an exception or a tuple of exceptions to catch. default: Exception.
+    :param tries: the maximum number of attempts. default: -1 (infinite).
+    :param delay: initial delay between attempts. default: 0.
+    :param max_delay: the maximum value of delay. default: None (no limit).
+    :param backoff: multiplier applied to delay between attempts. default: 1 (no backoff).
+    :param jitter: extra seconds added to delay between attempts. default: 0.
+                   fixed if a number, random if a range tuple (min, max)
+    :param logger: logger.warning(fmt, error, delay) will be called on failed attempts.
+                   default: retry.logger. if None, logging is disabled.
+    :returns: a retry decorator.
+    """
+    @decorator
+    def retry_decorator(f, *fargs, **fkwargs):
+        args = fargs if fargs else list()
+        kwargs = fkwargs if fkwargs else dict()
+        return __retry_internal(partial(f, *args, **kwargs), exceptions, tries, delay, max_delay, backoff, jitter,
+                                logger)
+    return retry_decorator
+def retry_call(f, fargs=None, fkwargs=None, exceptions=Exception, tries=-1, delay=0, max_delay=None, backoff=1,
+               jitter=0,
+               logger=logger):
+    """
+    Calls a function and re-executes it if it failed.
+    :param f: the function to execute.
+    :param fargs: the positional arguments of the function to execute.
+    :param fkwargs: the named arguments of the function to execute.
+    :param exceptions: an exception or a tuple of exceptions to catch. default: Exception.
+    :param tries: the maximum number of attempts. default: -1 (infinite).
+    :param delay: initial delay between attempts. default: 0.
+    :param max_delay: the maximum value of delay. default: None (no limit).
+    :param backoff: multiplier applied to delay between attempts. default: 1 (no backoff).
+    :param jitter: extra seconds added to delay between attempts. default: 0.
+                   fixed if a number, random if a range tuple (min, max)
+    :param logger: logger.warning(fmt, error, delay) will be called on failed attempts.
+                   default: retry.logger. if None, logging is disabled.
+    :returns: the result of the f function.
+    """
+    args = fargs if fargs else list()
+    kwargs = fkwargs if fkwargs else dict()
+    return __retry_internal(partial(f, *args, **kwargs), exceptions, tries, delay, max_delay, backoff, jitter, logger)
 def get_thispath():
   return os.path.abspath(os.path.dirname(__file__))
 def get_projectpath():
@@ -340,14 +510,22 @@ def multiple_replace(text, adict):
     def one_xlat(match):
         return adict[dedictkey(match.group(0))]
     return rx.sub(one_xlat, text)
-class a(MyObject):
-  def __init__(self):
-    self.b = 1
+
+def queue_put(q, msg, timeout = 5):
+    import queue
+    try:
+        q.put(msg, timeout)
+    except queue.Full:
+       d('tweet_log_sender put() timed out. Queue is Full')
+       raise
 if __name__ == '__main__':
   # adjustSize(DIR)
-  # s = '@yohane_t  最近絵里が可愛いです……'
-  # p(s)
-  reconnect_wifi()
+  @deco_tag('oo')
+  def a():
+    return 'a'
+  p(a())      
+  # reconnect_wifi()
+  # import sys, traceback
   # a = a()
   # a = BotProfile()
   # p(a)

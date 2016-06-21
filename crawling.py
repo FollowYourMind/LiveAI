@@ -132,23 +132,23 @@ if __name__ == '__main__':
 	import natural_language_processing
 	site_url = 'http://www.lovelive-ss.com/?p={}'
 	# range(4538, 8000):
-	reg = natural_language_processing.RegexTools()
-	for ss_number in range(4538):
-		p(ss_number)
-		try:
-			url = site_url.format(ss_number)
-			# ss_ls = extract_ss(url = url)
-			# if ss_ls:
-			# 	operate_sql.save_ss(url = url, texts = ss_ls, retry_cnt = 0)
-			# datas = operate_sql.get_ss(url = url)
-			# text = ''.join([data.text for data in datas])
-			# p(reg.extract_discorse(text))
-			operate_sql.save_ss_dialog(url)
-		except Exception as e:
-			d(e)
+	# reg = natural_language_processing.RegexTools()
+	# for ss_number in range(4557, 8000):
+	# 	p(ss_number)
+	# 	try:
+	# 		url = site_url.format(ss_number)
+	# 		ss_ls = extract_ss(url = url)
+	# 		if ss_ls:
+	# 			operate_sql.save_ss(url = url, texts = ss_ls, retry_cnt = 0)
+	# 		# datas = operate_sql.get_ss(url = url)
+	# 		# text = ''.join([data.text for data in datas])
+	# 		# p(reg.extract_discorse(text))
+	# 		# operate_sql.save_ss_dialog(url)
+	# 	except Exception as e:
+			# d(e)
 		# time.sleep(1+np.random.rand()*3)
-
 	# p(1+np.random.rand()*3)
+	operate_sql.save_ss(url = url, texts = ['a', 'ss'])
 	# extract_ss(url = 'http://www.lovelive-ss.com/?p=22')
 	# p(os.environ['PATH'])
 	# print(search_wiki(word = '官僚制'))
