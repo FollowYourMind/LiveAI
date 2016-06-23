@@ -33,7 +33,7 @@ class RegexTools(MyObject):
         ex_ls = compiled_reg.findall(s)
         return rest_text, ex_ls
     def extract_specific_words(self, s):
-        spe_char = re.compile('「([^「」]{2,}?)」');
+        spe_char = re.compile('\s{1,2}(\w{1,}?)\s{1,2}');
         ex_ls = spe_char.findall(s)
         extracted_rest = re.sub(spe_char, '<EX>' , s)
         return extracted_rest, ex_ls
@@ -93,7 +93,6 @@ class RegexTools(MyObject):
             if text is None:
                 text = ''
             compiled_reg = re.compile(reg, re.M)
-            # reg_tuples = compiled_reg.findall(text)
             iterator = compiled_reg.finditer(text)
             groupdict = []
             for match in iterator:
@@ -209,6 +208,9 @@ class MorphologicalAnalysis(MyObject):#MeCab
             info_of_words = [self.spawn_mecab(split_sentence) for split_sentence in cl_ls if not split_sentence in {'EOS', ''}]
             ma_ls = [[self.split_mecab_result(info) for info in infox if not info in {'EOS', ''}] for infox in info_of_words]
             special_words_cnt = len(ex)
+            if not cl_ls[-1]:
+                cl_ls = cl_ls[:-1]
+                ma_ls += ['']
             if cl_ls[0]:
                 ma_ls = [ma_ls[cursor] + [[ex[cursor], '名詞', '特別', 'regex_special', '*', '*', '*', ex[cursor], '*', '*']] for cursor in range(special_words_cnt)] + [ma_ls[special_words_cnt]]
             else:
@@ -1116,11 +1118,14 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''にこ「ちょちょちょっと待ちなさい！食い気味に飛びついてこないで！｣ｸﾞｲｸﾞｲ   凛「えええ？そんなぁ、ここまで来てオアズケなんてひどいにゃーっ！」希「んっふっふ、それはね…」   真姫「それは…？」   希「…うちも聞かされてないから、えりちにパスするわ」   絵里「…」  '''    # text = 'したい'
+    text = ''''''    # text = 'したい'
     # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
     # p(np.random.choice(a))
-    reg = RegexTools()
-    p(reg.extract_discorse(text))
+    # reg = RegexTools()
+    # p(reg.extract_discorse(text))
+    aa = {'a', 'b', 'a', 'c'}
+    p(aa.count('a'))
+    # p(MA.get_mecab_ls(text))
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
     # nlp_data = NLPdatas(text).main

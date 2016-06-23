@@ -22,6 +22,7 @@ from itertools import chain
 
 import functools
 from functools import partial
+from contextlib import contextmanager
 try:
     from decorator import decorator
 except ImportError:
@@ -56,10 +57,19 @@ def forever(exceptions = Exception, is_print = True, is_logging = True, ret = Tr
             except exceptions:
                 log_err(is_print, is_logging)
                 wret = ret
-            finally:
-                return wret
+            return wret
         return wrapper
     return _forever
+
+@contextmanager
+def forever_with(func, exceptions = Exception, is_print = True, is_logging = True):
+    is_bug = False
+    try:
+        yield is_bug
+    except exceptions:
+        log_err(is_print, is_logging)
+        is_bug = True
+
 
 def deco_tag(tag):
     def _deco_tag(func):
@@ -218,6 +228,23 @@ def retry_call(f, fargs=None, fkwargs=None, exceptions=Exception, tries=-1, dela
     args = fargs if fargs else list()
     kwargs = fkwargs if fkwargs else dict()
     return __retry_internal(partial(f, *args, **kwargs), exceptions, tries, delay, max_delay, backoff, jitter, logger)
+
+@contextmanager
+def process_with(auto_start = True):
+    processes = []
+    yield processes
+    if auto_start:
+        [process.start() for process in processes if not process.is_alive()]
+    try:
+        for process in processes:
+            if process.is_alive():
+                process.join()
+    except KeyboardInterrupt:
+        for worker in processes:
+            if worker.is_alive():
+                worker.terminate()
+                worker.join()
+
 def get_thispath():
   return os.path.abspath(os.path.dirname(__file__))
 def get_projectpath():

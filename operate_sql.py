@@ -122,14 +122,12 @@ def save_tweet_status(status_dic = {
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}):
-	if status_dic:
-		tweetstatus, is_created = Tweets.create_or_get(**status_dic)
-		return tweetstatus
+	tweetstatus, is_created = Tweets.create_or_get(**status_dic)
+	return tweetstatus
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
 def get_twlog(status_id = 1):
-	return Tweets.select().where(Tweets.status_id == status_id).get()._data
-
+	return Tweets.select().where(Tweets.status_id == status_id).get()
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
 def get_twlog_pool(n = 1000):
@@ -161,6 +159,7 @@ def save_tweet_dialog(twdialog_dic = {
 			twdialog, is_created = TwDialog.create_or_get(**twdialog_dic)
 			return twdialog
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = '')
 @twlog_sql.atomic()
 def get_twlog_list(n = 1000, UserList = None, BlackList = [], contains = ''):
 	if not UserList is None:
@@ -172,6 +171,7 @@ def get_twlog_list(n = 1000, UserList = None, BlackList = [], contains = ''):
 	return tweetslist
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = '')
 @core_sql.atomic()
 def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
 	if character == 'sys':
@@ -183,10 +183,11 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
 	else:
 		Ps = Phrases.select().where(Phrases.s_type == s_type, Phrases.status == status, Phrases.character == character).limit(n)
 	if len(Ps) == 0:
-		Ps = Phrases.select().where(Phrases.status == status).limit(n)
-		return ''.join([np.random.choice([p.phrase for p in Ps]), '\n(代:[', status, ']of\'', character, '\')'])
-	else:
+		Ps = Phrases.select().where(Phrases.status == status).limit(n)             
+	try:
 		return np.random.choice([p.phrase for p in Ps])
+	except:
+		raise DoesNotExist
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
@@ -196,6 +197,7 @@ def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', 
 
 # [TODO]
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = False)
 @core_sql.atomic()
 def update_phrase(phrase, ok_add = 0, ng_add = 1):
 	P = Phrases.select().where(Phrases.phrase == phrase).get()
@@ -207,10 +209,10 @@ def update_phrase(phrase, ok_add = 0, ng_add = 1):
 @contextmanager
 def userinfo_with(screen_name):
 	try:
-		userstatus = get_userinfo(screen_name)
-		yield userstatus
+		userinfo = get_userinfo(screen_name)
+		yield userinfo
 	finally:
-		 save_userinfo(userstatus)
+		 userinfo.save()
 def read_userinfo(screen_name):
 	return get_userinfo(screen_name = screen_name)
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
@@ -228,9 +230,8 @@ def get_userinfo(screen_name):
 		'context' : '',
 		'time' : datetime.utcnow()
 		})
-	userinfo_dic = userinfo._data
-	userinfo_dic['is_created'] = is_created
-	return userinfo_dic
+	userinfo.is_created = is_created
+	return userinfo
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
@@ -286,13 +287,17 @@ class BotProfile(MyObject):
 		self.abs_banner_filename = upsert_core_info(whose_info = self.bot_id, info_label = 'abs_banner_filename', kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 if __name__ == '__main__':
 	# a = read_userinfo('h_y_okaaaaaaaaaaaa')/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg
-	a = np.random.choice(get_twlog_users(n = 100, screen_name = 'ci_nq'))
-	p(a)
+	# a = np.random.choice(get_twlog_users(n = 100, screen_name = 'ci_nq'))
+	# p(a)
 	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
-	# a = get_phrase(status = 'kusoripu', character = 'sys')
+	# a = get_phrase(status = 'kusorip', character = 'sys')
+	# p(a)
 	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
-	# with userinfo_with(screen_name = '_mmKmmm') as userinfo:
-
+	p(get_twlog_pool(5).count('ww'))
+	# with userinfo_with(screen_name = 'h_y_ok') as userinfo:
+	# 	p(userinfo.__dict__)
+	# 	userinfo.name = 'ひよこ'
+	# 	p('cnt' in userinfo._data)
 
 	# save_userinfo(a)
 	# update_phrase('', ok_add = 0, ng_add = 1)

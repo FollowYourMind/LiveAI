@@ -79,7 +79,6 @@ class TweetLogPool(MyObject):
 			self.timeline_twlog.append(appendage_status['clean_text'])
 			self.status_ids.append(status_id)
 			self.timeline_twlog = self.timeline_twlog[-20:]
-twlog_pool = TweetLogPool()
 class StreamResponseFunctions(MyObject):
 	def __init__(self, bot_id):
 		debug_style = ''
@@ -269,7 +268,7 @@ class StreamResponseFunctions(MyObject):
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
 				screen_name = ''
-		elif text in set(operate_sql.get_twlog_pool(n = 5)):
+		elif operate_sql.get_twlog_pool(n = 10).count(text) > 2:
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
 			if len(''.join([ans,'@',screen_name, ' '])) > 140:
 				ans = text
@@ -285,9 +284,9 @@ class StreamResponseFunctions(MyObject):
 		#ツイート
 		if ans and screen_name:
 			with operate_sql.userinfo_with(screen_name) as userinfo:
-				if not 'select_chara' in userinfo:
-					userinfo['select_chara'] = self.default_character
-				if userinfo['select_chara'] == self.default_character:
+				if not 'select_chara' in userinfo._data:
+					userinfo.select_chara = self.default_character
+				if userinfo.select_chara == self.default_character:
 					self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
 			return True
 		return False
@@ -322,35 +321,33 @@ class StreamResponseFunctions(MyObject):
 		status_id = status['id_str']
 		screen_name = status['user']['screen_name']
 		bot_id = self.bot_id
-		is_new_user = userinfo['is_created']
+		is_new_user = userinfo.is_created
 		self.sync_now()
-		if not 'select_chara' in userinfo:
-			userinfo['select_chara'] = self.default_character
-		if not userinfo['select_chara']:
-			userinfo['select_chara'] = self.default_character
-		userinfo['context'] = text
+		if not userinfo.select_chara:
+			userinfo.select_chara = self.default_character
+		userinfo.context = text
 		call_chara_ls = iscalledBOT(text = text,  select_set = {self.default_character})
 		if not call_chara_ls:
 			pass
 		elif any([call_phrase in text for call_phrase in {'おいで', 'かもん', 'hey', 'きて', 'こい', '来', '114514'}]):
 			new_chara = call_chara_ls[0]
-			if new_chara != userinfo['select_chara']:
-				ans = ''.join([userinfo['select_chara'],'→', new_chara, '「', operate_sql.get_phrase(status = 'よびだし', character = new_chara), '」'])
-				userinfo['select_chara'] = new_chara
+			if new_chara != userinfo.select_chara:
+				ans = ''.join([userinfo.select_chara,'→', new_chara, '「', operate_sql.get_phrase(status = 'よびだし', character = new_chara), '」'])
+				userinfo.select_chara = new_chara
 			else:
-				ans = ''.join([userinfo['select_chara'],'「', operate_sql.get_phrase(status = 'よびだし', character = userinfo['select_chara']), '」'])
+				ans = ''.join([userinfo.select_chara,'「', operate_sql.get_phrase(status = 'よびだし', character = userinfo.select_chara), '」'])
 			try:
 				filename = _.getRandIMG(DATADIR + '/imgs/' + new_chara)
 			except:
 				filename = ''
 		character = self.default_character
-		deltasec = self.get_deltasec(time_future = self.now, time_past = userinfo['time'])
+		deltasec = self.get_deltasec(time_future = self.now, time_past = userinfo.time)
 		#返答タイムアウト処理
 		if deltasec > 1000:
-			userinfo['cnt'] = 0
-			userinfo['context'] = ''
-			userinfo['mode'] = 'dialog'
-			userinfo['select_chara'] = self.default_character
+			userinfo.cnt = 0
+			userinfo.context = ''
+			userinfo.mode = 'dialog'
+			userinfo.select_chara = self.default_character
 		dialog_obj = dialog_generator.DialogObject(status['text'].replace(self.atmarked_bot_id, ''))
 		nlp_summary = dialog_obj.nlp_data.summary
 		acceptability = np.random.rand()
@@ -359,54 +356,54 @@ class StreamResponseFunctions(MyObject):
 		# 応答
 		elif 'ping' in text:
 			ans = ''.join(['Δsec : ', str(deltasec)])
-		elif userinfo['mode'] == 'ignore':
+		elif userinfo.mode == 'ignore':
 			if 'ごめん' in text:
-				userinfo['cnt'] = 0
-				userinfo['mode'] = 'dialog'
+				userinfo.cnt = 0
+				userinfo.mode = 'dialog'
 				ans = operate_sql.get_phrase(status = 'ゆるす', n = 20, character = character)
 			else:
-				userinfo['cnt'] = 0
-				userinfo['mode'] = 'dialog'
+				userinfo.cnt = 0
+				userinfo.mode = 'dialog'
 				ans = 'ignore'
 		elif deltasec < 3 and not is_new_user:
 			ans = operate_sql.get_phrase(status =  'tooFreq', n = 20, character = character)
-			userinfo['mode'] = 'ignore'
-		elif userinfo['mode'] == 'add.text':
+			userinfo.mode = 'ignore'
+		elif userinfo.mode == 'add.text':
 			if status['in_reply_to_screen_name'] in {self.bot_id}:
 				text = status['text'].replace(self.atmarked_bot_id, '')
 				if 'end' in text:
-					userinfo['mode'] = 'dialog'
-					userinfo['tmp'] = ''
+					userinfo.mode = 'dialog'
+					userinfo.tmp = ''
 					ans = '[学習モード]をクローズしました。この結果は開発にフィードバックされます。ご協力感謝します。'
 				elif 'ttp' in text:
 					if screen_name != self.manager_id:
 						ans = '画像やURLを覚えさせるためには、管理者権限が必要です。'
 				if not ans:
 					text = re.sub(r'(@[^\s　]+)', '{ID}', text)
-					labelstatus = userinfo['tmp']
+					labelstatus = userinfo.tmp
 					if '</>' in labelstatus:
 						character, labelstatus = labelstatus.split('</>')
-					userinfo['cnt'] = 0
+					userinfo.cnt = 0
 					operate_sql.save_phrase(phrase = text, author = screen_name, status = labelstatus, character = character,s_type = 'UserLearn')
 					ans = ''.join(['[学習モード] ', labelstatus, ' of ', character, ' SAVED!!...\n 続けて覚えさせるテキストをリプライしてください。\n\'end\'と入力するまでモードは続きます。'])
 			else:
 				ans = '[学習モード]の途中です。覚えさせるテキストをリプライしてください。\n\'end\'と入力するまでモードは続きます。'
-		elif userinfo['mode'] == 'kadai':
+		elif userinfo.mode == 'kadai':
 			if status['in_reply_to_screen_name'] in {self.bot_id}:
 				text = status['text'].replace(self.atmarked_bot_id, '')
 				text = re.sub(r'(@[^\s　]+)', '{ID}', text)
 				if 'end' in text:
-					userinfo['mode'] = 'dialog'
+					userinfo.mode = 'dialog'
 					userinfo['tmp'] = ''
-					ans = '[課題モード]CLOSED!!...\nこの結果は開発にフィードバックされます。ご協力感謝します。\n報酬として50EXP獲得\n[現在:'+ str(userinfo['exp']) +'EXP]'
-					userinfo['exp'] += 50
+					ans = '[課題モード]CLOSED!!...\nこの結果は開発にフィードバックされます。ご協力感謝します。\n報酬として50EXP獲得\n[現在:'+ str(userinfo.exp) +'EXP]'
+					userinfo.exp += 50
 				else:
-					labelstatus = userinfo['tmp']
-					userinfo['cnt'] = 0
+					labelstatus = userinfo.tmp
+					userinfo.cnt = 0
 					operate_sql.save_phrase(phrase = text, author = screen_name, status = labelstatus, character = 'sys',s_type = 'kadai.annotate')
 					userinfo['tmp'] = np.random.choice(['好評', '苦情', '要望', '質問'])
-					userinfo['exp'] += 100
-					ans = '[課題モード] SAVED!!...報酬として100EXP獲得。\n[現在:'+ str(userinfo['exp']) +'EXP]\n 次は「'+ userinfo['tmp'] + '」のテキストをリプライしてください。e.g.) 好評 -> いいですねー\n\'end\'と入力するまでモードは続きます。'
+					userinfo.exp += 100
+					ans = '[課題モード] SAVED!!...報酬として100EXP獲得。\n[現在:'+ str(userinfo.exp) +'EXP]\n 次は「'+ userinfo.tmp + '」のテキストをリプライしてください。e.g.) 好評 -> いいですねー\n\'end\'と入力するまでモードは続きます。'
 			else:
 				ans = '[課題モード]の途中です。\n\'end\'と入力するまでモードは続きます。'
 		elif nlp_summary.has_function('禁止') and nlp_summary.value:
@@ -449,7 +446,7 @@ class StreamResponseFunctions(MyObject):
 			if not is_accepted:
 				ans = operate_sql.get_phrase(status =  'reject', character = character)
 			else:
-				userinfo['mode'] = 'add.text'
+				userinfo.mode = 'add.text'
 				# cmds = text.split(' ')
 				tmplabel = nlp_summary.akkusativ
 				try:
@@ -457,7 +454,7 @@ class StreamResponseFunctions(MyObject):
 				except:
 					chara = character
 				userinfo['tmp'] = '</>'.join([chara, tmplabel])
-				userinfo['cnt'] = 0
+				userinfo.cnt = 0
 				ans = '[学習モード]\n' +chara +'に「' + tmplabel+ '」として覚えさせるテキストをリプライしてください。\nendと入力するまでモードは続きます。'
 		elif nlp_summary.value in {'勧誘する'}:
 			is_accepted = False
@@ -471,15 +468,15 @@ class StreamResponseFunctions(MyObject):
 			else:
 				cmds = text.split(' ')
 				picDIR = DATADIR + '/imgs/ガチャ'
-				if userinfo['exp'] < 0:
-					userinfo['exp'] = 0
+				if userinfo.exp < 0:
+					userinfo.exp = 0
 					ans = operate_sql.get_phrase(status =  '勧誘チケ.shortexp', character = character)
-				elif userinfo['exp'] < 500:
+				elif userinfo.exp < 500:
 					ans = operate_sql.get_phrase(status =  '勧誘チケ.shortexp', character = character)
 				else:
 					try:
 						filename = _.getRandIMG(picDIR)
-						userinfo['exp'] -= 500
+						userinfo.exp -= 500
 						ans = operate_sql.get_phrase(status =  '勧誘チケ.success', character = character) + ' EXP -500'
 					except:
 						ans = operate_sql.get_phrase(status =  '勧誘チケ.error', character = character)
@@ -489,7 +486,7 @@ class StreamResponseFunctions(MyObject):
 		elif '淫夢' in text:
 			ans = operate_sql.get_phrase(status =  '淫夢', character = character)
 		elif 'media' in status['entities'] and status['in_reply_to_screen_name'] in {self.bot_id}:
-			userinfo['cnt'] = 0
+			userinfo.cnt = 0
 			fileID = self.now.strftime('%Y%m%d%H%M%S')
 			if 'update' in text:
 				if 'icon' in text or 'アイコン' in text:
@@ -535,9 +532,9 @@ class StreamResponseFunctions(MyObject):
 						if os.path.exists(drc) == False:
 							os.mkdir(drc)
 						shutil.copy(filename, drc)
-						userinfo['mode'] = 'confirm.tag.img'
+						userinfo.mode = 'confirm.tag.img'
 						logger.debug('/'.join([drc, filename.split('/')[-1]]))
-						userinfo['tmpFile'] = '/'.join(rc, filename.split('/')[-1])
+						userinfo.tmpFile = '/'.join(rc, filename.split('/')[-1])
 						filename = IMGfile
 					elif img_kind == 'cat':
 						ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
@@ -545,15 +542,15 @@ class StreamResponseFunctions(MyObject):
 					else:
 						ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
 						filename = ''
-						userinfo['mode'] = 'dialog'
+						userinfo.mode = 'dialog'
 
 				except Exception as e:
 					d(e, 'main get_img')
 					ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
-		elif userinfo['cnt'] > 6 and mode != 'dm':
+		elif userinfo.cnt > 6 and mode != 'dm':
 			ans = operate_sql.get_phrase(status =  'cntOver', n = 20, character = character)
-			userinfo['mode'] = 'ignore'
+			userinfo.mode = 'ignore'
 
 		# elif 'img' in cmds_dic:
 		# 	cmds = text.split(' ')
@@ -566,9 +563,9 @@ class StreamResponseFunctions(MyObject):
 		# 		ans = '...none'
 		# elif 'giveme' in cmds_dic:
 		# 	add_exp = np.random.rand() * 100
-		# 	userinfo['exp'] += add_exp
+		# 	userinfo.exp += add_exp
 		# 	userinfo['tmpTime. = self.now
-		# 	ans = '{add_exp}EXP GET!!\nTotal: {total_exp}EXP'.format(add_exp == str(add_exp), total_exp = str(userinfo['exp']))
+		# 	ans = '{add_exp}EXP GET!!\nTotal: {total_exp}EXP'.format(add_exp == str(add_exp), total_exp = str(userinfo.exp))
 		# elif 'send' in cmds_dic:
 		# 	try:
 		# 		cmds = status['text'].replace(''.join(['@', bot_id, ' ']), '').split(' ')
@@ -769,10 +766,10 @@ class StreamResponseFunctions(MyObject):
 						except Exception as e:
 							d(e, 'imitate')
 							ans = 'ものまね失敗。管理者にお問い合わせください。'
-		elif nlp_summary.value in {'遊ぶ', '尻取りする', '頭取りする', '頭とりする'} or userinfo['mode'] == 'srtr':
+		elif nlp_summary.value in {'遊ぶ', '尻取りする', '頭取りする', '頭とりする'} or userinfo.mode == 'srtr':
 			is_accepted = False
 			p(nlp_summary)
-			if userinfo['mode'] == 'srtr':
+			if userinfo.mode == 'srtr':
 				is_accepted = True
 			elif nlp_summary.has_function('希望', '要望', '勧誘'):
 				is_accepted = True
@@ -782,23 +779,23 @@ class StreamResponseFunctions(MyObject):
 			if not is_accepted:
 				ans = operate_sql.get_phrase(status =  'reject', character = character)
 			else:
-				if nlp_summary.value in {'尻取りする'} or nlp_summary.dativ in {'尻取り', None} or userinfo['mode'] == 'srtr':
-					userinfo['mode'] = 'srtr'
+				if nlp_summary.value in {'尻取りする'} or nlp_summary.dativ in {'尻取り', None} or userinfo.mode == 'srtr':
+					userinfo.mode = 'srtr'
 					ans = game_functions.Shiritori(text, user = screen_name).main()
 					if '\END' in ans:
 						ans = ans.replace('\END', '')
-						userinfo['mode'] = 'dialog'
+						userinfo.mode = 'dialog'
 					if '\MISS' in ans:
 						ans = ans.replace('\MISS', '')
-						if userinfo['cnt'] > 3:
+						if userinfo.cnt > 3:
 							ans = operate_sql.get_phrase(status =  'shiritori.end', character = character)
-							userinfo['mode'] = 'dialog'
-							userinfo['cnt'] = 0
+							userinfo.mode = 'dialog'
+							userinfo.cnt = 0
 					else:
-						userinfo['cnt'] = 0
-		elif nlp_summary.value in {'戦う', '対戦する', '倒す', 'バトルする',  'たたかう', '申し込む'} or userinfo['mode'] in {'mon', 'battle_game'}:
+						userinfo.cnt = 0
+		elif nlp_summary.value in {'戦う', '対戦する', '倒す', 'バトルする',  'たたかう', '申し込む'} or userinfo.mode in {'mon', 'battle_game'}:
 			is_accepted = False
-			if userinfo['mode']  in {'mon', 'battle_game'}:
+			if userinfo.mode  in {'mon', 'battle_game'}:
 				is_accepted = True
 			if nlp_summary.has_function('希望', '要望', '勧誘'):
 				is_accepted = True
@@ -809,38 +806,38 @@ class StreamResponseFunctions(MyObject):
 				ans = operate_sql.get_phrase(status =  'reject', character = character)
 			else:
 				try:
-					if userinfo['mode'] in {'mon', 'battle_game'}:
+					if userinfo.mode in {'mon', 'battle_game'}:
 						enemy_name = None
 					else:
 						enemy_name = nlp_summary.dativ
 					if not enemy_name:
 						enemy_name = nlp_summary.akkusativ
 
-					userinfo['mode'] = 'battle_game'
+					userinfo.mode = 'battle_game'
 					intext = status['text'].replace(''.join(['@', self.bot_id, ' ']), '').replace('@', '')
 					battle_game = game_functions.BattleGame(screen_name, enemy_name)
 					ans = '\n' + battle_game.main(intext)
-					userinfo['cnt'] = 0
+					userinfo.cnt = 0
 					if '#END' in ans:
 						ans = ans.replace('#END', '')
-						userinfo['mode'] = 'dialog'
+						userinfo.mode = 'dialog'
 					if '#MISS' in ans:
 						ans = ans.replace('#MISS', '')
 					if '#exp' in ans:
 						ans, exp = ans.split('#exp')
-						userinfo['exp'] += 20
+						userinfo.exp += 20
 				except Exception as e:
 					d(e, 'battle_game')
 					ans = '工事中...'
-					userinfo['mode'] = 'dialog'
+					userinfo.mode = 'dialog'
 		#----------------
 		# Feedback_cooperation_program
 		elif nlp_summary.value in {'お手伝いする', 'てつだう', '手伝う'}:
 			if nlp_summary.has_function('希望'):
 				label = np.random.choice(['好評', '苦情', '要望', '質問'])
 				ans = operate_sql.get_phrase(status =  'kadai.labeling.text', n = 20, character = character).format(label)
-				userinfo['mode'] = 'kadai'
-				userinfo['tmp'] = label
+				userinfo.mode = 'kadai'
+				userinfo.tmp = label
 			if nlp_summary.has_function('要望'):
 				is_following = True
 				nlp_summary.akkusativ = self._convert_first_personal_pronoun(word = nlp_summary.akkusativ, convert_word = screen_name)
@@ -863,7 +860,7 @@ class StreamResponseFunctions(MyObject):
 				if nlp_summary.akkusativ in {'トレンド', '流行語'}:
 					ans = '\n- '.join(['[現在のトレンドワード]']+self.tmp.trendwords_ls[:10])
 				elif nlp_summary.akkusativ in {'経験値', 'exp', 'EXP', 'Exp'}:
-					ans = '\n'.join(['[現在の経験値]:', str(userinfo['exp'])])
+					ans = '\n'.join(['[現在の経験値]:', str(userinfo.exp)])
 		#----------------
 		# Omikuji
 		elif nlp_summary.value in {'御籤する', '占う'}:
@@ -944,17 +941,17 @@ class StreamResponseFunctions(MyObject):
 				operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': 'tweet', 'to_whom': screen_name, 'when':set_time, 'tmpid': status_id, 'tmptext': ans})
 			else:
 				tweet_status = self.send(ans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = mode)
-			userinfo['context'] = '</>'.join([userinfo['context'], ans])
+			userinfo.context = '</>'.join([userinfo.context, ans])
 
-		userinfo['time'] = self.now
+		userinfo.time = self.now
 		try:
-			userinfo['cnt'] += 1
+			userinfo.cnt += 1
 		except:
-			userinfo['cnt'] = 0
+			userinfo.cnt = 0
 		try:
-			userinfo['exp'] += 10
+			userinfo.exp += 10
 		except:
-			userinfo['exp'] = 0
+			userinfo.exp = 0
 		return tweet_status
 
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
@@ -1045,14 +1042,14 @@ class StreamResponseFunctions(MyObject):
 			if logstatus:
 				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus._json))
 		if not twlog is None:
-			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
-			logname = twlog['screen_name']
+			clean_logtext = _.clean_text(twlog.text.replace('(Log合致度:', ''))
+			logname = twlog.screen_name
 			nega = 0
 			if 'NG' in status['text']:
 				nega = 10
 			operate_sql.save_tweet_dialog(
  				twdialog_dic = {
-				'SID' : '/'.join([str(twlog['status_id']), status['id_str'], datetime.strftime(self.sync_now() , '%Y%m%d%H%M%S%f')]),
+				'SID' : '/'.join([str(twlog.status_id), status['id_str'], datetime.strftime(self.sync_now() , '%Y%m%d%H%M%S%f')]),
 				'KWs' : '',
 				'nameA' : logname,
 				'textA' : clean_logtext,
@@ -1188,11 +1185,8 @@ class StreamResponseFunctions(MyObject):
 			elif todo == 'teiki.MC':
 				try:
 					ans = ''
-					dialog_obj = dialog_generator.DialogObject('')
-					while True:
-						ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n = 5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.6, character = self.default_character, tools = 'WN,LOG,¡MC', username = '@〜〜')
-						if not '<人名>' in ans:
-							break
+					trigram_markov_chain_instance = TrigramMarkovChain(self.default_character)
+					ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
 					ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
 					task_restart()
 				except Exception as e:
@@ -1219,8 +1213,8 @@ class StreamResponseFunctions(MyObject):
 						time.sleep(10)
 				task_restart()
 			elif todo == 'update.lists':
-				userinfo_me = self.twf.twtr_api.me().__dict__
-				bot_id = userinfo_me['screen_name']
+				userinfo_me = self.twf.twtr_api.me()
+				bot_id = userinfo_me.screen_name
 				self.bot_id = bot_id
 				self.bots_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT'))
 				self.karamix2_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2'))
@@ -1275,7 +1269,7 @@ class StreamResponseFunctions(MyObject):
 		operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teiki.MC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program', 'followback_check'], taskdict = {'status': 'end'})
 		self.sync_now()
 		task_duration_dic = {
-			'teiki': 30,
+			# 'teiki': 30,
 			'teikiMC': 20,
 			'teiki.trendword': 60,
 			'erase.tmp.stats.tweet_cnt_hour': 60,
@@ -1286,7 +1280,6 @@ class StreamResponseFunctions(MyObject):
 			}
 		if self.bot_id == 'LiveAI_Umi':
 			task_duration_dic['reconnect_wifi'] = 3
-			# task_duration_dic['restart_program'] = 60
 		def save_task(task_name, duration_min):
 			rand_start_min = np.random.randint(0, 20)
 			operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': task_name, 'to_whom': '', 'tmptext': str(duration_min), 'when': self.get_time(minutes = rand_start_min)})
@@ -1304,12 +1297,12 @@ def task_manager(bot_id, period = 60):
 	else:
 		while True:
 			now = response_funcs.sync_now()
-			p(bot_id, 'TASK>> ', now)
 			tasks = operate_sql.search_tasks(when = now, who = bot_id, n = 10)
-			try:
-				[response_funcs.implement_tasks(task) for task in tasks if task]
-			except Exception as e:
-				d(e, 'task_manager whileloop')
+			if tasks:
+				try:
+					[response_funcs.implement_tasks(task) for task in tasks if task]
+				except Exception:
+					pass
 			time.sleep(period)
 def stream(bot_id):
 	twf = twtr_functions.TwtrTools(bot_id)
@@ -1325,21 +1318,19 @@ def main(is_experience = False):
 		else:
 			bots = ['LiveAI_Alpaca']
 		#
-		for bot_id in bots:
-			bot_process = multiprocessing.Process(target = stream, args=(bot_id,), name=bot_id)
-			bot_processes.append(bot_process)
-			bot_process.start()
-			manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
-			manage_processes.append(manage_process)
-			manage_process.start()
-		try:
-			for process in manage_processes + bot_processes:
-				process.join()
-		except KeyboardInterrupt:
-			p('-> Exiting..')
-			for worker in manage_processes + bot_processes:
-				worker.terminate()
-				worker.join()
+		with _.process_with() as process_queue:
+			for bot_id in bots:
+				bot_process = multiprocessing.Process(target = stream, args=(bot_id, ), name = bot_id)
+				process_queue.append(bot_process)
+				manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
+				process_queue.append(manage_process)
+		# try:
+		# 	for process in manage_processes + bot_processes:
+		# 		process.join()
+		# except KeyboardInterrupt:
+		# 	for worker in manage_processes + bot_processes:
+		# 		worker.terminate()
+		# 		worker.join()
 
 if __name__ == '__main__':
 	main(0)

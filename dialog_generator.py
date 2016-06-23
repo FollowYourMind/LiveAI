@@ -235,59 +235,52 @@ class TFIDF(MyObject):
                         return impkey
         def precalc_s1_tfidf(self, s):
                 self.fix_s1_tfidf =  {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
+        @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
         def calc_cosine_similarity(self, s1, s2):
-                try:
-                        if not s1 or not s2:
-                            return 0
-                        if not self.fix_s1_tfidf:
-                            self.precalc_s1_tfidf(s1)
-                        tf_idf_ls0 = self.fix_s1_tfidf
-                        tf_idf_ls1 = {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s2)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
-                        vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls0.keys()] + [tf_idf_ls1.keys()]))))
-                        v1 = np.array([tf_idf_ls0[w] if w in set(tf_idf_ls0) else 0 for w in vecF])
-                        v2 = np.array([tf_idf_ls1[w] if w in set(tf_idf_ls1) else 0 for w in vecF])
-                        bunbo = (np.linalg.norm(v1) * np.linalg.norm(v2))
-                        if bunbo:
-                                return np.dot(v1, v2) / bunbo
-                        else:
-                                return 0
-                except Exception as e:
-                        d(e, 'calc_cosine_similarity')
+                if not s1 or not s2:
+                        return 0
+                if not self.fix_s1_tfidf:
+                        self.precalc_s1_tfidf(s1)
+                tf_idf_ls0 = self.fix_s1_tfidf
+                tf_idf_ls1 = {ma[7]: ma[10] for ma in self.extract_tf_idf(natural_language_processing.MA.get_mecab_coupled(s2)) if ma[1] in {'動詞', '名詞', '固有名詞', '形容詞', '助詞', '副詞', '助動詞'}}
+                vecF = set(_.f7(list(chain.from_iterable([tf_idf_ls0.keys()] + [tf_idf_ls1.keys()]))))
+                v1 = np.array([tf_idf_ls0[w] if w in set(tf_idf_ls0) else 0 for w in vecF])
+                v2 = np.array([tf_idf_ls1[w] if w in set(tf_idf_ls1) else 0 for w in vecF])
+                bunbo = (np.linalg.norm(v1) * np.linalg.norm(v2))
+                if bunbo:
+                        return np.dot(v1, v2) / bunbo
+                else:
                         return 0
 class TrigramMarkovChain(MyObject):
         def __init__(self, character = 'sys'):
                 self.character = character
                 self.selected_character_database = []
+        @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+        @talk_sql.atomic()
         def generate(self, word, is_randomize_metasentence = True):
                 ans = ''
+                metaframe_str = self.get_metasentence()
+                metaframe = metaframe_str.split(',')
+                self.database = TrigramModel.select()
+                self.selected_character_database = self.database.where(TrigramModel.character == self.character)
+                if not word:
+                        try:
+                                Ws = self.selected_character_database.where(TrigramModel.W1 == '<BOS>', TrigramModel.P2 == '名詞').order_by(TrigramModel.cnt.desc())
+                                word = self.choose_randomword(Ws, place = 2)
+                        except Exception as e:
+                                word = '...'
+                # try:
+                #         backward_ans = self.generate_backward(startWith = word)
+                # except Exception as e:
+                #         d(e)
+                backward_ans = ''
                 try:
-                        with talk_sql.transaction():
-                                metaframe_str = self.get_metasentence()
-                                metaframe = metaframe_str.split(',')
-                                # if '助詞,' in metaframe:
-                                #         metaframe = [''.join([f, '助詞']) if f[-1] != '>' else f for f in metaframe.split('助詞,')][0]
-                                self.database = TrigramModel.select()
-                                self.selected_character_database = self.database.where(TrigramModel.character == self.character)
-                                if not word:
-                                        try:
-                                                Ws = self.selected_character_database.where(TrigramModel.W1 == '<BOS>', TrigramModel.P2 == '名詞').order_by(TrigramModel.cnt.desc())
-                                                word = self.choose_randomword(Ws, place = 2)
-                                        except Exception as e:
-                                                word = '...'
-                                # try:
-                                #         backward_ans = self.generate_backward(startWith = word)
-                                # except Exception as e:
-                                #         d(e)
-                                backward_ans = ''
-                                try:
-                                        forward_ans = self.generate_forward(word, Plist = metaframe)
-                                except Exception as e:
-                                        d(e)
-                                        forward_ans = ''
-                                ans = ''.join([backward_ans, forward_ans])
-                                ans = ans.replace('<BOS>', '').replace('<EOS>', '')
+                        forward_ans = self.generate_forward(word, Plist = metaframe)
                 except Exception as e:
-                        talk_sql.rollback()
+                        d(e)
+                        forward_ans = ''
+                ans = ''.join([backward_ans, forward_ans])
+                ans = ans.replace('<BOS>', '').replace('<EOS>', '')
                 return ans
         def choose_randomword(self, Ws, place = 2):
                 word_cnt_ls = [w.cnt for w in Ws]
