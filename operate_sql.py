@@ -34,7 +34,7 @@ def get_ss_dialog_within(person = '', kw = 'カバン', n = 100000):
 			return None
 		return obj.text, response_obj.text
 	return _.compact([_func(dialog_obj) for dialog_obj in dialogs])
-def save_ss_dialog(url, retry_cnt = 0):
+def save_ss_dialog(url):
 	reg = natural_language_processing.RegexTools()
 	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 	@webdata_sql.atomic()
@@ -79,7 +79,6 @@ def upsert_core_info(whose_info = '', info_label = '', kwargs = {'Char1': '', 'C
 def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
 	t = Task.create(**taskdict)
 	return t
-	# p(''.join(['TASK_SAVED]',taskdict['who'], '_', taskdict['what']]))
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
@@ -95,17 +94,15 @@ def search_tasks(when = datetime.now(), who = '_mmKm', n = 10):
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
 def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
-	if who_ls:
-		if not kinds:
-			task = Task.update(**taskdict).where(Task.id == taskid)
-		elif not taskid:
+	if not kinds:
+		task = Task.update(**taskdict).where(Task.id == taskid)
+	elif who_ls:
+		if not taskid:
 			task = Task.update(**taskdict).where(Task.what << kinds, Task.who << who_ls)
 		else:
 			task = Task.update(**taskdict).where(Task.id == taskid, Task.what << kinds, Task.who << who_ls)
 	else:
-		if not kinds:
-			task = Task.update(**taskdict).where(Task.id == taskid)
-		elif not taskid:
+		if not taskid:
 			task = Task.update(**taskdict).where(Task.what << kinds)
 		else:
 			task = Task.update(**taskdict).where(Task.id == taskid, Task.what << kinds)
@@ -125,16 +122,25 @@ def save_tweet_status(status_dic = {
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
 			}):
-	tweetstatus = Tweets.create(**status_dic)
-	return tweetstatus._data
+	if status_dic:
+		tweetstatus, is_created = Tweets.create_or_get(**status_dic)
+		return tweetstatus
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
-def get_tweet_dialog(status_id = 1):
+def get_twlog(status_id = 1):
 	return Tweets.select().where(Tweets.status_id == status_id).get()._data
+
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
-def get_twlog(status_id = 1, retry_cnt = 0):
-	return Tweets.select().where(Tweets.status_id == status_id).get()._data
+def get_twlog_pool(n = 1000):
+	tweets = Tweets.select().order_by(Tweets.createdAt.desc()).limit(n)
+	return [tweet.text for tweet in tweets]
+
+@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@twlog_sql.atomic()
+def get_twlog_users(n = 1000, screen_name = 'chana1031'):
+	tweets = Tweets.select().where(Tweets.screen_name == screen_name).order_by(Tweets.createdAt.desc()).limit(n)
+	return [t for t in [tweet.text for tweet in tweets] if not 'RT' in t and not '@' in t]
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
@@ -150,17 +156,18 @@ def save_tweet_dialog(twdialog_dic = {
 				'bot_id' : 'bot',
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
-			}, retry_cnt = 0):
-		twdialog = TwDialog.create(**twdialog_dic)
-		return twdialog
-
+			}):
+		if twdialog_dic:
+			twdialog, is_created = TwDialog.create_or_get(**twdialog_dic)
+			return twdialog
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @twlog_sql.atomic()
-def get_twlog_list(n = 1000, UserList = [], BlackList = [], contains = ''):
-	if not UserList:
-		tweets = Tweets.select().where(Tweets.text.contains(contains), ~Tweets.text.contains('RT'), ~Tweets.screen_name << BlackList, ~Tweets.text.contains('【')).order_by(Tweets.createdAt.desc()).limit(n)
+def get_twlog_list(n = 1000, UserList = None, BlackList = [], contains = ''):
+	if not UserList is None:
+		users_tweets = Tweets.select().where(Tweets.screen_name << UserList, ~Tweets.screen_name << BlackList)
 	else:
-	 	tweets = Tweets.select().where(Tweets.screen_name << UserList , ~Tweets.screen_name << BlackList, ~Tweets.text.contains('RT'), ~Tweets.text.contains('【')).order_by(Tweets.createdAt.desc()).limit(n)
+		users_tweets = Tweets.select().where(~Tweets.screen_name << BlackList)
+	tweets = users_tweets.where(~Tweets.text.contains('RT'), ~Tweets.text.contains('【'), Tweets.text.contains(contains)).order_by(Tweets.createdAt.desc()).limit(n)
 	tweetslist = [_.clean_text(tweet.text) for tweet in tweets]
 	return tweetslist
 
@@ -234,11 +241,13 @@ def save_userinfo(userstatus):
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @wordnet_sql.atomic()
-def get_wordnet_result(lemma, retry_cnt = 0):
+def get_wordnet_result(lemma):
 	n = 10
-	langs_ls = ['jpn', 'eng']
+	# langs_ls = ['jpn', 'eng']
 	langs_ls = ['jpn']
 	wn_relation = {}
+	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+	@wordnet_sql.atomic()
 	def convert_synset_into_words(target_synset):
 		try:
 			same_sense_set = Sense.select().where(Sense.synset == target_synset).limit(n)
@@ -277,10 +286,10 @@ class BotProfile(MyObject):
 		self.abs_banner_filename = upsert_core_info(whose_info = self.bot_id, info_label = 'abs_banner_filename', kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 if __name__ == '__main__':
 	# a = read_userinfo('h_y_okaaaaaaaaaaaa')/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg
-	# save_phrase('test')
-	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
-	a = get_phrase(status = 'kusoripu', character = 'sys')
+	a = np.random.choice(get_twlog_users(n = 100, screen_name = 'ci_nq'))
 	p(a)
+	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
+	# a = get_phrase(status = 'kusoripu', character = 'sys')
 	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
 	# with userinfo_with(screen_name = '_mmKmmm') as userinfo:
 

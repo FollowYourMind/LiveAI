@@ -47,7 +47,7 @@ def timeit(func):
         return ret
     return wrapper
 
-def forever(exceptions = Exception, is_print = True, is_logging = True):
+def forever(exceptions = Exception, is_print = True, is_logging = True, ret = True):
     def _forever(func):
         @functools.wraps(func)
         def wrapper(*args, **kw):
@@ -55,7 +55,6 @@ def forever(exceptions = Exception, is_print = True, is_logging = True):
                 ret = func(*args, **kw)
             except exceptions:
                 log_err(is_print, is_logging)
-                ret = True
             finally:
                 return ret
         return wrapper
