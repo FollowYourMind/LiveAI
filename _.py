@@ -52,11 +52,12 @@ def forever(exceptions = Exception, is_print = True, is_logging = True, ret = Tr
         @functools.wraps(func)
         def wrapper(*args, **kw):
             try:
-                ret = func(*args, **kw)
+                wret = func(*args, **kw)
             except exceptions:
                 log_err(is_print, is_logging)
+                wret = ret
             finally:
-                return ret
+                return wret
         return wrapper
     return _forever
 

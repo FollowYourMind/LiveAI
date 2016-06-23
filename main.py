@@ -283,20 +283,14 @@ class StreamResponseFunctions(MyObject):
 				mas = natural_language_processing.MA.get_mecab_ls(text)
 				ans = dialog_generator.extract_haiku(mas)
 		#ツイート
-		if ans:
-			try:
-				if screen_name:
-					userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
-					if not 'select_chara' in userinfo:
-						userinfo['select_chara'] = self.default_character
-					if userinfo['select_chara'] != self.default_character:
-						return False
-				return self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
-			except Exception as e:
-				d(e, 'main tweet')
-				return False
-		else:
-			return False
+		if ans and screen_name:
+			with operate_sql.userinfo_with(screen_name) as userinfo:
+				if not 'select_chara' in userinfo:
+					userinfo['select_chara'] = self.default_character
+				if userinfo['select_chara'] == self.default_character:
+					self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
+			return True
+		return False
 	def get_deltasec(self, time_future, time_past):
 	#time_future - time_past時間計測(秒)
 		try:
@@ -1042,8 +1036,11 @@ class StreamResponseFunctions(MyObject):
 	def save_tweet_dialog(self, status):
 		twlog = None
 		if not status['in_reply_to_status_id_str'] is None:
-			twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'])
-		if not twlog:
+			try:
+				twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'])
+			except:
+				twlog = None
+		if twlog is None:
 			logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
 			if logstatus:
 				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus._json))
