@@ -111,7 +111,6 @@ class StreamResponseFunctions(MyObject):
 		#CLASS
 		self.bot_profile = operate_sql.BotProfile(self.bot_id)
 		self.tmp = Temp()
-		# self.twlog_pool = TweetLogPool()
 		self.stats = Stats()
 		self.tmp.charas = Temp()
 		#
@@ -262,18 +261,18 @@ class StreamResponseFunctions(MyObject):
 				ans = 'QR-Code作成に失敗'
 		elif 'add' in text:
 			return False
+		elif 'respon' in text:
+			return False
 		elif is_kusoripu(text):
 			operate_sql.save_phrase(phrase = text, author = screen_name, status = 'kusoripu', character = 'sys', s_type = 'AutoLearn')
 			rand = np.random.rand()
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
 				screen_name = ''
-		elif text in set(twlog_pool.timeline_twlog[:5]):
+		elif text in set(operate_sql.get_twlog_pool(n = 5)):
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
 			if len(''.join([ans,'@',screen_name, ' '])) > 140:
 				ans = text
-		elif 'respon' in text:
-			return False
 		elif status['in_reply_to_screen_name'] in {None, self.bot_id}:
 			special_response_word = _.crowlList(text = text, dic = self.tmp.response)
 			if special_response_word:
@@ -922,10 +921,13 @@ class StreamResponseFunctions(MyObject):
 		# 			else:
 		# 				ans = ''.join(['なにが', nlp_summary.value, '...???'])
 		if not ans:
-			ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.2, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
-			ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
-			if not ans:
-				ans = '...'
+			if self.tmp.imitating != self.bot_id:
+				ans = np.random.choice(operate_sql.get_twlog_users(n = 100, screen_name = self.tmp.imitating))
+			else:
+				ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.2, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
+				ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
+				if not ans:
+					ans = '...'
 		if ans == 'ignore':
 			ans = ''
 		if is_new_user:
@@ -961,96 +963,66 @@ class StreamResponseFunctions(MyObject):
 			userinfo['exp'] = 0
 		return tweet_status
 
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
 	def is_ignore(self, status):
-		try:
-			if status['retweeted']:
-				return True
-			if status['is_quote_status']:
-				return True
-			screen_name = status['user']['screen_name']
-			if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '定期', '【', 'ポストに到達', 'リプライ数']]):
-				if status['mode'] != 'dm':
-					return True
-			if screen_name == self.bot_id:
-				return True
-			if screen_name in self.response_exception_set:
-				return True
-			return False
-		except Exception as e:
-			d(e, 'is_ignore')
+		if status['retweeted']:
 			return True
+		if status['is_quote_status']:
+			return True
+		screen_name = status['user']['screen_name']
+		if screen_name in self.response_exception_set:
+			return True
+		if screen_name == self.bot_id:
+			return True
+		if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '定期', '【', 'ポストに到達', 'リプライ数']]):
+			if status['mode'] != 'dm':
+				return True
+		return False
 
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = False)
 	def is_react(self, status):
-		try:
-			text = status['clean_text']
-			if self.bot_id in status['text']: #リプライ全応答。
-				return True
-			elif iscalledBOT(text = text,  select_set = {self.default_character}):
-				return True
-			rand = np.random.rand()
-			if status['user']['screen_name'] in self.bots_set:
-				if rand < 0.001: #BOTに対する自発。0.1%
-					return True
-			# if status['user']['screen_name'] in self.karamix2_set:
-			# 	if rand < 0.02: #2%
-			# 		return True
-			if rand < 0.01: #自発。0.5%
-				return True
-			return False
-		except Exception as e:
-			d(e, 'is_react')
-			return False
-	def on_status_main(self, status):
-		try:
-			status['mode'] = 'timeline'
-			if not self.is_ignore(status):
-				self.stats.TL_cnt += 1
-				np.random.seed()
-				status_id = status['id_str']
-				screen_name = status['user']['screen_name']
-				replyname = status['in_reply_to_screen_name']
-				text = _.clean_text(status['text'])
-				if not replyname is None:
-					p(self.bot_id,':STREAM>>', status['user']['name'], ']@', replyname, text)
-				else:
-					p(self.bot_id,':STREAM>>', status['user']['name'], ']', text)
-				self.sync_now()
-				#ツイートステータス情報追加処理
-				status['now'] = self.now
-				status['clean_text'] = text
-				#直近ツイート処理
-				if self.monitor_timeline(status):
-					return True
-				# リアクション
-				if self.is_react(status):
-					with operate_sql.userinfo_with(screen_name) as userinfo:
-						tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
-				# 記憶部
-				if not text in set(twlog_pool.timeline_twlog):
-					try:
-						save_tweet_status_thread = threading.Thread(target = operate_sql.save_tweet_status, name = self.bot_id+'save_tweet_status', args=(self.status_dic(status), ))
-						save_tweet_status_thread.start()
-						# operate_sql.save_tweet_status(status, self.bot_id)
-					except Exception as e:
-						d(s, 'threading save')
-						pass
-				#Tweetプーリング
-					if not screen_name in self.bots_set:
-						if not status['entities']['urls']:
-							if len(text) > 5:
-								if not any([ng_word in text for ng_word in ['便乗', 'imitate', 'learn', 'img', 'kusoripu', 'haken', 'add', '午̷̖̺͈̆͛͝前̧̢̖̫̊3̘̦時̗͡の̶̛̘̙̤̙̌̉͢い̷゙̊̈̓̓̅ば̬̬̩͈̊͡ら゙̜̩̹ぎ̫̺̓ͣ̕͡げ̧̛̩̞̽ん゙̨̼̗̤̂̄']]):
-									twlog_pool.append_and_adjust_timeline_twlog(status)
-					#Dialog保存
-					if not screen_name in {self.bot_id}:
-						if not status['in_reply_to_status_id_str'] is None:
-							try:
-								self.save_tweet_dialog(status)
-							except:
-								pass
-		except Exception as e:
-			d(e, '+++++timeline_status+++++++')
-		else:
+		text = status['clean_text']
+		if self.bot_id in status['text']: #リプライ全応答。
 			return True
+		elif iscalledBOT(text = text,  select_set = {self.default_character}):
+			return True
+		rand = np.random.rand()
+		if status['user']['screen_name'] in self.bots_set:
+			if rand < 0.001: #BOTに対する自発。0.1%
+				return True
+		if rand < 0.01: #自発。0.5%
+			return True
+		return False
+
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
+	def on_status_main(self, status):
+		status['mode'] = 'timeline'
+		if not self.is_ignore(status):
+			self.stats.TL_cnt += 1
+			np.random.seed()
+			status_id = status['id_str']
+			screen_name = status['user']['screen_name']
+			replyname = status['in_reply_to_screen_name']
+			text = _.clean_text(status['text'])
+			if not replyname is None:
+				p(self.bot_id,':STREAM>>', status['user']['name'], ']@', replyname, text)
+			else:
+				p(self.bot_id,':STREAM>>', status['user']['name'], ']', text)
+			self.sync_now()
+			#ツイートステータス情報追加処理
+			status['now'] = self.now
+			status['clean_text'] = text
+			#直近ツイート処理
+			if self.monitor_timeline(status):
+				return True
+			# リアクション
+			if self.is_react(status):
+				with operate_sql.userinfo_with(screen_name) as userinfo:
+					tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
+			# 記憶部
+			operate_sql.save_tweet_status(self.status_dic(status))
+			self.save_tweet_dialog(status)
+			#Dialog保存
 	def status_dic(self, status):
 		if status['id_str'].isdigit():
 			status_dic = {
@@ -1065,18 +1037,17 @@ class StreamResponseFunctions(MyObject):
 				'updatedAt' : datetime.utcnow()
 			}
 			return status_dic
+
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
 	def save_tweet_dialog(self, status):
-		try:
-			twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'], retry_cnt = 0)
-		except:
-			twlog = None
-		try:
-			if not twlog:
-				logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
-				if not logstatus:
-					raise Exception
+		twlog = None
+		if not status['in_reply_to_status_id_str'] is None:
+			twlog = operate_sql.get_twlog(status_id = status['in_reply_to_status_id_str'])
+		if not twlog:
+			logstatus = self.twf.get_status(status_id = status['in_reply_to_status_id_str'])
+			if logstatus:
 				twlog = operate_sql.save_tweet_status(self.status_dic(logstatus._json))
-			#save
+		if not twlog is None:
 			clean_logtext = _.clean_text(twlog['text'].replace('(Log合致度:', ''))
 			logname = twlog['screen_name']
 			nega = 0
@@ -1095,88 +1066,72 @@ class StreamResponseFunctions(MyObject):
 				'bot_id' : self.bot_id,
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
-			}, retry_cnt = 0)
-		except Exception as e:
-			d(e, 'save_tweet dialog')
-			return False
-		else:
-			return True
+			})
+
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
 	def on_direct_message_main(self, status):
-		try:
-			self.stats.DM_cnt += 1
-			status['mode'] = 'dm'
-			status = self.twf.convert_direct_message_to_tweet_status(status)
-			if not self.is_ignore(status):
-				try:
-					np.random.seed()
-					text = _.clean_text(status['text'])
-					status['clean_text'] = text
-					self.sync_now()
-					#ツイートステータス情報追加処理
-					status['now'] = self.now
-					screen_name = status['user']['screen_name']
-					# userinfo, is_new_user = operate_sql.read_userinfo(screen_name)
-					with operate_sql.userinfo_with(screen_name) as userinfo:
-						tweet_status = self.main(status, mode = 'dm', userinfo = userinfo)
-					# save
-					operate_sql.save_tweet_status(self.status_dic(status))
-					kws = dialog_generator.DialogObject(context).keywords
-					operate_sql.save_tweet_dialog(
- 						twdialog_dic = {
-						'SID' : '/'.join(['DM_', status['id_str']]),
-						'KWs' : '</>'.join(kws),
-						'nameA' : self.bot_id,
-						'textA' : _.clean_text(context),
-						'nameB' : status['user']['screen_name'],
-						'textB' : status['clean_text'],
-						'posi' : 1,
-						'nega' : 0,
-						'bot_id' : self.bot_id,
-						'createdAt' : status['now'],
-						'updatedAt' : status['now']
-					}, retry_cnt = 0)
-				except Exception as e:
-					d(e, 'on_direct_message')
-		except Exception as e:
-			d(e, '++++direct_message++++++')
-		else:
-			return True
+		self.stats.DM_cnt += 1
+		status['mode'] = 'dm'
+		status = self.twf.convert_direct_message_to_tweet_status(status)
+		if not self.is_ignore(status):
+			np.random.seed()
+			text = _.clean_text(status['text'])
+			#ツイートステータス情報追加処理
+			status['clean_text'] = text
+			self.sync_now()
+			status['now'] = self.now
+			with operate_sql.userinfo_with(status['user']['screen_name']) as userinfo:
+				tweet_status = self.main(status, mode = 'dm', userinfo = userinfo)
+			# save
+			operate_sql.save_tweet_status(self.status_dic(status))
+			operate_sql.save_tweet_dialog(
+				twdialog_dic = {
+				'SID' : '/'.join(['DM_', status['id_str']]),
+				'KWs' : '</>',
+				'nameA' : self.bot_id,
+				'textA' : _.clean_text(context),
+				'nameB' : status['user']['screen_name'],
+				'textB' : status['clean_text'],
+				'posi' : 1,
+				'nega' : 0,
+				'bot_id' : self.bot_id,
+				'createdAt' : status['now'],
+				'updatedAt' : status['now']
+			})
+		return True
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
 	def on_event_main(self, status):
 		p(status['event'])
-		try:
-			# if status['event'] == 'favorite':
-			# 	if status['target']['screen_name'] == self.bot_id:
-			# 		text = _.clean_text(status['target_object']['text'])
-			# 		operate_sql.save_phrase(phrase = text, author = status['source']['name'], status = 'favorite', character = 'sys',s_type = 'favorite')
-			if status['event'] == 'unfollow':
-				if status['target']['screen_name'] == self.bot_id:
+		# if status['event'] == 'favorite':
+		# 	if status['target']['screen_name'] == self.bot_id:
+		# 		text = _.clean_text(status['target_object']['text'])
+		# 		operate_sql.save_phrase(phrase = text, author = status['source']['name'], status = 'favorite', character = 'sys',s_type = 'favorite')
+		if status['event'] == 'unfollow':
+			if status['target']['screen_name'] == self.bot_id:
+				screen_name = status['source']['screen_name']
+				p(screen_name)
+				if self.twf.is_destroy_friendship_success(screen_name = screen_name):
+					return True
+		elif status['event'] == 'follow':
+			if status['target']['screen_name'] == self.bot_id:
+				userobject = status['source']
+				is_followback_ok = self.check_if_follow(userobject)
+				if is_followback_ok:
 					screen_name = status['source']['screen_name']
-					p(screen_name)
-					if self.twf.is_destroy_friendship_success(screen_name = screen_name):
+					if self.twf.is_create_friendship_success(screen_name = screen_name):
 						return True
-			elif status['event'] == 'follow':
-				if status['target']['screen_name'] == self.bot_id:
-					userobject = status['source']
-					is_followback_ok = self.check_if_follow(userobject)
-					if is_followback_ok:
-						screen_name = status['source']['screen_name']
-						if self.twf.is_create_friendship_success(screen_name = screen_name):
-							return True
-			elif status['event'] == 'user_update':
-				if status['target']['screen_name'] == self.bot_id:
-					if not status['source']['location'] is None:
-						if 'まねっこ' in status['source']['location']:
-							return True
-					self.bot_profile.name = status['source']['name']
-					self.bot_profile.description = status['source']['description']
-					self.bot_profile.url = status['source']['url']
-					self.bot_profile.id_str = status['source']['id_str']
-					self.bot_profile.location = status['source']['location']
-					self.bot_profile.save()
-		except Exception as e:
-			d(e, '++++event++++++')
-		finally:
-			return True
+		elif status['event'] == 'user_update':
+			if status['target']['screen_name'] == self.bot_id:
+				if not status['source']['location'] is None:
+					if 'まねっこ' in status['source']['location']:
+						return True
+				self.bot_profile.name = status['source']['name']
+				self.bot_profile.description = status['source']['description']
+				self.bot_profile.url = status['source']['url']
+				self.bot_profile.id_str = status['source']['id_str']
+				self.bot_profile.location = status['source']['location']
+				self.bot_profile.save()
+		return True
 
 	def check_if_follow(self, userobject):
 		try:

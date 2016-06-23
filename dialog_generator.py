@@ -961,7 +961,7 @@ class DialogObject(MyObject):
             q.join_thread()
     @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
     @twlog_sql.atomic()
-    def tweet_log_sender(self, q, UserList = [], BlackList = [], n = 100,  retry_cnt = 0):
+    def tweet_log_sender(self, q, UserList = [], BlackList = [], n = 100):
         dialogs = None
         try:
             for i in range(10):

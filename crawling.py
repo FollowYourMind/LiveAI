@@ -139,7 +139,7 @@ if __name__ == '__main__':
 	# 		url = site_url.format(ss_number)
 	# 		ss_ls = extract_ss(url = url)
 	# 		if ss_ls:
-	# 			operate_sql.save_ss(url = url, texts = ss_ls, retry_cnt = 0)
+	# 			operate_sql.save_ss(url = url, texts = ss_ls)
 	# 		# datas = operate_sql.get_ss(url = url)
 	# 		# text = ''.join([data.text for data in datas])
 	# 		# p(reg.extract_discorse(text))
