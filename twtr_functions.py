@@ -10,36 +10,39 @@ import natural_language_processing
 import operate_sql
 import main
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, bot_id):
+	def __init__(self, bot_id, lock):
 		super().__init__()
 		p(bot_id)
 		self.bot_id = bot_id
-		self.response_main = main.StreamResponseFunctions(bot_id)
+		self.response_main = main.StreamResponseFunctions(bot_id, lock)
 		self.response_main.on_initial_main()
+		self.processes = []
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
+		_.process_finish(self.processes)
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
 		return self.response_main.on_friends_main(friends)
+
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		try:
-			status_main_process = multiprocessing.Process(target = self.response_main.on_status_main, args=(status._json,), name=self.bot_id)
-			status_main_process.start()
-			return True
-			# return self.response_main.on_status_main(status._json)
-		except Exception as e:
-			d('StreamListener on_status',e)
-			return True
+		# status_main_process = multiprocessing.Process(target = self.response_main.on_status_main, args=(status._json,), name=self.bot_id)
+		# self.processes.append(status_main_process)
+		# status_main_process.start()
+		# return True
+		return self.response_main.on_status_main(status._json)
+
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		try:
-			dm_main_process = multiprocessing.Process(target = self.response_main.on_direct_message_main, args=(status._json,), name=self.bot_id)
-			dm_main_process.start()
-			return True
-			# return self.response_main.on_status_main(status._json)
-		except Exception as e:
-			d('StreamListener on_direct_message',e)
-			return True
+		# try:
+		# 	dm_main_process = multiprocessing.Process(target = self.response_main.on_direct_message_main, args=(status._json,), name=self.bot_id)
+		# 	dm_main_process.start()
+		# 	return True
+		return self.response_main.on_status_main(status._json)
+		# except Exception as e:
+		# 	d('StreamListener on_direct_message',e)
+		# 	return True
 		# return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
 		return self.response_main.on_event_main(status._json)
@@ -76,18 +79,19 @@ def get_twtr_auth(auth_dic):
 	except:
 		pass
 class TwtrTools:
-	def __init__(self, bot_id = 'LiveAIs'):
+	def __init__(self, bot_id = 'LiveAIs', lock = None):
 		self.bot_id = bot_id
 		api_keys = cfg['twtr']
 		twtr_auths = {key: get_twtr_auth(value) for key, value in api_keys.items()}
 		twtr_apis = {key: tweepy.API(value, wait_on_rate_limit = True) for key, value in twtr_auths.items()}
+		self.lock = lock
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
 	def Stream(self):
 		auth = self.twtr_auth
 		while True:
 			try:
-				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), timeout = 60, async = True, secure=True)
+				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, self.lock), timeout = 60, async = True, secure=True)
 				stream.userstream()
 			except tweepy.TweepError as e:
 				d(e, 'twf.stream tweeperror waiting 100sec')
@@ -320,7 +324,9 @@ class TwtrTools:
 			return False
 
 if __name__ == '__main__':
-	twf = TwtrTools('LiveAI_Maki')
+	twf = TwtrTools('LiveAI_Alpaca')
+	objs = twf.get_followers_all('LiveAI_Maki')
+	p(objs[0]._json)
 	# twf.Stream()
 	# ans = twf.get_listmembers_all(username = 'LiveAI_Rin' , listname = 'BOaaa')
 	# ans = twf.get_status(status_id = '715662952372699136')

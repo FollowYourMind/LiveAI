@@ -14,6 +14,7 @@ import opencv_functions
 import crawling
 import game_functions
 import operate_sql
+import random
 def get_kusoripu(tg1):
 	ans = operate_sql.get_phrase(status = 'kusoripu', n = 3000)
 	if '{ID}' in ans:
@@ -80,9 +81,10 @@ class TweetLogPool(MyObject):
 			self.status_ids.append(status_id)
 			self.timeline_twlog = self.timeline_twlog[-20:]
 class StreamResponseFunctions(MyObject):
-	def __init__(self, bot_id):
+	def __init__(self, bot_id, lock = None):
 		debug_style = ''
 		self.default_character = 'sys'
+		self.lock = lock
 		if bot_id == 'LiveAI_Umi':
 			self.default_character = '海未'
 		if bot_id == 'LiveAI_Honoka':
@@ -268,6 +270,8 @@ class StreamResponseFunctions(MyObject):
 			if rand < 0.08:
 				ans = get_kusoripu(tg1 = screen_name)
 				screen_name = ''
+			else:
+				return True
 		elif operate_sql.get_twlog_pool(n = 10).count(text) > 2:
 			ans = ''.join(['\n', text,'(パクツイ便乗)'])
 			if len(''.join([ans,'@',screen_name, ' '])) > 140:
@@ -290,27 +294,23 @@ class StreamResponseFunctions(MyObject):
 					self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
 			return True
 		return False
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = 50)
 	def get_deltasec(self, time_future, time_past):
 	#time_future - time_past時間計測(秒)
 		try:
-			try:
-				delta = time_future - time_past
-			except: #文字列対策
-				logger.debug('convert str into datetime')
-				delta = time_future - datetime.strptime(time_past, '%Y-%m-%d %H:%M:%S.%f')
-			deltasec = delta.total_seconds()
-			return deltasec
-		except Exception as e:
-			d(e, 'get_deltasec')
-			deltasec = 50
-			return deltasec
+			delta = time_future - time_past
+		except: #文字列対策
+			logger.debug('convert str into datetime')
+			delta = time_future - datetime.strptime(time_past, '%Y-%m-%d %H:%M:%S.%f')
+		deltasec = delta.total_seconds()
+		return deltasec
 	def _convert_first_personal_pronoun(self, word, convert_word):
 		if word in {'私', 'わたし', 'ぼく', '僕', 'あたし', 'おれ', '俺', 'オレ', '拙者', 'わし'}:
 			return convert_word
 		else:
 			return word
 	#MAIN FUNCTION
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def main(self, status, mode = 'dm', userinfo = ''):
 		ans = ''
 		IMGfile = ''
@@ -954,7 +954,7 @@ class StreamResponseFunctions(MyObject):
 			userinfo.exp = 0
 		return tweet_status
 
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
+	@_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = False)
 	def is_ignore(self, status):
 		if status['retweeted']:
 			return True
@@ -995,10 +995,6 @@ class StreamResponseFunctions(MyObject):
 			screen_name = status['user']['screen_name']
 			replyname = status['in_reply_to_screen_name']
 			text = _.clean_text(status['text'])
-			if not replyname is None:
-				p(self.bot_id,':STREAM>>', status['user']['name'], ']@', replyname, text)
-			else:
-				p(self.bot_id,':STREAM>>', status['user']['name'], ']', text)
 			self.sync_now()
 			#ツイートステータス情報追加処理
 			status['now'] = self.now
@@ -1011,9 +1007,13 @@ class StreamResponseFunctions(MyObject):
 				with operate_sql.userinfo_with(screen_name) as userinfo:
 					tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
 			# 記憶部
-			operate_sql.save_tweet_status(self.status_dic(status))
-			self.save_tweet_dialog(status)
-			#Dialog保存
+			with self.lock:
+				if not replyname is None:
+					p(self.default_character,'|', status['user']['name'], '|\n@', replyname, text)
+				else:
+					p(self.default_character,'|', status['user']['name'], '|\n', text)
+				operate_sql.save_tweet_status(self.status_dic(status))
+				self.save_tweet_dialog(status)
 	def status_dic(self, status):
 		if status['id_str'].isdigit():
 			status_dic = {
@@ -1093,7 +1093,7 @@ class StreamResponseFunctions(MyObject):
 				'updatedAt' : status['now']
 			})
 		return True
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True)
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_event_main(self, status):
 		p(status['event'])
 		# if status['event'] == 'favorite':
@@ -1109,10 +1109,8 @@ class StreamResponseFunctions(MyObject):
 		elif status['event'] == 'follow':
 			if status['target']['screen_name'] == self.bot_id:
 				userobject = status['source']
-				is_followback_ok = self.check_if_follow(userobject)
-				if is_followback_ok:
-					screen_name = status['source']['screen_name']
-					if self.twf.is_create_friendship_success(screen_name = screen_name):
+				if self.check_if_follow(userobject):
+					if self.twf.is_create_friendship_success(screen_name = status['source']['screen_name']):
 						return True
 		elif status['event'] == 'user_update':
 			if status['target']['screen_name'] == self.bot_id:
@@ -1127,141 +1125,134 @@ class StreamResponseFunctions(MyObject):
 				self.bot_profile.save()
 		return True
 
+	@_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = False)
 	def check_if_follow(self, userobject):
-		try:
-			is_followback_ok = True
-			if userobject['lang'] != 'ja':
-				return True
-			if userobject['statuses_count'] < 100:
-				return True
-			if userobject['favourites_count'] < 20:
-				return True
-			if userobject['listed_count'] / userobject['followers_count'] < 0.015:
-				is_followback_ok = False
-			ff_rate = userobject['followers_count'] / userobject['friends_count']
-			if ff_rate < 0.6:
-				is_followback_ok = False
-			if not is_followback_ok:
-				if userobject['followers_count'] > 1000:
-					is_followback_ok = True
-			return is_followback_ok
-		except:
+		is_followback_ok = True
+		if userobject['lang'] != 'ja':
 			return False
+		if userobject['statuses_count'] < 100:
+			return False
+		if userobject['favourites_count'] < 20:
+			return False
+		if userobject['listed_count'] / userobject['followers_count'] < 0.02:
+			return False
+		ff_rate = userobject['followers_count'] / userobject['friends_count']
+		if ff_rate < 0.7:
+			return False
+		# if not is_followback_ok:
+		# 	if userobject['followers_count'] > 1000:
+		# 		is_followback_ok = True
+		# return is_followback_ok
+		return True
 
+	@_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = True)
 	def implement_tasks(self, task):
+		@_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = True)
 		def task_restart(is_noised = True):
-			try:
-				duration_min = int(task['tmptext'])
-				postmin = self.get_time(minutes = duration_min, is_noised = is_noised)
-				operate_sql.update_task(who_ls = [self.bot_id], kinds = [task['what']], taskdict = {'status': 'end'})
-				operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': task['what'], 'to_whom': '', 'when':postmin, 'tmptext': task['tmptext']})
-			except:
-				pass
-		try:
-			ans = ''
-			taskid = task['id']
-			todo = task['what']
-			screen_name = task['to_whom']
-			filename = task['tmpfile']
-			status_id = task['tmpid']
-			set_time = task['when']
-			try_cnt = 0
-			if todo == 'timer':
-				ans = datetime.strftime(set_time, '%m月%d日 %H時%M分%S秒') + 'です。タイマーの時刻を経過しました。\n' + task['tmptext']
-			elif todo == 'tweet':
-				ans = task['tmptext']
-				try_cnt = task['tmpcnt']
-			elif todo == 'default':
-				if self.default_profile():
-					self.tmp.imitating = self.bot_id
-					ans = 'デフォルトに戻りました'
-				else:
-					ans = 'デフォルトに戻るのに失敗 サポートにお問い合わせください。'
-			# elif todo == 'teiki':
-			# 	ans = operate_sql.get_phrase(status = 'teiki', n = 100, character= self.default_character)
-			# 	post20min = self.get_time(minutes = 30)
-			# 	operate_sql.update_task(who_ls = [self.bot_id], kinds = [todo], taskdict = {'status': 'end'})
-			# 	operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
-			elif todo == 'teiki.MC':
-				try:
-					ans = ''
-					trigram_markov_chain_instance = TrigramMarkovChain(self.default_character)
-					ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
-					ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
-					task_restart()
-				except Exception as e:
-					d(e, 'teiki.MC')
-			elif todo == 'teiki.trendword':
-				trendwords = self.twf.getTrendwords()
-				trendword = np.random.choice(trendwords)
-				ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
-				self.tmp.trendwords_ls = trendwords
-				task_restart()
-			elif todo == 'followback_check':
-				followers = self.twf.get_followers_all(self.bot_id)
-				not_followbacked_followers_objects = [obj for obj in ans if self.check_if_follow(obj) if obj._json['following'] != True and check_if_follow(obj)]
-				p(not_followbacked_followers_objects)
-				for userobject in not_followbacked_followers_objects:
-					target_name = userobject['screen_name']
-					p(target_name)
-					try:
-						self.twf.is_create_friendship_success(screen_name = target_name)
-					except Exception as e:
-						d(target_name, e)
-						pass
-					else:
-						time.sleep(10)
-				task_restart()
-			elif todo == 'update.lists':
-				userinfo_me = self.twf.twtr_api.me()
-				bot_id = userinfo_me.screen_name
-				self.bot_id = bot_id
-				self.bots_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT'))
-				self.karamix2_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2'))
-				self.response_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'responseException'))
-				self.feedback_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'feedbackException'))
-				task_restart()
-			elif todo == 'del.response':
-				try:
-					self.tmp.response.remove(task['tmptext'])
-				except:
-					logger.debug('del err')
-			elif todo == 'erase.tmp.stats.tweet_cnt_hour':
-				self.stats.tweet_cnt_hour = 0
-				task_restart()
-			elif todo == 'save_stats':
-				operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'time_line_cnt', 'number': self.stats.TL_cnt})
-				operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'direct_message_cnt', 'number': self.stats.DM_cnt})
-				task_restart(is_noised = False)
-			elif todo == 'reconnect_wifi':
-				_.reconnect_wifi()
-				task_restart()
-			elif todo == 'reload_modules':
-				importlib.reload(natural_language_processing)
-				importlib.reload(dialog_generator)
-				importlib.reload(game_functions)
-				# importlib.reload(twtr_functions)
-				task_restart()
-			elif todo == 'restart_program':
-				print('restrarting_program...')
-				# _.restart_program()
-				raise KeyboardInterrupt
-			elif todo == 'update_userprofile':
-				# self.bot_profile = self.twf.twtr_api.me()
-				# if not 'まねっこ' in self.bot_profile.location:
-				# 	self.bot_profile = self.twf.download_userobject_urls(self.bot_profile, DIR = DIRusers)
-				# task_restart()
-				pass
+			duration_min = int(task['tmptext'])
+			postmin = self.get_time(minutes = duration_min, is_noised = is_noised)
+			operate_sql.update_task(who_ls = [self.bot_id], kinds = [task['what']], taskdict = {'status': 'end'})
+			operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': task['what'], 'to_whom': '', 'when':postmin, 'tmptext': task['tmptext']})
+		ans = ''
+		taskid = task['id']
+		todo = task['what']
+		screen_name = task['to_whom']
+		filename = task['tmpfile']
+		status_id = task['tmpid']
+		set_time = task['when']
+		try_cnt = 0
+		p(self.bot_id, todo)
+		if todo == 'timer':
+			ans = datetime.strftime(set_time, '%m月%d日 %H時%M分%S秒') + 'です。タイマーの時刻を経過しました。\n' + task['tmptext']
+		elif todo == 'tweet':
+			ans = task['tmptext']
+			try_cnt = task['tmpcnt']
+		elif todo == 'default':
+			if self.default_profile():
+				self.tmp.imitating = self.bot_id
+				ans = 'デフォルトに戻りました'
 			else:
-				pass
-			#Answer
-			if ans:
-				self.send(ans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = 'tweet', try_cnt = try_cnt)
-			operate_sql.update_task(who_ls = [self.bot_id], taskid = taskid, taskdict = {'status': 'end'})
-			return True
-		except Exception as e:
-			d(task, 'task_manager', e)
-			return True
+				ans = 'デフォルトに戻るのに失敗 サポートにお問い合わせください。'
+		# elif todo == 'teiki':
+		# 	ans = operate_sql.get_phrase(status = 'teiki', n = 100, character= self.default_character)
+		# 	post20min = self.get_time(minutes = 30)
+		# 	operate_sql.update_task(who_ls = [self.bot_id], kinds = [todo], taskdict = {'status': 'end'})
+		# 	operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
+		elif todo == 'teikiMC':
+			p('MC')
+			ans = ''
+			trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
+			ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
+			p(ans)
+			ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
+			task_restart()
+		elif todo == 'teiki.trendword':
+			trendwords = self.twf.getTrendwords()
+			trendword = np.random.choice(trendwords)
+			ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
+			self.tmp.trendwords_ls = trendwords
+			task_restart()
+		elif todo == 'followback_check':
+			followers = self.twf.get_followers_all(self.bot_id)
+			not_followbacked_followers_objects = [obj._json for obj in followers if obj._json['following'] != True and self.check_if_follow(obj._json)]
+			for userobject in random.sample(not_followbacked_followers_objects, 10):
+				target_name = userobject['screen_name']
+				p(target_name)
+				try:
+					self.twf.is_create_friendship_success(screen_name = target_name)
+				except Exception as e:
+					d(target_name, e)
+					pass
+				else:
+					time.sleep(10)
+			task_restart()
+		elif todo == 'update.lists':
+			userinfo_me = self.twf.twtr_api.me()
+			bot_id = userinfo_me.screen_name
+			self.bot_id = bot_id
+			self.bots_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT'))
+			self.karamix2_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2'))
+			self.response_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'responseException'))
+			self.feedback_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'feedbackException'))
+			task_restart()
+		elif todo == 'del.response':
+			try:
+				self.tmp.response.remove(task['tmptext'])
+			except:
+				logger.debug('del err')
+		elif todo == 'erase.tmp.stats.tweet_cnt_hour':
+			self.stats.tweet_cnt_hour = 0
+			task_restart()
+		elif todo == 'save_stats':
+			operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'time_line_cnt', 'number': self.stats.TL_cnt})
+			operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'direct_message_cnt', 'number': self.stats.DM_cnt})
+			task_restart(is_noised = False)
+		elif todo == 'reconnect_wifi':
+			_.reconnect_wifi()
+			task_restart()
+		elif todo == 'reload_modules':
+			importlib.reload(natural_language_processing)
+			importlib.reload(dialog_generator)
+			importlib.reload(game_functions)
+			# importlib.reload(twtr_functions)
+			task_restart()
+		elif todo == 'restart_program':
+			print('restrarting_program...')
+			# _.restart_program()
+			raise KeyboardInterrupt
+		elif todo == 'update_userprofile':
+			# self.bot_profile = self.twf.twtr_api.me()
+			# if not 'まねっこ' in self.bot_profile.location:
+			# 	self.bot_profile = self.twf.download_userobject_urls(self.bot_profile, DIR = DIRusers)
+			# task_restart()
+			pass
+		else:
+			pass
+		#Answer
+		if ans:
+			self.send(ans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = 'tweet', try_cnt = try_cnt)
+		operate_sql.update_task(who_ls = [self.bot_id], taskid = taskid, taskdict = {'status': 'end'})
+		return True
 	def get_time(self, hours = 0, minutes = 5, seconds = 0, is_noised = True):
 		rand_time = self.now + timedelta(hours = hours, minutes = minutes, seconds = seconds)
 		return rand_time
@@ -1304,8 +1295,8 @@ def task_manager(bot_id, period = 60):
 				except Exception:
 					pass
 			time.sleep(period)
-def stream(bot_id):
-	twf = twtr_functions.TwtrTools(bot_id)
+def stream(bot_id, lock):
+	twf = twtr_functions.TwtrTools(bot_id, lock)
 	twf.Stream()
 def main(is_experience = False):
 	with multiprocessing.Manager() as manager:
@@ -1320,17 +1311,10 @@ def main(is_experience = False):
 		#
 		with _.process_with() as process_queue:
 			for bot_id in bots:
-				bot_process = multiprocessing.Process(target = stream, args=(bot_id, ), name = bot_id)
+				bot_process = multiprocessing.Process(target = stream, args=(bot_id, lock), name = bot_id)
 				process_queue.append(bot_process)
 				manage_process = multiprocessing.Process(target = task_manager, args=(bot_id, 30,), name=bot_id)
 				process_queue.append(manage_process)
-		# try:
-		# 	for process in manage_processes + bot_processes:
-		# 		process.join()
-		# except KeyboardInterrupt:
-		# 	for worker in manage_processes + bot_processes:
-		# 		worker.terminate()
-		# 		worker.join()
 
 if __name__ == '__main__':
 	main(0)

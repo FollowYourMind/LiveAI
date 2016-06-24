@@ -203,7 +203,9 @@ class MorphologicalAnalysis(MyObject):#MeCab
             ma[7] = ma[0]
         return ma
     def integrate_ex_ma(self, cleaned_sentence, ex):
-        if ex:
+        try:
+            if not ex:
+                raise
             cl_ls = cleaned_sentence.split('<EX>')
             info_of_words = [self.spawn_mecab(split_sentence) for split_sentence in cl_ls if not split_sentence in {'EOS', ''}]
             ma_ls = [[self.split_mecab_result(info) for info in infox if not info in {'EOS', ''}] for infox in info_of_words]
@@ -216,7 +218,7 @@ class MorphologicalAnalysis(MyObject):#MeCab
             else:
                 ma_ls = [[[ex[cursor], '名詞', '特別', 'regex_special', '*', '*', '*', ex[cursor], '*', '*']] + ma_ls[cursor] for cursor in range(special_words_cnt)]
             ma_ls = list(chain.from_iterable(ma_ls))
-        else:
+        except:
             infos = self.spawn_mecab(cleaned_sentence)
             ma_ls = [self.split_mecab_result(info) for info in infos if not info in {'EOS', ''}]
         return ma_ls
@@ -1123,8 +1125,9 @@ if __name__ == '__main__':
     # p(np.random.choice(a))
     # reg = RegexTools()
     # p(reg.extract_discorse(text))
-    aa = {'a', 'b', 'a', 'c'}
-    p(aa.count('a'))
+    aa = ['a', tmp, 'b', 'a', 'c', 'd', 'e']
+    import random
+    p(random.sample(aa, 3))
     # p(MA.get_mecab_ls(text))
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)

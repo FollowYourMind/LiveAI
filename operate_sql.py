@@ -241,30 +241,29 @@ def save_userinfo(userstatus):
 	return userstatus
 
 @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = None)
 @wordnet_sql.atomic()
 def get_wordnet_result(lemma):
+	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+	@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = [])
+	@wordnet_sql.atomic()
+	def _convert_synset_into_words(target_synset):
+		same_sense_set = Sense.select().where(Sense.synset == target_synset).limit(n)
+		same_sense_wordid_ls = [same_sense_word.wordid for same_sense_word in same_sense_set]
+		same_sense_words = Word.select().where(Word.wordid << same_sense_wordid_ls, Word.lang << langs_ls).limit(n)
+		same_sense_lemma_ls = [same_sense_word.lemma for same_sense_word in same_sense_words]
+		return same_sense_lemma_ls
 	n = 10
 	# langs_ls = ['jpn', 'eng']
 	langs_ls = ['jpn']
 	wn_relation = {}
-	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
-	@wordnet_sql.atomic()
-	def convert_synset_into_words(target_synset):
-		try:
-			same_sense_set = Sense.select().where(Sense.synset == target_synset).limit(n)
-			same_sense_wordid_ls = [same_sense_word.wordid for same_sense_word in same_sense_set]
-			same_sense_words = Word.select().where(Word.wordid << same_sense_wordid_ls, Word.lang << langs_ls).limit(n)
-			same_sense_lemma_ls = [same_sense_word.lemma for same_sense_word in same_sense_words]
-			return same_sense_lemma_ls
-		except:
-			return []	
 	W = Word.select().where(Word.lemma == lemma).get()
 	selected_wordid = W.wordid
 	wn_sense = Sense.select().where(Sense.wordid == selected_wordid).get()
 	selected_synset = wn_sense.synset
-	coordinated_lemma_ls = convert_synset_into_words(target_synset = selected_synset)
+	coordinated_lemma_ls = _convert_synset_into_words(target_synset = selected_synset)
 	synlinks = Synlink.select().where(Synlink.synset1 == selected_synset).limit(n)
-	wn_relation = {link: words_ls for link, words_ls in [(synlink.link, convert_synset_into_words(target_synset = synlink.synset2))  for synlink in synlinks] if words_ls}
+	wn_relation = {link: words_ls for link, words_ls in [(synlink.link, _convert_synset_into_words(target_synset = synlink.synset2))  for synlink in synlinks] if words_ls}
 	wn_relation['coordinate'] = coordinated_lemma_ls
 	return wn_relation
 class BotProfile(MyObject):

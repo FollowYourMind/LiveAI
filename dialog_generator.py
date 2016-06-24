@@ -782,7 +782,7 @@ def wordnet_dialog(kw = 'テスト'):
     try:
         wn_dic = operate_sql.get_wordnet_result(lemma = kw)
         if not wn_dic:
-            raise Exception
+            raise
         wn_dic_keys = ([key for key in wn_dic.keys()])
         # p(wn_dic.values())
         rand_key = np.random.choice(wn_dic_keys)

@@ -235,6 +235,9 @@ def process_with(auto_start = True):
     yield processes
     if auto_start:
         [process.start() for process in processes if not process.is_alive()]
+    process_finish(processes)
+
+def process_finish(processes):
     try:
         for process in processes:
             if process.is_alive():
