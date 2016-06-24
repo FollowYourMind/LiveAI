@@ -232,10 +232,12 @@ def retry_call(f, fargs=None, fkwargs=None, exceptions=Exception, tries=-1, dela
 @contextmanager
 def process_with(auto_start = True):
     processes = []
-    yield processes
-    if auto_start:
-        [process.start() for process in processes if not process.is_alive()]
-    process_finish(processes)
+    try:
+        yield processes
+        if auto_start:
+            [process.start() for process in processes if not process.is_alive()]
+    finally:
+        process_finish(processes)
 
 def process_finish(processes):
     try:

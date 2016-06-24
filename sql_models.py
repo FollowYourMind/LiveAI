@@ -369,6 +369,6 @@ class Xlink(WordNetModel):
         )
 if __name__ == '__main__':
     s = ''
-    webdata_sql.create_tables([SS, SSdialog_relation, SSdialog], True)
+    core_sql.create_tables([Task], True)
 
 
