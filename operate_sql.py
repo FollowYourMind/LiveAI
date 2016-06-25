@@ -314,11 +314,11 @@ if __name__ == '__main__':
 	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
 	# a = get_phrase(status = 'kusorip', character = 'sys')
 	# p(a)
-	p(locals())
+	# p(locals())
 	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
 	# # p(get_twlog_pool(10))
-	# with userinfo_with(screen_name = 'h_y_ok') as userinfo:
-	# 	p(userinfo.__dict__)
+	with userinfo_with(screen_name = 'h_y_ok') as userinfo:
+		p(userinfo.__dict__)
 	# 	userinfo.name = 'ひよ'
 	# save_userinfo(a)
 	# update_phrase('', ok_add = 0, ng_add = 1)

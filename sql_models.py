@@ -4,7 +4,7 @@ from setup import *
 #DBs
 DATADIR = '/Users/masaMikam/Desktop/Data'
 twlog_sql_PLACE = DATADIR + '/SQL/sys.twlog'
-core_sql_PLACE = DATADIR + '/SQL/sys.info'
+core_sql_PLACE = 'sys.db'
 talk_sql_PLACE = DATADIR + '/SQL/sys.talk'
 wordnet_sql_PLACE = DATADIR + '/lib/wnjpn.db'
 webdata_sql_PLACE = DATADIR + '/SQL/webdata.db'
