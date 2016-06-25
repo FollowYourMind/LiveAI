@@ -9,12 +9,13 @@ talk_sql_PLACE = DATADIR + '/SQL/sys.talk'
 wordnet_sql_PLACE = DATADIR + '/lib/wnjpn.db'
 webdata_sql_PLACE = DATADIR + '/SQL/webdata.db'
 
-from playhouse.sqlite_ext import SqliteExtDatabase
-core_sql = SqliteExtDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
-talk_sql = SqliteExtDatabase(talk_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
-twlog_sql = SqliteExtDatabase(twlog_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
-wordnet_sql =  SqliteExtDatabase(wordnet_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
-webdata_sql =  SqliteExtDatabase(webdata_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+from playhouse.apsw_ext import APSWDatabase
+
+core_sql = APSWDatabase(core_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+talk_sql = APSWDatabase(talk_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+twlog_sql = APSWDatabase(twlog_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+wordnet_sql =  APSWDatabase(wordnet_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
+webdata_sql =  APSWDatabase(webdata_sql_PLACE, autocommit=False, journal_mode='persist', threadlocals=True)
 ###################################################
 #
 # >>>>>>>>WEBDATA_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>

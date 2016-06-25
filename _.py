@@ -62,7 +62,7 @@ def forever(exceptions = Exception, is_print = True, is_logging = True, ret = Tr
     return _forever
 
 @contextmanager
-def forever_with(func, exceptions = Exception, is_print = True, is_logging = True):
+def forever_with(exceptions = Exception, is_print = True, is_logging = True):
     is_bug = False
     try:
         yield is_bug
@@ -504,7 +504,6 @@ def saveMedias(status, ID, DIR):
       return ''
   try:
     medias = status['extended_entities']['media']
-    # print(status)
     return [filename for filename in [saveMedia(medias, ID, i, status['user']['screen_name']) for i in range(len(medias))] if filename != '']
   except Exception as e:
     print(e)

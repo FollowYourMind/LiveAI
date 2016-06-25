@@ -14,23 +14,21 @@ class StreamListener(tweepy.streaming.StreamListener):
 		super().__init__()
 		p(bot_id)
 		self.bot_id = bot_id
-		self.response_main = main.StreamResponseFunctions(bot_id, lock)
+		self.response_main = main.StreamResponseFunctions(bot_id, lock, twq)
 		self.response_main.on_initial_main()
 		self.processes = []
 		self.twq = twq
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
-		_.process_finish(self.processes)
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
 		return self.response_main.on_friends_main(friends)
-
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		self.response_main.on_status_main(status._json)
+		self.response_main.on_status_main(status)
 		# try:
-		_.queue_put(self.twq, [status, self.bot_id], timeout = 5)
+		# _.queue_put(self.twq, [status, self.bot_id], timeout = 5)
 		# finally:
 		# 	self.twq.close()
 		# 	self.twq.join_thread()
@@ -50,7 +48,6 @@ class StreamListener(tweepy.streaming.StreamListener):
 		status['retweeted'] = False
 		status['is_quote_status'] = False
 		self.response_main.on_direct_message_main(status)
-		_.queue_put(self.twq, [status, self.bot_id], timeout = 5)
 		return True
 		# return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
@@ -77,17 +74,14 @@ class StreamListener(tweepy.streaming.StreamListener):
 		p('timeout...')
 		return False
 def get_twtr_auth(auth_dic):
-	try:
-		CONSUMER_KEY = auth_dic['consumer_key']
-		CONSUMER_SECRET = auth_dic['consumer_secret']
-		auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-		ACCESS_TOKEN = auth_dic['access_token_key']
-		ACCESS_SECRET = auth_dic['access_token_secret']
-		auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
-		return auth
-	except:
-		pass
-class TwtrTools:
+	CONSUMER_KEY = auth_dic['consumer_key']
+	CONSUMER_SECRET = auth_dic['consumer_secret']
+	auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+	ACCESS_TOKEN = auth_dic['access_token_key']
+	ACCESS_SECRET = auth_dic['access_token_secret']
+	auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+	return auth
+class TwtrTools(MyObject):
 	def __init__(self, bot_id = 'LiveAIs', lock = None, twq = None):
 		self.bot_id = bot_id
 		api_keys = cfg['twtr']
@@ -109,7 +103,6 @@ class TwtrTools:
 			except Exception as e:
 				d(e, 'twf.stream waiting 100sec')
 				time.sleep(100)
-				# stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id), async = True, secure=True)
 	def get_status(self, status_id):
 		try:
 			return self.twtr_api.get_status(id = status_id)

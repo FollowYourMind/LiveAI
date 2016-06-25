@@ -10,13 +10,13 @@ import threading
 from contextlib import contextmanager
 # @_.timeit
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @webdata_sql.atomic()
 def get_ss(url):
 	datas = SS.select().where(SS.url ==  url).order_by(SS.time.desc()).limit(100)
 	return datas
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @webdata_sql.atomic()
 def get_ss_dialog_within(person = '', kw = 'カバン', n = 100000):
 	dialogs = SSdialog.select().where(SSdialog.text.contains(kw)).limit(n)
@@ -36,7 +36,7 @@ def get_ss_dialog_within(person = '', kw = 'カバン', n = 100000):
 	return _.compact([_func(dialog_obj) for dialog_obj in dialogs])
 def save_ss_dialog(url):
 	reg = natural_language_processing.RegexTools()
-	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+	@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 	@webdata_sql.atomic()
 	def _save_ssdialog():
 		datas = SS.select().where(SS.url ==  url).order_by(SS.time.desc()).limit(100)
@@ -52,20 +52,20 @@ def save_ss_dialog(url):
 		return True
 	return _save_ssdialog()
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def save_stats(stats_dict = {'whose': 'sys', 'status': '', 'number': 114514}):
 	t = Stats.create(**stats_dict)
 	return t
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def get_stats(whose = 'sys', status = '', n = 100):
 	stats_data = Stats.select().where(Stats.whose ==  whose, Stats.status == status).order_by(Stats.time.desc()).limit(n)
 	data_ls = [(data.number, data.time) for data in stats_data]
 	return data_ls
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def upsert_core_info(whose_info = '', info_label = '', kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True):
 	core_info, is_created = CoreInfo.get_or_create(whose_info = whose_info, info_label = info_label, defaults = kwargs)
@@ -74,13 +74,13 @@ def upsert_core_info(whose_info = '', info_label = '', kwargs = {'Char1': '', 'C
 		update.execute()
 	return core_info
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
 	t = Task.create(**taskdict)
 	return t
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def search_tasks(when = datetime.now(), who = '_mmKm', n = 10):
 	active = Task.select().where(~Task.status == 'end')
@@ -91,7 +91,7 @@ def search_tasks(when = datetime.now(), who = '_mmKm', n = 10):
 	tasklist = [task._data for task in tasks]
 	return tasklist
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
 	if not kinds:
@@ -108,8 +108,19 @@ def update_task(taskid = None, who_ls = [], kinds = [], taskdict = {'who':'', 'w
 			task = Task.update(**taskdict).where(Task.id == taskid, Task.what << kinds)
 	task.execute()
 
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
+@core_sql.atomic()
+def upsert_shiritori(name = '', kwargs = {'kana_stream': '', 'word_stream': ''}, is_update = True):
+	core_info, is_created = ShiritoriModel.get_or_create(name = name, defaults = kwargs)
+	if is_update:
+		update = ShiritoriModel.update(**kwargs).where(ShiritoriModel.name == name)
+		update.execute()
+	return core_info
+
+
+
 #####twlog_sql#######
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
 def save_tweet_status(status_dic = {
 				'status_id' : '',
@@ -124,23 +135,23 @@ def save_tweet_status(status_dic = {
 			}):
 	tweetstatus, is_created = Tweets.create_or_get(**status_dic)
 	return tweetstatus
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
 def get_twlog(status_id = 1):
 	return Tweets.select().where(Tweets.status_id == status_id).get()
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
 def get_twlog_pool(n = 1000):
 	tweets = Tweets.select().order_by(Tweets.createdAt.desc()).limit(n)
 	return [tweet.text for tweet in tweets]
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
 def get_twlog_users(n = 1000, screen_name = 'chana1031'):
 	tweets = Tweets.select().where(Tweets.screen_name == screen_name).order_by(Tweets.createdAt.desc()).limit(n)
 	return [t for t in [tweet.text for tweet in tweets] if not 'RT' in t and not '@' in t]
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
 def save_tweet_dialog(twdialog_dic = {
 				'SID' : '',
@@ -158,7 +169,7 @@ def save_tweet_dialog(twdialog_dic = {
 		if twdialog_dic:
 			twdialog, is_created = TwDialog.create_or_get(**twdialog_dic)
 			return twdialog
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = '')
 @twlog_sql.atomic()
 def get_twlog_list(n = 1000, UserList = None, BlackList = [], contains = ''):
@@ -170,7 +181,7 @@ def get_twlog_list(n = 1000, UserList = None, BlackList = [], contains = ''):
 	tweetslist = [_.clean_text(tweet.text) for tweet in tweets]
 	return tweetslist
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = '')
 @core_sql.atomic()
 def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
@@ -189,14 +200,14 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
 	except:
 		raise DoesNotExist
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys'):
 	P = Phrases.create(phrase = phrase)
 	return P
 
 # [TODO]
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = False)
 @core_sql.atomic()
 def update_phrase(phrase, ok_add = 0, ng_add = 1):
@@ -206,16 +217,22 @@ def update_phrase(phrase, ok_add = 0, ng_add = 1):
 	P.save()
 	return True
 
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
+def data_save(data):
+	data.save()
+
 @contextmanager
+@core_sql.atomic()
 def userinfo_with(screen_name):
 	try:
 		userinfo = get_userinfo(screen_name)
 		yield userinfo
 	finally:
-		 userinfo.save()
+		if userinfo:
+			data_save(userinfo)
 def read_userinfo(screen_name):
 	return get_userinfo(screen_name = screen_name)
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
 def get_userinfo(screen_name):
 	if screen_name == 'h_y_ok':
@@ -233,18 +250,18 @@ def get_userinfo(screen_name):
 	userinfo.is_created = is_created
 	return userinfo
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
 @core_sql.atomic()
 def save_userinfo(userstatus):
 	userinfo = Users(**userstatus)
 	userinfo.save()
 	return userstatus
 
-@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = None)
 @wordnet_sql.atomic()
 def get_wordnet_result(lemma):
-	@_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+	@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 	@_.forever(exceptions = DoesNotExist, is_print = False, is_logging = False, ret = [])
 	@wordnet_sql.atomic()
 	def _convert_synset_into_words(target_synset):
@@ -284,6 +301,12 @@ class BotProfile(MyObject):
 		self.url = upsert_core_info(whose_info = self.bot_id, info_label = 'url', kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 		self.abs_icon_filename = upsert_core_info(whose_info = self.bot_id, info_label = 'abs_icon_filename',kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
 		self.abs_banner_filename = upsert_core_info(whose_info = self.bot_id, info_label = 'abs_banner_filename', kwargs = {'Char1': '', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = False)._data['Char1']
+#####talk_sql#######
+
+@talk_sql.atomic()
+def count_words():
+	wordscnt = TFIDFModel.select().where(TFIDFModel.hinshi << ['名詞', '固有名詞'], TFIDFModel.yomi != '*', ~TFIDFModel.hinshi2 << ['数', '接尾']).	count()
+	return wordscnt
 if __name__ == '__main__':
 	# a = read_userinfo('h_y_okaaaaaaaaaaaa')/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg
 	# a = np.random.choice(get_twlog_users(n = 100, screen_name = 'ci_nq'))
@@ -291,13 +314,12 @@ if __name__ == '__main__':
 	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
 	# a = get_phrase(status = 'kusorip', character = 'sys')
 	# p(a)
+	p(locals())
 	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
-	p(get_twlog_pool(5).count('ww'))
+	# # p(get_twlog_pool(10))
 	# with userinfo_with(screen_name = 'h_y_ok') as userinfo:
 	# 	p(userinfo.__dict__)
-	# 	userinfo.name = 'ひよこ'
-	# 	p('cnt' in userinfo._data)
-
+	# 	userinfo.name = 'ひよ'
 	# save_userinfo(a)
 	# update_phrase('', ok_add = 0, ng_add = 1)
 

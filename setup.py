@@ -55,8 +55,9 @@ DIRIMGundefined = DATADIR + '/imgs/feedback/undefined'
 DIRusers = DATADIR + '/user'
 
 #DBs
-from peewee import *
-from playhouse.sqlite_ext import SqliteExtDatabase
+# from peewee import *
+from playhouse.apsw_ext import *
+
 # modelmachine_learning_img = DATADIR + '/ML_Brain/DNN_1-3_8'
 modelSVM = DATADIR + '/lib/SVM_us/SVMmodel2.pkl'
 testpic = DATADIR + '/imgs/maki/sr-maki-cool-shoki-go.jpg'

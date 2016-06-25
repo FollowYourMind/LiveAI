@@ -18,39 +18,29 @@ class Shiritori(MyObject):
 			self.user = '_mmKm'
 		else:
 			self.user = user
+		self.srtrdb = operate_sql.upsert_shiritori(name = self.user, kwargs = {'name': self.user, 'mode': self.game_mode, 'word_stream': '', 'kana_stream': '', 'len_rule': self.len_rule}, is_update = False)
 	def main(self):
 		text = self.s
 		if not text:
 			return 'なにか、言ってくれないとしりとりできないです。\MISS'
 		elif 'しりとりおわり' in text:
-			with core_sql.transaction():
-				try:
-					word = ShiritoriModel.select().where(ShiritoriModel.name == self.user).limit(1).get()
-					word.kana_stream = ''
-					word.word_stream = ''
-					word.save()
-					core_sql.commit()
-					return 'それでは、しりとりは終わりにしましょう。また遊んでくださいね。\END'
-				except Exception as e:
-					d(e)
-					core_sql.rollback()
-					return'データの消去に失敗しました。とりあえず、しりとりは終わりにします。\END'
+			operate_sql.upsert_shiritori(name = '', kwargs = {'kana_stream': '', 'word_stream': ''}, is_update = True)
+			return 'それでは、しりとりは終わりにしましょう。また遊んでくださいね。\END'
 		elif text == 'show':
-			with talk_sql.transaction():
-				wordscnt = TFIDFModel.select().where(TFIDFModel.hinshi << ['名詞', '固有名詞'], TFIDFModel.yomi != '*', ~TFIDFModel.hinshi2 << ['数', '接尾']).	count()
-				return '現在、SQLに'+ str(wordscnt)+'コの名詞・固有名詞を覚えています。現在の単語の流れ↓\n' + self.word_stream
+			wordscnt = operate_sql.count_words()
+			return '現在、SQLに'+ str(wordscnt)+'コの名詞・固有名詞を覚えています。現在の単語の流れ↓\n' + self.srtrdb.word_stream
 		elif text == 'showlist':
-			return self.word_stream
-		elif text == 'check':
-			try:
-				checkword = cmdlist[1]
-				with core_sql.transaction():
-					word = Words.select().where(Words.word == checkword).limit(1).get()
-				return checkword + 'の結果...\nよみ:'+ word.yomi+'\n語頭:'+ word.head+'\n語尾:'+ word.tail+'\n長さ:'+ str(word.length)
-			except Exception as e:
-				core_sql.rollback()
-				print(e)
-				return 'そのような単語は見当たりません。しりとりに戻りませんか？'
+			return self.srtrdb.word_stream
+		# elif text == 'check':
+		# 	try:
+		# 		checkword = cmdlist[1]
+		# 		with core_sql.atomic():
+		# 			word = Words.select().where(Words.word == checkword).limit(1).get()
+		# 		return checkword + 'の結果...\nよみ:'+ word.yomi+'\n語頭:'+ word.head+'\n語尾:'+ word.tail+'\n長さ:'+ str(word.length)
+		# 	except Exception as e:
+		# 		core_sql.rollback()
+		# 		print(e)
+		# 		return 'そのような単語は見当たりません。しりとりに戻りませんか？'
 		else:
 			return self.srtr()
 	def srtr(self):
@@ -59,24 +49,11 @@ class Shiritori(MyObject):
 		answord = ''
 		wordsList = []
 		kanasList = []
-		try:
-			with core_sql.transaction():
-				try:
-					srtrdb, created = ShiritoriModel.get_or_create(name = self.user, defaults = {'name': self.user, 'mode': self.game_mode, 'word_stream': '', 'kana_stream': '', 'len_rule': self.len_rule})
-				except Exception as e:
-					print(e)
-				core_sql.commit()
-		except Exception as e:
-			core_sql.rollback()
-			d(e, 'srtr readdb')
-			wordsList = []
-			kanasList = []
-		else:
-			wordsList = srtrdb.word_stream.split('<JOIN>')
-			kanasList = srtrdb.kana_stream.split('<JOIN>')
-			self.game_mode = srtrdb.mode
-			self.time = srtrdb.tmp_time
-			self.len_rule = srtrdb.len_rule
+		wordsList = self.srtrdb.word_stream.split('<JOIN>')
+		kanasList = self.srtrdb.kana_stream.split('<JOIN>')
+		self.game_mode = self.srtrdb.mode
+		self.time = self.srtrdb.tmp_time
+		self.len_rule = self.srtrdb.len_rule
 		if any([rev_srtr in s for rev_srtr in ['逆しりとり', '頭取り', 'あたまとり', 'あたま取']]):
 			self.game_mode = 'reverse'
 			self.event = 'restart'
@@ -86,24 +63,20 @@ class Shiritori(MyObject):
 		else:
 			pass
 		turncnt = len(wordsList)
-		try:
-			# アポストロフィに無理やり対応(すごい例外)
-			s = s.replace('海未', '園田海未')
-			if "μ's" in s:
-				rawnoun = "μ's"
-				kana = 'ミューズ'
+		# TODO]アポストロフィに無理やり対応(すごい例外)
+		s = s.replace('海未', '園田海未')
+		if "μ's" in s:
+			rawnoun = "μ's"
+			kana = 'ミューズ'
+		else:
+			rawNouns = natural_language_processing.MA.get_mecab(s, form=['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
+			kanaNouns = natural_language_processing.MA.get_mecab(s, mode = 8, form = ['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
+			if not rawNouns:
+				ans += '名詞の単語が見あたりません。他の単語はありませんか？\MISS'
+				raise
 			else:
-				rawNouns = natural_language_processing.MA.get_mecab(s, form=['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
-				kanaNouns = natural_language_processing.MA.get_mecab(s, mode = 8, form = ['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
-				if not rawNouns:
-					ans += '名詞の単語が見あたりません。他の単語はありませんか？\MISS'
-					raise Exception
-				else:
-					rawnoun = rawNouns[0]
-					kana = kanaNouns[0]
-		except Exception as e:
-			d(e, 'srtr1')
-			return ans
+				rawnoun = rawNouns[0]
+				kana = kanaNouns[0]
 		try:
 			cleaned_noun = re.sub(re.compile("[!-@[-`{-~]"), '', kana)
 			gobi = cleaned_noun[-1:]
@@ -191,43 +164,27 @@ class Shiritori(MyObject):
 					wordsList.append(rawnoun)
 					kanasList.append(kana)
 					LoseFlag = False
-					# LoseFLAGについて
+					# LoseFLAG
 					if turncnt > 25:
 						LoseFlag = True
-					if LoseFlag:
-						try:
-							with talk_sql.transaction():
-								try:
-									answords = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi), TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi << ['数']).order_by(TFIDFModel.df.desc()).limit(50)
-									answord = self.choose_answord(answords)
-								except Exception as e:
-									d(e, 'srtr.get Loseword')
-						except IntegrityError as ex:
-							d(ex)
-							talk_sql.rollback()
-					else:
-						try:
-							with talk_sql.transaction():
-								try:
-									if self.game_mode != 'reverse':
-										select_words = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi),~TFIDFModel.yomi.contains('*'), ~TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
-									else:
-										select_words = TFIDFModel.select().where(TFIDFModel.yomi.endswith(gobi),~TFIDFModel.yomi.contains('*'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
-									answords = select_words.order_by(TFIDFModel.df.desc()).limit(300)
-									answord = self.choose_answord(answords)
-								except Exception as e:
-									d(e, 'srtr.get not Loseword')
-						except IntegrityError as ex:
-							d(ex, 'IE')
-							talk_sql.rollback()
-					aword = answord.word
-					if aword in wordsList:
+					with talk_sql.atomic():
+						if LoseFlag:
+							answords = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi), TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi << ['数']).order_by(TFIDFModel.df.desc()).limit(50)
+							answord = self.choose_answord(answords)
+						else:
+							if self.game_mode != 'reverse':
+								select_words = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi),~TFIDFModel.yomi.contains('*'), ~TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
+							else:
+								select_words = TFIDFModel.select().where(TFIDFModel.yomi.endswith(gobi),~TFIDFModel.yomi.contains('*'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
+							answords = select_words.order_by(TFIDFModel.df.desc()).limit(300)
+							answord = self.choose_answord(answords)
+					if answord.word in wordsList:
 						wordsList = []
 						kanasList = []
 						losecnt =+ 1
-						ans += aword + ' ですッ!! あ、既に出ていた単語でした...。くっ、私の負けです。\END'
+						ans += answord.word + ' ですッ!! あ、既に出ていた単語でした...。くっ、私の負けです。\END'
 					elif answord.yomi[-1] == 'ン':
-						ans += aword + ' ですッ!! あ、「ン」がついてしまいました...。くっ、私の負けです。\END'
+						ans += answord.word + ' ですッ!! あ、「ン」がついてしまいました...。くっ、私の負けです。\END'
 					else:
 						if self.game_mode != 'reverse':
 							shiji = '頭文字'
@@ -239,45 +196,30 @@ class Shiritori(MyObject):
 						if next_char == 'ー':
 							next_char = answord.yomi[-2]
 							anskana = answord.yomi[:-1]
-						wordsList.append(aword)
+						wordsList.append(answord.word)
 						kanasList.append(anskana)
-						ans += aword + '(' + answord.yomi + ')'+ ' ですっ!! 次の'+ shiji + 'は「' + next_char +'」ですよ。'
+						ans += answord.word + '(' + answord.yomi + ')'+ ' ですっ!! 次の'+ shiji + 'は「' + next_char +'」ですよ。'
 		except Exception as e:
 			d(e, 'srtr')
 			ans += '思いつきませんでした。悔しいですけど、私の負けです。\END'
 			wordsList = []
 			kanasList = []
-	
-		# メモリー
-		try:
-			# core_sql.create_tables([Words], True)
-			with core_sql.transaction():
-				try:
-					srtrdb = ShiritoriModel.get(name = self.user)
-					srtrdb.name = self.user
-					srtrdb.mode = self.game_mode
-					srtrdb.word_stream = '<JOIN>'.join(wordsList)
-					srtrdb.kana_stream = '<JOIN>'.join(kanasList)
-					srtrdb.len_rule = self.len_rule
-					srtrdb.tmp_time = datetime.utcnow()
-					srtrdb.save()
-				except Exception as e:
-					print(e)
-				core_sql.commit()
-		except IntegrityError as ex:
-			d(ex)
-			core_sql.rollback()
+		with core_sql.atomic():
+			self.srtrdb.name = self.user
+			self.srtrdb.mode = self.game_mode
+			self.srtrdb.word_stream = '<JOIN>'.join(wordsList)
+			self.srtrdb.kana_stream = '<JOIN>'.join(kanasList)
+			self.srtrdb.len_rule = self.len_rule
+			self.srtrdb.tmp_time = datetime.utcnow()
+			self.srtrdb.save()
 		return ans
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = '')
 	def choose_answord(self, answords):
-		try:
-			answord = np.random.choice([w for w in answords])
-			if len(answord.yomi) > self.len_rule:
-				return answord
-			else:
-				return self.choose_answord(answords)
-		except Exception as e:
-			d(e, 'choose_random_answord')
-			return ''
+		answord = np.random.choice([w for w in answords])
+		if len(answord.yomi) > self.len_rule:
+			return answord
+		else:
+			return self.choose_answord(answords)
 class CharacterStatus(object):
 	def __init__(self, name, character_level = 10):
 		self.name = name.replace('@', '')
@@ -285,6 +227,7 @@ class CharacterStatus(object):
 		self.full_hp = 10
 		self.rest_hp = self.full_hp
 		self.character_level = character_level
+		self.exp = None
 		status = self.read_status(name)
 		if status:
 			self.character_level = status.character_level
@@ -316,18 +259,10 @@ class CharacterStatus(object):
 		if self.level_up_cnt > 0:
 			self.praise_flag = True
 		self.update_hp_gage()
+	@core_sql.atomic()
 	def read_status(self, user = 'masaMikam'):
-		try:
-			# core_sql.create_tables([CharacterStatusModel], True)
-			with core_sql.transaction():
-				try:
-					status = CharacterStatusModel.select().where(CharacterStatusModel.name == user).get()
-					return status
-				except Exception as e:
-					print(e)
-				core_sql.commit()
-		except Exception as e:
-			core_sql.rollback()
+		status = CharacterStatusModel.select().where(CharacterStatusModel.name == user).get()
+		return status
 	def recovery_status(self, rate = 1):
 		self.damage = 0
 		self.rest_hp = self.full_hp * rate
@@ -339,20 +274,14 @@ class CharacterStatus(object):
 		self.recovery_status()
 		return True
 	def recalc_status(self):
-		try:
-			userinfo, is_created = operate_sql.get_userinfo(self.name)
-			if is_created:
-				raise Exception
-			if not userinfo['nickname']:
-				self.nickname = userinfo['screen_name'].replace('@', '').replace('例外', '')[:5]
-			try:
-				self.exp = userinfo['exp']
-				if not self.exp:
-					self.exp = self.character_level ** 3
-			except Exception as e:
-				print(e)
-		except Exception as e:
-			p(e)
+		with _.forever_with(is_print = True, is_logging = True):
+			userinfo = operate_sql.get_userinfo(self.name)
+			if not userinfo.nickname:
+				self.nickname = userinfo.screen_name.replace('@', '').replace('例外', '')[:5]
+			self.exp = userinfo.exp
+			if not self.exp:
+				self.exp = self.character_level ** 3
+		if self.exp is None:
 			self.exp = self.character_level ** 3
 		self.total_cnt = 1
 		self.last_time = 1
@@ -368,9 +297,7 @@ class CharacterStatus(object):
 			status =  self.calc_character_level()
 		else:
 			self.exp_to_level_up = 0
-		# p(self.character_level)
 		if self.character_level is None:
-			p(self.character_level)
 			self.character_level = 10
 		self.full_hp = int(np.log2(self.statuses_cnt)*10 * (self.character_level/100) +(self.character_level +10))
 		self.Atk = int(np.log2(self.friends_cnt)*10 * (self.character_level/100) +(self.character_level +5))
@@ -432,20 +359,11 @@ class BattleGame():
 		self.save_character_model(self.my_status.__dict__)
 		self.save_character_model(self.enemy_status.__dict__)
 		return '\n'.join(ans_ls)
+	@core_sql.atomic()
 	def save_character_model(self, status):
-		try:
-			# core_sql.create_tables([CharacterStatusModel], True)
-			with core_sql.transaction():
-				try:
-					character_status, created = CharacterStatusModel.get_or_create(name = status['name'])
-					character_status = CharacterStatusModel(**status)
-					character_status.save()
-					core_sql.commit()
-				except Exception as e:
-					print(e)
-		except IntegrityError as ex:
-			print (ex)
-			core_sql.rollback()
+		character_status, created = CharacterStatusModel.get_or_create(name = status['name'])
+		character_status = CharacterStatusModel(**status)
+		character_status.save()
 	def encount(self, enemy_name):
 		enemy_character_level = self.my_status.character_level + 1
 		self.enemy_status = CharacterStatus(enemy_name, character_level = enemy_character_level)
@@ -471,14 +389,12 @@ class BattleGame():
 			ans += Atker + 'の攻撃 -' + str(damage)
 		return ans, damage
 	def battle(self, text = ''):
-		def battle_enemy_turn(waza_value = 100, flag = '◉'):
+		@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = 'err')
+		def _battle_enemy_turn(waza_value = 100, flag = '◉'):
 			ans = ''
-			try:
-				randomed_damage = int(np.random.randint(15)) + 60
-				base_damage = int(int((waza_value * int(self.enemy_status.character_level * 2 / 5) + 2 ) * self.enemy_status.Atk / self.my_status.Def)/ 50) + 2
-				damage = int(base_damage * randomed_damage / 100)
-			except Exception as e:
-				print(e)
+			randomed_damage = int(np.random.randint(15)) + 60
+			base_damage = int(int((waza_value * int(self.enemy_status.character_level * 2 / 5) + 2 ) * self.enemy_status.Atk / self.my_status.Def)/ 50) + 2
+			damage = int(base_damage * randomed_damage / 100)
 			ans, damage = self.damage_hantei(self.enemy_status.nickname, damage)
 			ans = ''.join([flag, ans])
 			self.my_status.rest_hp = self.my_status.rest_hp - damage
@@ -488,14 +404,12 @@ class BattleGame():
 			self.my_status.damage = damage
 			self.my_status.update_hp_gage()
 			return ans
-		def battle_my_turn(waza_value = 100, flag = '◉'):
+		@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = 'err')
+		def _battle_my_turn(waza_value = 100, flag = '◉'):
 			ans = flag
-			try:
-				randomed_damage = int(np.random.randint(15)) + 60
-				base_damage = int(int((waza_value * int(self.my_status.character_level * 2 / 5) + 2 ) * self.my_status.Atk / self.enemy_status.Def)/ 50) + 2
-				damage = int(base_damage * randomed_damage / 100)
-			except Exception as e:
-				print(e)
+			randomed_damage = int(np.random.randint(15)) + 60
+			base_damage = int(int((waza_value * int(self.my_status.character_level * 2 / 5) + 2 ) * self.my_status.Atk / self.enemy_status.Def)/ 50) + 2
+			damage = int(base_damage * randomed_damage / 100)
 			ans, damage = self.damage_hantei(self.my_status.nickname, damage)
 			ans = ''.join([flag, ans])
 			self.enemy_status.rest_hp = self.enemy_status.rest_hp - damage
@@ -509,50 +423,46 @@ class BattleGame():
 		waza_value = random.randint(0, 150)
 		ans_ls = []
 		if self.my_status.Spe > self.enemy_status.Spe:
-			ans_ls.append(battle_my_turn(flag = '🈜'))
+			ans_ls.append(_battle_my_turn(flag = '🈜'))
 			if not self.enemy_status.status == 'Fainting':
-				ans_ls.append(battle_enemy_turn(waza_value, flag = '🈝'))
+				ans_ls.append(_battle_enemy_turn(waza_value, flag = '🈝'))
 		else:
-			ans_ls.append(battle_enemy_turn(flag = '🈜'))
+			ans_ls.append(_battle_enemy_turn(flag = '🈜'))
 			if not self.my_status.status == 'Fainting':
-				ans_ls.append(battle_my_turn(waza_value, flag = '🈝'))
+				ans_ls.append(_battle_my_turn(waza_value, flag = '🈝'))
 		self.my_status.enemy_name = self.enemy_status.name
 		self.enemy_status.enemy_name = self.my_status.name
 		self.my_status.mode = 'battle'
 		self.enemy_status.mode = 'battle'
 		return '\n'.join(ans_ls)
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = 'ans')
 	def display(self):
-		try:
-			buf = ['ー', 
-				''.join([self.enemy_status.nickname, 'Lv', str(self.enemy_status.character_level)]), 
-				''.join([self.enemy_status.hp_gage, '[', str(self.enemy_status.damage), '↓']), 
-				''.join(['HP', str(self.enemy_status.rest_hp), '/', str(self.enemy_status.full_hp)]), 
-				''.join(['↑ー↓']), 
-				''.join([self.my_status.nickname, 'Lv', str(self.my_status.character_level)]), 
-				''.join([self.my_status.hp_gage, '[', str(self.my_status.damage), '↓']), 
-				''.join(['HP', str(self.my_status.rest_hp), '/', str(self.my_status.full_hp)])
-				]
-			if self.enemy_status.rest_hp <= 0:
-				kotaichi = 50
-				addexp = int(kotaichi * self.enemy_status.character_level)
-				buf.append(''.join([self.enemy_status.name , 'をたおした\n#END']))
-				self.enemy_status.rest_hp = self.enemy_status.full_hp 
-				self.my_status.enemy_name = 'あるぱか'
-				self.my_status.mode = 'encount'
-			elif self.my_status.rest_hp <= 0:
-				buf.append(''.join([self.my_status.nickname, 'はたおれた\n#END']))
-				self.my_status.enemy_name = self.enemy_status.name 
-				self.my_status.mode = 'encount'
-				self.my_status.rest_hp = self.my_status.full_hp
-			else:
-				buf.append('(任意のテキストで技発動)')
-				self.my_status.enemy_name = self.enemy_status.name 
-			ans = '\n'.join(buf)
-			return ans
-		except Exception as e:
-			print('ERR.display', e)
-			return ans
-	
+		buf = ['ー', 
+			''.join([self.enemy_status.nickname, 'Lv', str(self.enemy_status.character_level)]), 
+			''.join([self.enemy_status.hp_gage, '[', str(self.enemy_status.damage), '↓']), 
+			''.join(['HP', str(self.enemy_status.rest_hp), '/', str(self.enemy_status.full_hp)]), 
+			''.join(['↑ー↓']), 
+			''.join([self.my_status.nickname, 'Lv', str(self.my_status.character_level)]), 
+			''.join([self.my_status.hp_gage, '[', str(self.my_status.damage), '↓']), 
+			''.join(['HP', str(self.my_status.rest_hp), '/', str(self.my_status.full_hp)])
+			]
+		if self.enemy_status.rest_hp <= 0:
+			kotaichi = 50
+			addexp = int(kotaichi * self.enemy_status.character_level)
+			buf.append(''.join([self.enemy_status.name , 'をたおした\n#END']))
+			self.enemy_status.rest_hp = self.enemy_status.full_hp 
+			self.my_status.enemy_name = 'あるぱか'
+			self.my_status.mode = 'encount'
+		elif self.my_status.rest_hp <= 0:
+			buf.append(''.join([self.my_status.nickname, 'はたおれた\n#END']))
+			self.my_status.enemy_name = self.enemy_status.name 
+			self.my_status.mode = 'encount'
+			self.my_status.rest_hp = self.my_status.full_hp
+		else:
+			buf.append('(任意のテキストで技発動)')
+			self.my_status.enemy_name = self.enemy_status.name 
+		ans = '\n'.join(buf)
+		return ans
 	def selectMode(self, text):
 		if 'もどる' in text:
 			p2 = 'back'
@@ -640,137 +550,6 @@ class BattleGame():
 			else:
 				p2 = p2
 		return p2
-	
-	def old_main(self, text, me):
-		enemy = 'あるぱか'
-		p2 = self.selectMode(text)
-		isSaveOK = True
-		ans = ''
-		try:
-			# status, enemy_status = self.deal_status(me, enemy)
-			status = self.my_status
-			enemy_status = self.enemy_status
-			# p2 = selectModebyStatus(p2, status, enemy_status)
-		except Exception as e:
-			d(e, 'old_main')
-			# status = self.initialize_status(me)
-			# enemy_status = self.initialize_status(enemy)
-			status.mode = 'encount'
-			self.save_character_model(status)
-			self.save_character_model(enemy_status)
-			return ans
-		try:
-			if p2 == 'encount' or self.my_status.mode == 'encount':
-				cmds = text.split(' ')
-				try:
-					status, enemy_status = encount(me, enemy = cmds[1])
-					ans += ''.join(['あ、やせいの',self.enemy_status.name,'があらわれた'])
-				except Exception as e:
-					print(e)
-					status, enemy_status = encount(me, enemy)
-					ans +=''.join(['あ、やせいの',self.enemy_status.name,'があらわれた'])
-				self.my_status.hp_gage =  '■■■■■'
-				status, enemy_status, ansD= display(status, enemy_status)
-				self.my_status.mode = 'battle'
-				ans += '\n'+ansD
-			elif p2 == 'status':
-				self.show_status(status)
-			elif p2 == 'にげる':
-				rnd = np.random.randint(100);
-				if rnd < 80:
-					ans += 'うまくにげられました。\nまたあそんでくださいね。#END'
-					self.my_status.enemy = ''
-					self.my_status.mode = 'encount'
-				else:
-					ans += 'にげられない'
-					status, ans = display(status, enemy_status)
-			elif p2 == 'リセット':
-				ans += 'リセット完了#END'
-			elif p2 == 'セーブ':
-				status = sendEXP(status)
-				self.my_status.mode = 'battle'
-			elif p2 == 'rename':
-				try:
-					newname = text.split(' ')[1].replace('@', '')
-					if len(newname)>5:
-						ans += newname +' では文字数が長いです。5文字まででお願いします。'
-					else:
-						oldname = self.my_status.nickname
-						self.my_status.nickname = newname
-						ans += '「' + oldname+ '」から「'+ newname +'」にニックネームの変更が完了しました。\n'
-					ans += '1.わざ名 2.つーる\n3.もどる 4.にげる'
-				except Exception as e:
-					print(e)
-					ans +='その名前ではリネーム不可\n'
-					ans +='1.わざ名 2.つーる\n3.もどる 4.にげる'
-	
-			elif p2 == 'recovery':
-				rest_hp = self.my_status.rest_hp
-				max_hp = self.my_status.full_hp
-				status = recover(me)
-				ans += '( •̀ ᴗ •́ )hpが全回復しました\n' + str(rest_hp) +'->' + str(max_hp)
-				ans += '1.たたかう 2.つーる\n3.かくにん 4.にげる'
-	
-			elif p2 == 'ほむまん':
-				rest_hpB = self.my_status.rest_hp
-				status = recover(me, 10)
-				rest_hpA = self.my_status.rest_hp
-				max_hp = self.my_status.full_hp
-				ans += '( •̀ ᴗ •́ )hpが10回復しました。('+ str(rest_hpB) +'->' + str(rest_hpA) +')/'+ str(max_hp) +'	\代償として20経験値下げておきますね'
-				status = getEXP(me, -20)
-				ans += '1.たたかう 2.つーる\n3.かくにん 4.にげる'
-	
-			elif p2 == '炭酸':
-				status = recover(status, -10)
-				ans += '( •̀ ᴗ •́ )怒 hpを10減らしました。炭酸はきらいです。'
-				ans += '1.たたかう 2.つーる\n3.かくにん 4.にげる'
-			elif p2 == 'update':
-				status = self.initialize_status(me)
-				ans += 'ステータスをアップデートしました。\n'
-				ans += '1.たたかう 2.つーる\n3.かくにん 4.にげる'
-				self.my_status.mode = 'back'
-			elif p2 == 'tool':
-				ans += toolNote
-	
-			elif p2 == 'help':
-				ans += helpNote
-		
-			elif p2 == 'back':
-				ans += '行動を選択してください'
-				status, ans = display(status, enemy_status)
-				self.my_status.mode = 'back'
-		
-			else:
-				random.seed(text)
-				waza_value = random.randint(0, 150)
-				if self.my_status.Spe > self.enemy_status.Spe:
-					enemy_status, status, ansB1 = battle(enemy_status, status, flag = '🈜')
-					status, enemy_status, ansB2 = battle(status, enemy_status, waza_value, flag = '🈝')
-					status, enemy_status, ansD = display(status, enemy_status)
-					ans += ansB1 +'\n' + ansB2 +'\n'+ ansD
-				else:
-					status, enemy_status, ansB1 = battle(status, enemy_status, flag = '🈜')
-					enemy_status, status, ansB2 = battle(enemy_status, status, waza_value, flag = '🈝')
-					status, enemy_status, ansD = display(status, enemy_status)
-					ans += ansB1 +'\n' + ansB2 +'\n'+ ansD
-		except Exception as e:
-			print(e)
-			try:
-				try:
-					ans += '( •̀ ᴗ •́ )あ、敵は逃げてしまいました。また今度にしましょう。とりあえず、オートセーブしておきました。再開する場合は「うみもん」で。バグったら「リセット」#END' + '#exp' + str(self.my_status.exp)
-				except Exception as e:
-					print(e)
-					ans += '( •̀ ᴗ •́ )あ、敵は困って逃げてしまいました。また今度にしましょう。 再開する場合は「うみもん」で。バグったら「リセット」#END'
-				status = self.initialize_status(me)
-				enemy_status = self.initialize_status(enemy)
-			except Exception as e:
-				print(e)
-				ans +='( •̀ ᴗ •́ )バグ発生。\n そんなこともありますよね。そのうち直しておきますね #END'
-	
-		if isSaveOK:
-			self.save_character_model(status)
-			self.save_character_model(enemy_status)
-		return ans
 if __name__ == '__main__':
 	import sys
 	import io
@@ -781,8 +560,8 @@ if __name__ == '__main__':
 		text = argvs[1]
 		user = argvs[2]
 	except:
-		user = 'p_evassl'
-		text = "皇居"
+		user = 'p_ev'
+		text = "うんこ"
 	# p(CharacterStatus('アルパカあああ').__dict__)
 	battle_game = BattleGame('_mmkm', 'chana')
 	ans = battle_game.main(text)

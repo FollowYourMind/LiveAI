@@ -164,6 +164,7 @@ def FaceRecognition(filename = testpic, isShow = True, saveStyle = 'icon', workD
 		return image, altfilename, frame
 	# ++++++++++++++++++++++++++
 	frame = cv2.imread(filename)
+	p(frame)
 	if through:
 		return frame, filename, frame, True
 	else:
@@ -264,9 +265,10 @@ if __name__ == '__main__':
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 	filename = "/Users/masaMikam/Downloads/CV_FACE_icon1_46481697.jpeg"
 	filename2 = '/Users/masaMikam/Downloads/46481697.jpeg'
-	xml = '/Users/masaMikam/Desktop/Mecha_SYS/Data/lib/aGest.xml'
-	# ans  = FaceRecognition(filename = filename, isShow = True, saveStyle = 'icon', workDIR = 'Downloads', frameSetting = {'thickness': 2, 'color':(0, 0, 255)}, through = False, cascade_lib = xml)
-	print(hudist(filename, filename2))
+	xml = cascade_lib_anime
+	ans  = FaceRecognition(filename = filename, isShow = True, saveStyle = 'icon', workDIR = 'Downloads', frameSetting = {'thickness': 2, 'color':(0, 0, 255)}, through = False, cascade_lib = xml)
+	p(ans)
+	# print(hudist(filename, filename2))
 	# img, altfilename, frame, flag = FaceRecognition(filename, isShow = 0, saveStyle = '', workDIR = '')
 	# print(img)
 	# preIMGprocess(DIR = "/Users/masaMikam/OneDrive/imgs/learn/", workDIR ='_work', isFaced = True, processes =['VF', 'HF'])
