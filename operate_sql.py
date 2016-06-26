@@ -82,14 +82,13 @@ def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'wh
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
-def search_tasks(when = datetime.now(), who = '_mmKm', n = 10):
+def search_tasks(when = datetime.now(), who = None, n = 10):
 	active = Task.select().where(~Task.status == 'end')
-	if not who:
+	if who is None:
 		tasks = active.where(Task.when < when).order_by(Task.id.desc()).limit(n)
 	else:
 		tasks = active.where(Task.when < when, Task.who == who).order_by(Task.id.desc()).limit(n)
-	tasklist = [task._data for task in tasks]
-	return tasklist
+	return tasks
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()

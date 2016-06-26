@@ -12,10 +12,9 @@ import main
 class StreamListener(tweepy.streaming.StreamListener):
 	def __init__(self, bot_id, lock, twq):
 		super().__init__()
-		p(bot_id)
 		self.bot_id = bot_id
-		self.response_main = main.StreamResponseFunctions(bot_id, lock, twq)
-		self.response_main.on_initial_main()
+		# self.response_main = main.StreamResponseFunctions(bot_id, lock, twq)
+		# self.response_main.on_initial_main()
 		self.processes = []
 		self.twq = twq
 	def __del__(self):
@@ -23,35 +22,24 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
-		return self.response_main.on_friends_main(friends)
+		# return self.response_main.on_friends_main(friends)
+		pass
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		self.response_main.on_status_main(status)
-		# try:
-		# _.queue_put(self.twq, [status, self.bot_id], timeout = 5)
-		# finally:
-		# 	self.twq.close()
-		# 	self.twq.join_thread()
+		event = 'status'
+		self.twq.put_nowait([status, self.bot_id, event])
 		return True
 
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		status = status._json
-		status = status['direct_message']
-		status['user'] = {}
-		status['user']['screen_name'] = status['sender_screen_name']
-		status['user']['name'] = status['sender']['name']
-		status['user']['id_str'] = status['sender']['id_str']
-		status['in_reply_to_status_id_str'] = None
-		status['in_reply_to_screen_name'] = self.bot_id
-		status['extended_entities'] = status['entities']
-		status['retweeted'] = False
-		status['is_quote_status'] = False
-		self.response_main.on_direct_message_main(status)
+		event = 'direct_message'
+		self.twq.put_nowait([status, self.bot_id, event])
 		return True
-		# return self.response_main.on_direct_message_main(status._json)
 	def on_event(self, status):
-		return self.response_main.on_event_main(status._json)
+		# return self.response_main.on_event_main(status._json)
+		event = 'event'
+		self.twq.put_nowait([status, self.bot_id, event])
+		return True
 	def on_limit(self, track):
 		p(track, 'track')
 		return True
@@ -91,11 +79,11 @@ class TwtrTools(MyObject):
 		self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
-	def Stream(self):
+	def Stream(self, bot_id = None, lock = None, twq = None):
 		auth = self.twtr_auth
 		while True:
 			try:
-				stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, self.lock, self.twq), timeout = 60, async = True, secure=True)
+				stream = tweepy.Stream(auth = auth, listener = StreamListener(bot_id, lock, twq), timeout = 60, async = True, secure=True)
 				stream.userstream()
 			except tweepy.TweepError as e:
 				d(e, 'twf.stream tweeperror waiting 100sec')
