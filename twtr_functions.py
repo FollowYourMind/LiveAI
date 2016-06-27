@@ -13,10 +13,8 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def __init__(self, bot_id, lock, twq):
 		super().__init__()
 		self.bot_id = bot_id
-		# self.response_main = main.StreamResponseFunctions(bot_id, lock, twq)
-		# self.response_main.on_initial_main()
-		self.processes = []
 		self.twq = twq
+		# self.shared_ls = shared_ls
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	def on_connect(self):
@@ -26,28 +24,24 @@ class StreamListener(tweepy.streaming.StreamListener):
 		pass
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		event = 'status'
-		self.twq.put_nowait([status, self.bot_id, event])
+		self.twq.put_nowait([status, self.bot_id, 'status'])
 		return True
 
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		event = 'direct_message'
-		self.twq.put_nowait([status, self.bot_id, event])
+		self.twq.put_nowait([status, self.bot_id, 'direct_message'])
 		return True
 	def on_event(self, status):
-		# return self.response_main.on_event_main(status._json)
-		event = 'event'
-		self.twq.put_nowait([status, self.bot_id, event])
+		self.twq.put_nowait([status, self.bot_id, 'event'])
 		return True
 	def on_limit(self, track):
-		p(track, 'track')
+		p(self.bot_id, 'track', track)
 		return True
 	def keep_alive(self):
-		p('|')
+		p(self.bot_id, 'keep_alive...')
 		return True
 	def on_exception(self, exception):
-		p(exception, 'exception')
+		p(exception, self.bot_id, 'exception')
 		return True
 	def on_warning(self, notice):
 		p(notice, 'warning')

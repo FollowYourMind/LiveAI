@@ -142,10 +142,11 @@ def FaceRecognition(filename = testpic, isShow = True, saveStyle = 'icon', workD
 		if not (Ftop<0 or Fbottom>height or  Fleft<0 or Fright>width):
 			thickness = frameSetting['thickness']
 			image = frame[Ftop+thickness: Fbottom-thickness, Fleft+thickness:Fright-thickness]
-			margin = min((Fbottom-Ftop)/4, Ftop, height-Fbottom, Fleft, width-Fright)
+			margin = int(min((Fbottom-Ftop)/4, Ftop, height-Fbottom, Fleft, width-Fright))
+			p(margin)
 			icon = frame[Ftop-margin:Fbottom+margin, Fleft-margin:Fright+margin]
 			# cv2.rectangle(frame, (Fleft, Ftop), (Fright, Fbottom), frameSetting['color'], thickness = thickness)
-			if saveStyle != '':
+			if not saveStyle:
 				altfilename = getAltName(filename, workDIR = workDIR, kind1 = 'CV_', kind2 = 'FACE_', kind3 = saveStyle + str(i))
 				if saveStyle == 'icon':
 					cv2.imwrite(altfilename, image)
@@ -164,7 +165,6 @@ def FaceRecognition(filename = testpic, isShow = True, saveStyle = 'icon', workD
 		return image, altfilename, frame
 	# ++++++++++++++++++++++++++
 	frame = cv2.imread(filename)
-	p(frame)
 	if through:
 		return frame, filename, frame, True
 	else:
@@ -209,7 +209,6 @@ def passzbar(image):
 	optionargs = []
 	
 	args = [ZBARIMG, ':-', '-q'] + optionargs
-	print(args)
 	p = subprocess.Popen(
 		args,
 		stdin=subprocess.PIPE,
@@ -223,8 +222,6 @@ def passzbar(image):
 		bindata = stdout
 	else:
 		raise RuntimeError('ZBar threw error:\n' + stderr.decode('utf-8'))
-	    
-
 	zans = bindata.split(b":", 1)
 	if len(zans) == 2:
 		return True, zans

@@ -134,11 +134,9 @@ def predictSVM(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/
 
 	if img_kind == 'anime' or is_force:
 		img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28))
-		# print(img)
 		img = img.flatten().astype(np.float32)/255.0
 		result = classifier.predict(img)
-		print(result)
-		anslabel = label[result]
+		anslabel = label[result[0]]
 		return anslabel, img_kind, altfilename
 	elif img_kind == 'cat':
 		anslabel = 'cat'
@@ -153,12 +151,12 @@ if __name__ == '__main__':
 	# 6海未 7真姫
 	# filename = '/Users/masaMikam/OneDrive/imgs/face/LL3/海未/CV_FACE_icon0_LL1-03_20160212165427.png'
 	DIR = '/Users/masaMikam/OneDrive/imgs/learn/雪穂/'
-	# ans = predictSVM(filename  = filename, isShow = True, model = modelSVM, workDIR = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
-	# print(ans)
+	ans = predictSVM(filename  = filename, isShow = True, model = modelSVM, workDIR = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
+	print(ans)
 	# trainSVM(DIR = "/Users/masaMikam/OneDrive/imgs/learn/_work/", saveDIR = DATADIR + '/lib/SVM_us3/SVMmodel3.pkl')
 
-	adrs = [DIR+clsdir for clsdir in os.listdir(DIR) if not clsdir in set(['.DS_Store'])]
-	print([predictSVM(filename  =adr, isShow = 0, model = modelSVM)[0] for adr in adrs[:1]])
+	# adrs = [DIR+clsdir for clsdir in os.listdir(DIR) if not clsdir in set(['.DS_Store'])]
+	# print([predictSVM(filename  =adr, isShow = 0, model = modelSVM)[0] for adr in adrs[:1]])
 # 
 
 

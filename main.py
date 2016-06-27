@@ -514,7 +514,7 @@ class StreamResponseFunctions(MyObject):
                     d(e, 'hashtag_imgs')
                     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
             else:
-                with _.forever_with(is_print = True, is_logging = True):
+                try:
                     filenames = _.saveMedias(status, ID = fileID, DIR = DIRIMGtmp)
                     filename = filenames[0]
                     label = ''
@@ -535,8 +535,7 @@ class StreamResponseFunctions(MyObject):
                             os.mkdir(drc)
                         shutil.copy(filename, drc)
                         userinfo.mode = 'confirm.tag.img'
-                        # logger.debug('/'.join([drc, filename.split('/')[-1]]))
-                        userinfo.tmpFile = '/'.join(drc, filename.split('/')[-1])
+                        userinfo.tmpFile = '/'.join([drc, filename.split('/')[-1]])
                         filename = IMGfile
                     elif img_kind == 'cat':
                         ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
@@ -545,6 +544,8 @@ class StreamResponseFunctions(MyObject):
                         ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
                         filename = ''
                         userinfo.mode = 'dialog'
+                except:
+                    _.log_err()
                 if not ans:
                     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
@@ -1308,14 +1309,35 @@ def test_func(a):
     return True
 def receiver(srfs, q, lock, process_id):
     async def parallel_main(loop):
-        async def fetch(q, i):
+        async def save_tweets(async_q):
             while True:
-                msg = q.get()
-                status, bot_id, event = msg
-                # p(i, event, bot_id, status.text)
                 try:
+                    status = await async_q.get()
+                    # p(status)
+                    future = loop.run_in_executor(None, operate_sql.save_tweet_status, {
+                        'status_id' : int(status['id_str']),
+                        'screen_name' : status['user']['screen_name'],
+                        'name' : status['user']['name'],
+                        'text' : status['text'],
+                        'user_id' : status['user']['id_str'],
+                        'in_reply_to_status_id_str' : status['in_reply_to_status_id_str'],
+                        'bot_id' : '',
+                        'createdAt' : datetime.utcnow(),
+                        'updatedAt' : datetime.utcnow()
+                        })
+                    await asyncio.wait([future])
+                except:
+                    _.log_err()
+        async def fetch(q, async_q):
+            while True:
+                try:
+                    msg = q.get()
+                    status, bot_id, event = msg
                     status = status._json
-                    if event in {'status', 'direct_message'}:
+                    if event == 'event':
+                        future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
+                        tasks = [future1]
+                    elif event in {'status', 'direct_message'}:
                         if event == 'status':
                             future1 = loop.run_in_executor(None, srfs[bot_id].on_status_main, status)
                         elif event == 'direct_message':
@@ -1332,26 +1354,16 @@ def receiver(srfs, q, lock, process_id):
                             future1 = loop.run_in_executor(None, srfs[bot_id].on_direct_message_main, status)
                         else:
                             raise
-                        future2 = loop.run_in_executor(None, operate_sql.save_tweet_status, {
-                            'status_id' : int(status['id_str']),
-                            'screen_name' : status['user']['screen_name'],
-                            'name' : status['user']['name'],
-                            'text' : status['text'],
-                            'user_id' : status['user']['id_str'],
-                            'in_reply_to_status_id_str' : status['in_reply_to_status_id_str'],
-                            'bot_id' : '',
-                            'createdAt' : datetime.utcnow(),
-                            'updatedAt' : datetime.utcnow()
-                        })
-                        tasks = [future1, future2]
-                    elif event == 'event':
-                        future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
                         tasks = [future1]
+                        async_q.put_nowait(status)
+                    else:
+                        raise
                     await asyncio.wait(tasks)
                 except:
                     _.log_err()
-        parallel = 4
-        tasks = [fetch(q, i) for i in range(parallel)]
+        async_q = asyncio.Queue()
+        parallel = 2
+        tasks = [fetch(q, async_q) for i in range(parallel)] + [save_tweets(async_q)]
         return await asyncio.wait(tasks)
     #
     process = multiprocessing.current_process()
@@ -1405,7 +1417,7 @@ def init_srfs(bots, lock, twq):
         return srfs
 def main(is_experience = False):
     with multiprocessing.Manager() as manager:
-        common_dic = manager.dict()
+        # shared_ls = manager.list()
         lock = multiprocessing.Lock()
         twq = multiprocessing.Queue(maxsize = 0)
         if not is_experience:
