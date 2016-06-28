@@ -10,8 +10,12 @@ import natural_language_processing
 import operate_sql
 import main
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, bot_id, lock, twq):
+	def __init__(self, srf = None, bot_id = None, lock = None, twq = None):
 		super().__init__()
+		if srf is None:
+			self.srf = main.StreamResponseFunctions(bot_id, lock, twq)
+		else:
+			self.srf = srf
 		self.bot_id = bot_id
 		self.twq = twq
 	def __del__(self):
@@ -23,7 +27,8 @@ class StreamListener(tweepy.streaming.StreamListener):
 		pass
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		self.twq.put_nowait([status, self.bot_id, 'status'])
+		self.srf.on_status_main(status._json)
+		# self.twq.put_nowait([status, self.bot_id, 'status'])
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
@@ -73,9 +78,9 @@ class TwtrTools(MyObject):
 		self.twtr_api = twtr_apis[bot_id]
 
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	def Stream(self, bot_id = None, lock = None, twq = None):
+	def Stream(self, srf = None, lock = None, twq = None):
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(bot_id, lock, twq), timeout = 50, async = True, secure=True)
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, self.bot_id, lock, twq), timeout = 50, async = 1, secure=True)
 		stream.userstream()
 	def get_status(self, status_id):
 		try:

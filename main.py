@@ -1078,7 +1078,6 @@ class StreamResponseFunctions(MyObject):
         return True
     @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
     def on_event_main(self, status):
-        p(status['event'])
         # if status['event'] == 'favorite':
         #     if status['target']['screen_name'] == self.bot_id:
         #         text = _.clean_text(status['target_object']['text'])
@@ -1355,7 +1354,7 @@ def receiver(srfs, q, lock, process_id):
                         else:
                             raise
                         tasks = [future1]
-                        async_q.put_nowait(status)
+                        # async_q.put_nowait(status)
                     else:
                         raise
                     await asyncio.wait(tasks)
@@ -1398,6 +1397,28 @@ def task_manager(srfs, period = 60):
                 except Exception as e:
                     _.log_err()
             time.sleep(period)
+async def task_manage(srfs, period = 60):
+    try:
+        process = multiprocessing.current_process()
+        print('starting '+ process.name)
+        for srf in srfs.values():
+            await srf.initialize_tasks()
+    except Exception as e:
+        _.log_err()
+        return False
+    else:
+        while True:
+            now = datetime.utcnow() + timedelta(hours = 9)
+            tasks = operate_sql.search_tasks(when = now, n = 10)
+            if tasks:
+                try:
+                    for task in tasks:
+                        bot_id = task.who
+                        if bot_id in srfs:
+                            srfs[bot_id].implement_tasks(task._data)
+                except Exception as e:
+                    _.log_err()
+            time.sleep(period)
 def init_srfs(bots, lock, twq):
     def _init_srf(bot_id):
         try:
@@ -1415,25 +1436,29 @@ def init_srfs(bots, lock, twq):
     finally:
         loop.close()
         return srfs
+
+
 def main(is_experience = False):
-    with multiprocessing.Manager() as manager:
+    # with multiprocessing.Manager() as manager:
+    if True:
         # shared_ls = manager.list()
         lock = multiprocessing.Lock()
         twq = multiprocessing.Queue(maxsize = 0)
         if not is_experience:
             bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
         else:
-            bots = ['LiveAI_Alpaca', 'LiveAI_Nico']
+            # bots = ['LiveAI_Alpaca', 'LiveAI_Nico']
+            bots = ['LiveAI_Umi',  'LiveAI_Nico']
         srfs = init_srfs(bots, lock, twq)
         with _.process_with(auto_start = False) as process_queue:
-            receiver_process = multiprocessing.Process(target = receiver, args=(srfs, twq, lock, 1), name = 'receiver')
-            process_queue.append(receiver_process)
-            receiver_process.start()
+            # receiver_process = multiprocessing.Process(target = receiver, args=(srfs, twq, lock, 1), name = 'receiver')
+            # process_queue.append(receiver_process)
+            # receiver_process.start()
             manage_process = multiprocessing.Process(target = task_manager, args=(srfs, 30,), name= 'task_manager')
             process_queue.append(manage_process)
             manage_process.start()
-            for bot_id in bots:
-                bot_process = multiprocessing.Process(target = srfs[bot_id].twf.Stream, args=(bot_id, lock, twq), name = bot_id)
+            for srf in srfs.values():
+                bot_process = multiprocessing.Process(target = srf.twf.Stream, args=(srf, lock, twq), name = srf.bot_id)
                 process_queue.append(bot_process)
                 bot_process.start()
 
