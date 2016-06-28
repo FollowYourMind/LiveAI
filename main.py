@@ -486,8 +486,11 @@ class StreamResponseFunctions(MyObject):
         elif 'NG' in text:
             self.twf.give_fav(status_id)
             ans = operate_sql.get_phrase(status =  'NGreport', character = character)
+        elif 'ふぁぼ' in text:
+            self.twf.give_fav(status_id)
+            ans = '💓'
         elif '淫夢' in text:
-            ans = operate_sql.get_phrase(status =  '淫夢', character = character)
+            ans = operate_sql.get_phrase(status = '淫夢', character = character)
         elif 'media' in status['entities'] and status['in_reply_to_screen_name'] in {self.bot_id}:
             userinfo.cnt = 0
             fileID = self.now.strftime('%Y%m%d%H%M%S')
@@ -514,40 +517,42 @@ class StreamResponseFunctions(MyObject):
                     d(e, 'hashtag_imgs')
                     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
             else:
-                try:
-                    filenames = _.saveMedias(status, ID = fileID, DIR = DIRIMGtmp)
-                    filename = filenames[0]
-                    label = ''
-                    pic = opencv_functions.read_img(filename)
-                    is_bar_detected, zbarans = opencv_functions.passzbar(pic)
-                    if is_bar_detected:
-                        img_kind = zbarans[0].decode('utf-8')
-                        zbarans = zbarans[1].decode('utf-8')
-                    else:
-                        label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR = '')
-                    if img_kind in {'QR-Code'}:
-                        ans = zbarans
-                        filename = ''
-                    elif img_kind == 'anime':
-                        ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
-                        drc = '/'.join([DIRIMGfeedback, label])
-                        if os.path.exists(drc) == False:
-                            os.mkdir(drc)
-                        shutil.copy(filename, drc)
-                        userinfo.mode = 'confirm.tag.img'
-                        userinfo.tmpFile = '/'.join([drc, filename.split('/')[-1]])
-                        filename = IMGfile
-                    elif img_kind == 'cat':
-                        ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
-                        filename = IMGfile
-                    else:
-                        ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
-                        filename = ''
-                        userinfo.mode = 'dialog'
-                except:
-                    _.log_err()
-                if not ans:
-                    ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
+                filenames = _.saveMedias(status, ID = fileID, DIR = DIRIMGtmp)
+                filename = filenames[0]
+                label = ''
+                # pic = opencv_functions.read_img(filename)
+                # p('readed')
+                # is_bar_detected, zbarans = opencv_functions.passzbar(pic)
+                # if is_bar_detected:
+                #     img_kind = zbarans[0].decode('utf-8')
+                #     zbarans = zbarans[1].decode('utf-8')
+                # else:
+                # label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR = '')
+                # p(img_kind)
+                ans = 'saved工事中'
+                # if img_kind in {'QR-Code'}:
+                #     ans = zbarans
+                #     filename = ''
+                # elif img_kind == 'anime':
+                #     p('anime')
+                #     ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
+                #     drc = '/'.join([DIRIMGfeedback, label])
+                #     if os.path.exists(drc) == False:
+                #         os.mkdir(drc)
+                #     shutil.copy(filename, drc)
+                #     userinfo.mode = 'confirm.tag.img'
+                #     userinfo.tmpFile = '/'.join([drc, filename.split('/')[-1]])
+                #     filename = IMGfile
+                # elif img_kind == 'cat':
+                #     ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
+                #     filename = IMGfile
+                # else:
+                #     ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
+                #     filename = ''
+                #     userinfo.mode = 'dialog'
+                # p(ans)
+                # if not ans:
+                #     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
         elif userinfo.cnt > 6 and mode != 'dm':
             ans = operate_sql.get_phrase(status =  'cntOver', n = 20, character = character)
@@ -1105,22 +1110,18 @@ class StreamResponseFunctions(MyObject):
 
     @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = False)
     def check_if_follow(self, userobject):
-        is_followback_ok = True
         if userobject['lang'] != 'ja':
             return False
         if userobject['statuses_count'] < 100:
             return False
         if userobject['favourites_count'] < 20:
             return False
-        if userobject['listed_count'] / userobject['followers_count'] < 0.02:
+        if (userobject['listed_count'] / userobject['followers_count']) < 0.015:
             return False
         ff_rate = userobject['followers_count'] / userobject['friends_count']
         if ff_rate < 0.7:
-            return False
-        # if not is_followback_ok:
-        #     if userobject['followers_count'] > 1000:
-        #         is_followback_ok = True
-        # return is_followback_ok
+            if userobject['followers_count'] < 1000:
+                return False
         return True
 
     @_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = True)
@@ -1299,16 +1300,15 @@ def test_stream(bot_id, lock, twq):
         status = MyObject()
         status.text = 'this is test_stream... textNo. {}'.format(str(i))
         status.mode = 'test'
-        twq.put_nowait([status, bot_id])
+        event = 'wait'
+        twq.put_nowait([status, bot_id, event])
         time.sleep(np.random.randint(2))
         i += 1
 import asyncio
-def test_func(a):
-    p(a)
-    time.sleep(np.random.randint(7))
-    return True
+
 def receiver(srfs, q, lock, process_id):
     async def parallel_main(loop):
+    # TODO -> insert_manyへ。
         async def save_tweets(async_q):
             while True:
                 try:
@@ -1363,7 +1363,7 @@ def receiver(srfs, q, lock, process_id):
                     _.log_err()
         async_q = asyncio.Queue()
         parallel = 2
-        tasks = [fetch(q, async_q) for i in range(parallel)] + [save_tweets(async_q)]
+        tasks = [fetch(q, async_q) for i in range(parallel)]
         return await asyncio.wait(tasks)
     #
     process = multiprocessing.current_process()
@@ -1423,7 +1423,7 @@ def main(is_experience = False):
         if not is_experience:
             bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
         else:
-            bots = ['LiveAI_Alpaca']
+            bots = ['LiveAI_Alpaca', 'LiveAI_Nico']
         srfs = init_srfs(bots, lock, twq)
         with _.process_with(auto_start = False) as process_queue:
             receiver_process = multiprocessing.Process(target = receiver, args=(srfs, twq, lock, 1), name = 'receiver')

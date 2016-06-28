@@ -14,7 +14,6 @@ class StreamListener(tweepy.streaming.StreamListener):
 		super().__init__()
 		self.bot_id = bot_id
 		self.twq = twq
-		# self.shared_ls = shared_ls
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	def on_connect(self):
@@ -26,7 +25,6 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def on_status(self, status):
 		self.twq.put_nowait([status, self.bot_id, 'status'])
 		return True
-
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
 		self.twq.put_nowait([status, self.bot_id, 'direct_message'])
@@ -73,18 +71,12 @@ class TwtrTools(MyObject):
 		self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
+
+	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def Stream(self, bot_id = None, lock = None, twq = None):
 		auth = self.twtr_auth
-		while True:
-			try:
-				stream = tweepy.Stream(auth = auth, listener = StreamListener(bot_id, lock, twq), timeout = 60, async = True, secure=True)
-				stream.userstream()
-			except tweepy.TweepError as e:
-				d(e, 'twf.stream tweeperror waiting 100sec')
-				time.sleep(100)
-			except Exception as e:
-				d(e, 'twf.stream waiting 100sec')
-				time.sleep(100)
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(bot_id, lock, twq), timeout = 50, async = True, secure=True)
+		stream.userstream()
 	def get_status(self, status_id):
 		try:
 			return self.twtr_api.get_status(id = status_id)

@@ -173,7 +173,6 @@ def FaceRecognition(filename = testpic, isShow = True, saveStyle = 'icon', workD
 	faces = faceDetector.detectMultiScale(grayimg, scaleFactor = 1.1, minNeighbors = 5, minSize = (24, 24))
 	height, width = grayimg.shape[:2]
 	facecnt = len(faces)
-	print(filename, str(facecnt))
 	if facecnt == 0:
 		return frame, filename, frame, False
 	else:

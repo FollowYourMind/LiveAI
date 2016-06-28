@@ -27,7 +27,6 @@ def convData(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
 
 def convIMG(address, DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
 	imgaddress = DIR+address
-	print(imgaddress)
 	recogresult = opencv_functions.FaceRecognition(imgaddress, isShow = False, saveStyle = '', workDIR = 'work', through = True)
 	img = recogresult[0]
 	img = opencv_functions.adjustIMG(img, K = 0, isHC = True, size = (28, 28))
@@ -122,36 +121,37 @@ def trainSVM(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", saveDIR =
 	joblib.dump(clf, saveDIR) 
 
 def predictSVM(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/show.png", isShow = True, model = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", workDIR = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
-	classifier = joblib.load(model)
 	img_kind = ''
 	img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', workDIR = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
-	if FACEflag:
-		img_kind = 'cat'
-	if img_kind == '':
-		img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', workDIR = '', cascade_lib = cascade_lib_anime)
-		if FACEflag:
-			img_kind = 'anime'
-
-	if img_kind == 'anime' or is_force:
-		img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28))
-		img = img.flatten().astype(np.float32)/255.0
-		result = classifier.predict(img)
-		anslabel = label[result[0]]
-		return anslabel, img_kind, altfilename
-	elif img_kind == 'cat':
-		anslabel = 'cat'
-		return anslabel, img_kind, altfilename
-	else:
-		anslabel = 'no_face'
-		return anslabel, img_kind, filename
+	p()
+	# if FACEflag:
+	# 	img_kind = 'cat'
+	# if img_kind == '':
+	# 	img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', workDIR = '', cascade_lib = cascade_lib_anime)
+	# 	if FACEflag:
+	# 		img_kind = 'anime'
+	# p(img_kind)
+	# if img_kind == 'anime' or is_force:
+	# 	classifier = joblib.load(model)
+	# 	img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
+	# 	img = img.flatten().astype(np.float32)/255.0
+	# 	result = classifier.predict(img.reshape(1, -1))
+	# 	anslabel = label[result[0]]
+	# 	return anslabel, img_kind, altfilename
+	# elif img_kind == 'cat':
+	# 	anslabel = 'cat'
+	# 	return anslabel, img_kind, altfilename
+	# else:
+		# anslabel = 'no_face'
+		# return anslabel, img_kind, filename
 
 if __name__ == '__main__':
 	import sys, os, io
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 	# 6海未 7真姫
-	# filename = '/Users/masaMikam/OneDrive/imgs/face/LL3/海未/CV_FACE_icon0_LL1-03_20160212165427.png'
+	filename = '/Users/masaMikam/OneDrive/imgs/face/LL3/海未/CV_FACE_icon0_LL1-03_20160212165427.png'
 	DIR = '/Users/masaMikam/OneDrive/imgs/learn/雪穂/'
-	ans = predictSVM(filename  = filename, isShow = True, model = modelSVM, workDIR = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
+	ans = predictSVM(filename  = filename, isShow = 0, model = modelSVM, workDIR = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
 	print(ans)
 	# trainSVM(DIR = "/Users/masaMikam/OneDrive/imgs/learn/_work/", saveDIR = DATADIR + '/lib/SVM_us3/SVMmodel3.pkl')
 
