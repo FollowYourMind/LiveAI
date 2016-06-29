@@ -10,13 +10,59 @@ import natural_language_processing
 import operate_sql
 import main
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, srf = None, bot_id = None, lock = None, twq = None):
+	def __init__(self, bot_id = None, q = None):
 		super().__init__()
-		if srf is None:
-			self.srf = main.StreamResponseFunctions(bot_id, lock, twq)
-		else:
-			self.srf = srf
+		# self.srf = main.StreamResponseFunctions(bot_id)
 		self.bot_id = bot_id
+		self.q = q
+	def __del__(self):
+		p(self.bot_id, 'stopping streaming...')
+	def on_connect(self):
+		return True
+	def on_friends(self, friends):
+		# return self.response_main.on_friends_main(friends)
+		pass
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
+	def on_status(self, status):
+		# self.srf.on_status_main(status._json)
+		self.q.put((status, self.bot_id, 'status'))
+		return True
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
+	def on_direct_message(self,status):
+		# self.twq.put_nowait([status, self.bot_id, 'direct_message'])
+		return True
+	def on_event(self, status):
+		# self.twq.put_nowait([status, self.bot_id, 'event'])
+		return True
+	def on_limit(self, track):
+		p(self.bot_id, 'track', track)
+		return True
+	def keep_alive(self):
+		p(self.bot_id, 'keep_alive...')
+		return True
+	def on_exception(self, exception):
+		p(exception, self.bot_id, 'exception')
+		return True
+	def on_warning(self, notice):
+		p(notice, 'warning')
+		return True
+	def on_disconnect(self, notice):
+		d(notice, 'disconnect')
+		return False
+	def on_error(self,status_code):
+		p(status_code, 'cannot get')
+		return False
+	def on_timeout(self):
+		p('timeout...')
+		return False
+class FilterStreamListener(tweepy.streaming.StreamListener):
+	def __init__(self, twq = None):
+		super().__init__()
+		# if srf is None:
+		# 	self.srf = main.StreamResponseFunctions(bot_id, lock, twq)
+		# else:
+		# 	self.srf = srf
+		self.bot_id = 'sys'
 		self.twq = twq
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
@@ -27,7 +73,8 @@ class StreamListener(tweepy.streaming.StreamListener):
 		pass
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		self.srf.on_status_main(status._json)
+		p(status.text)
+		# self.srf.on_status_main(status._json)
 		# self.twq.put_nowait([status, self.bot_id, 'status'])
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
@@ -53,7 +100,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		d(notice, 'disconnect')
 		return False
 	def on_error(self,status):
-		p('cannot get')
+		p(status, 'cannot get')
 		return False
 	def on_timeout(self):
 		p('timeout...')
@@ -67,21 +114,26 @@ def get_twtr_auth(auth_dic):
 	auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
 	return auth
 class TwtrTools(MyObject):
-	def __init__(self, bot_id = 'LiveAIs', lock = None, twq = None):
+	def __init__(self, bot_id = 'LiveAIs'):
 		self.bot_id = bot_id
 		api_keys = cfg['twtr']
 		twtr_auths = {key: get_twtr_auth(value) for key, value in api_keys.items()}
 		twtr_apis = {key: tweepy.API(value, wait_on_rate_limit = True) for key, value in twtr_auths.items()}
-		self.lock = lock
-		self.twq = twq
+		# self.lock = lock
+		# self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
 
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	def Stream(self, srf = None, lock = None, twq = None):
+	def Stream(self, q):
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, self.bot_id, lock, twq), timeout = 50, async = 1, secure=True)
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, q), timeout = 60, async = True, secure=True)
 		stream.userstream()
+	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
+	def filter_stream(self, twq = None, track=['python']):
+		auth = self.twtr_auth
+		stream = tweepy.Stream(auth = auth, listener = FilterStreamListener(twq), timeout = 60, async = 1, secure=True)
+		stream.filter(async=True, languages=['ja'],track=['#'])
 	def get_status(self, status_id):
 		try:
 			return self.twtr_api.get_status(id = status_id)
@@ -307,9 +359,9 @@ class TwtrTools(MyObject):
 
 if __name__ == '__main__':
 	twf = TwtrTools('LiveAI_Alpaca')
-	objs = twf.get_followers_all('LiveAI_Maki')
-	p(objs[0]._json)
-	# twf.Stream()
+	# objs = twf.get_followers_all('LiveAI_Maki')
+	# p(objs[0]._json)
+	twf.filter_stream()
 	# ans = twf.get_listmembers_all(username = 'LiveAI_Rin' , listname = 'BOaaa')
 	# ans = twf.get_status(status_id = '715662952372699136')
 	# p(ans._json['user']['screen_name'])

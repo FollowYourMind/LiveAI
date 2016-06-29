@@ -124,6 +124,7 @@ def predictSVM(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/
 	img_kind = ''
 	img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', workDIR = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
 	p()
+	
 	# if FACEflag:
 	# 	img_kind = 'cat'
 	# if img_kind == '':

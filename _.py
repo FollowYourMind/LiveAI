@@ -16,6 +16,7 @@ import time
 import urllib
 import bs4
 import pprint
+import queue
 from datetime import datetime, timedelta
 from collections import Counter, deque
 from itertools import chain
@@ -37,6 +38,14 @@ except ImportError:
                 return caller(f, *args, **kwargs)
             return wrapper
         return decor
+
+class SetQueue(queue.Queue):
+    def _init(self, maxsize):
+        self.queue = set()
+    def _put(self, item):
+        self.queue.add(item)
+    def _get(self):
+        return self.queue.pop()
 
 def timeit(func):
     @functools.wraps(func)
@@ -551,10 +560,17 @@ def queue_put(q, msg, timeout = 5):
        raise
 if __name__ == '__main__':
   # adjustSize(DIR)
-  @deco_tag('oo')
-  def a():
-    return 'a'
-  p(a())      
+  sq = SetQueue()
+  sq.put(('a', 3))
+  a = sq.get()
+  p(a)
+  sq.put('a')    
+  sq.put('b')
+  sq.put('b')
+  sq.put('c')
+  while True:
+    a = sq.get()
+    p(a)
   # reconnect_wifi()
   # import sys, traceback
   # a = a()

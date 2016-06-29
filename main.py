@@ -82,11 +82,9 @@ class TweetLogPool(MyObject):
             self.status_ids.append(status_id)
             self.timeline_twlog = self.timeline_twlog[-20:]
 class StreamResponseFunctions(MyObject):
-    def __init__(self, bot_id, lock = None, twq = None):
+    def __init__(self, bot_id):
         debug_style = ''
         self.default_character = 'sys'
-        self.lock = lock
-        self.twq = twq
         if bot_id == 'LiveAI_Umi':
             self.default_character = '海未'
         if bot_id == 'LiveAI_Honoka':
@@ -1013,9 +1011,9 @@ class StreamResponseFunctions(MyObject):
                     tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
     def display_tweets(self, status):
             if not status['in_reply_to_screen_name'] is None:
-                print(''.join([self.default_character,'|', status['user']['name'], '|\n@', status['in_reply_to_screen_name'], status['clean_text']]))
+                print(''.join([self.default_character,'|', status['user']['name'], '|\n@', status['in_reply_to_screen_name'], status['text']]))
             else:
-                print(''.join([self.default_character,'|', status['user']['name'], '|\n', status['clean_text']]))
+                print(''.join([self.default_character,'|', status['user']['name'], '|\n', status['text']]))
     def status_dic(self, status):
         if status['id_str'].isdigit():
             status_dic = {
@@ -1293,89 +1291,104 @@ def save_tweet_dialog(status):
 ##############
 # Main Functions
 ##############
-def test_stream(bot_id, lock, twq):
+def test_stream(bot_id):
     i = 0
     while True:
         status = MyObject()
         status.text = 'this is test_stream... textNo. {}'.format(str(i))
+        p(status.text)
         status.mode = 'test'
         event = 'wait'
-        twq.put_nowait([status, bot_id, event])
         time.sleep(np.random.randint(2))
         i += 1
 import asyncio
 
-def receiver(srfs, q, lock, process_id):
-    async def parallel_main(loop):
+def receiver(srfs, q,):
+    # async def parallel_main(loop):
     # TODO -> insert_manyへ。
-        async def save_tweets(async_q):
-            while True:
+    async def save_tweets(async_q):
+        while True:
+            try:
+                status = await async_q.get()
+                # p(status)
+                future = loop.run_in_executor(None, operate_sql.save_tweet_status, {
+                    'status_id' : int(status['id_str']),
+                    'screen_name' : status['user']['screen_name'],
+                    'name' : status['user']['name'],
+                    'text' : status['text'],
+                    'user_id' : status['user']['id_str'],
+                    'in_reply_to_status_id_str' : status['in_reply_to_status_id_str'],
+                    'bot_id' : '',
+                    'createdAt' : datetime.utcnow(),
+                    'updatedAt' : datetime.utcnow()
+                    })
+                await asyncio.wait([future])
+            except:
+                _.log_err()
+    async def task_manage(period = 60):
+        while True:
+            now = datetime.utcnow() + timedelta(hours = 9)
+            tasks = operate_sql.search_tasks(when = now, n = 10)
+            p('TASK', now)
+            if tasks:
                 try:
-                    status = await async_q.get()
-                    # p(status)
-                    future = loop.run_in_executor(None, operate_sql.save_tweet_status, {
-                        'status_id' : int(status['id_str']),
-                        'screen_name' : status['user']['screen_name'],
-                        'name' : status['user']['name'],
-                        'text' : status['text'],
-                        'user_id' : status['user']['id_str'],
-                        'in_reply_to_status_id_str' : status['in_reply_to_status_id_str'],
-                        'bot_id' : '',
-                        'createdAt' : datetime.utcnow(),
-                        'updatedAt' : datetime.utcnow()
-                        })
-                    await asyncio.wait([future])
-                except:
+                    for task in tasks:
+                        bot_id = task.who
+                        if bot_id in srfs:
+                            srfs[bot_id].implement_tasks(task._data)
+                except Exception as e:
                     _.log_err()
-        async def fetch(q, async_q):
-            while True:
-                try:
-                    msg = q.get()
-                    status, bot_id, event = msg
-                    status = status._json
-                    if event == 'event':
-                        future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
-                        tasks = [future1]
-                    elif event in {'status', 'direct_message'}:
-                        if event == 'status':
-                            future1 = loop.run_in_executor(None, srfs[bot_id].on_status_main, status)
-                        elif event == 'direct_message':
-                            status = status['direct_message']
-                            status['user'] = {}
-                            status['user']['screen_name'] = status['sender_screen_name']
-                            status['user']['name'] = status['sender']['name']
-                            status['user']['id_str'] = status['sender']['id_str']
-                            status['in_reply_to_status_id_str'] = None
-                            status['in_reply_to_screen_name'] = self.bot_id
-                            status['extended_entities'] = status['entities']
-                            status['retweeted'] = False
-                            status['is_quote_status'] = False
-                            future1 = loop.run_in_executor(None, srfs[bot_id].on_direct_message_main, status)
-                        else:
-                            raise
-                        tasks = [future1]
-                        # async_q.put_nowait(status)
-                    else:
-                        raise
-                    await asyncio.wait(tasks)
-                except:
-                    _.log_err()
-        async_q = asyncio.Queue()
-        parallel = 2
-        tasks = [fetch(q, async_q) for i in range(parallel)]
-        return await asyncio.wait(tasks)
+            # time.sleep(period)
+            await asyncio.sleep(period)
+    async def fetch(q):
+        while True:
+            try:
+                msg = q.get()
+                status, bot_id, event = msg
+                # status = msg
+                status = status._json
+                if event == 'event':
+                    future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
+                elif event == 'status':
+                    future1 = loop.run_in_executor(None, srfs[bot_id].on_status_main, status)
+                elif event == 'direct_message':
+                    status = status['direct_message']
+                    status['user'] = {}
+                    status['user']['screen_name'] = status['sender_screen_name']
+                    status['user']['name'] = status['sender']['name']
+                    status['user']['id_str'] = status['sender']['id_str']
+                    status['in_reply_to_status_id_str'] = None
+                    status['in_reply_to_screen_name'] = self.bot_id
+                    status['extended_entities'] = status['entities']
+                    status['retweeted'] = False
+                    status['is_quote_status'] = False
+                    future1 = loop.run_in_executor(None, srfs[bot_id].on_direct_message_main, status)
+                else:
+                    raise
+                tasks = [future1]
+                #     # async_q.put_nowait(status)
+                # else:
+                #     raise
+                await asyncio.wait(tasks)
+            except:
+                _.log_err()
+        # async_q = asyncio.Queue()
+        # parallel = 2
+        # tasks = [fetch(q, async_q) for i in range(parallel)]
+        # return await asyncio.wait(tasks)
     #
     process = multiprocessing.current_process()
     print('starting '+ process.name)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.ensure_future(parallel_main(loop))
+    asyncio.ensure_future(fetch(q))
+    asyncio.ensure_future(task_manage(period = 60))
     try:
         loop.run_forever()
     finally:
         loop.close()
     print('end')
-def task_manager(srfs, period = 60):
+def task_manager(srfs, period = 20):
     try:
         process = multiprocessing.current_process()
         print('starting '+ process.name)
@@ -1397,85 +1410,56 @@ def task_manager(srfs, period = 60):
                 except Exception as e:
                     _.log_err()
             time.sleep(period)
-async def task_manage(srfs, period = 60):
-    try:
-        process = multiprocessing.current_process()
-        print('starting '+ process.name)
-        for srf in srfs.values():
-            await srf.initialize_tasks()
-    except Exception as e:
-        _.log_err()
-        return False
-    else:
-        while True:
-            now = datetime.utcnow() + timedelta(hours = 9)
-            tasks = operate_sql.search_tasks(when = now, n = 10)
-            if tasks:
-                try:
-                    for task in tasks:
-                        bot_id = task.who
-                        if bot_id in srfs:
-                            srfs[bot_id].implement_tasks(task._data)
-                except Exception as e:
-                    _.log_err()
-            time.sleep(period)
-def init_srfs(bots, lock, twq):
+def init_srfs(bots):
     def _init_srf(bot_id):
         try:
-            return bot_id, StreamResponseFunctions(bot_id, lock, twq)
+            return bot_id, StreamResponseFunctions(bot_id)
         except:
             _.log_err()
     srfs = {}
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     tasks = [loop.run_in_executor(None, _init_srf, bot_id) for bot_id in bots]
     try:
         done, pending = loop.run_until_complete(asyncio.wait(tasks))
         for d in done:
             bot_id, srf = d.result()
+            srf.initialize_tasks()
             srfs[bot_id] = srf
     finally:
         loop.close()
         return srfs
 
-
 def main(is_experience = False):
     # with multiprocessing.Manager() as manager:
     if True:
         # shared_ls = manager.list()
-        lock = multiprocessing.Lock()
-        twq = multiprocessing.Queue(maxsize = 0)
+        # lock = multiprocessing.Lock()
+        # twq = multiprocessing.Queue(maxsize = 0)
+        q = queue.Queue(maxsize = 0)
+        # sq = _.SetQueue()
         if not is_experience:
             bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
         else:
-            # bots = ['LiveAI_Alpaca', 'LiveAI_Nico']
+            # bots = ['LiveAI_Alpaca']
             bots = ['LiveAI_Umi',  'LiveAI_Nico']
-        srfs = init_srfs(bots, lock, twq)
-        with _.process_with(auto_start = False) as process_queue:
-            # receiver_process = multiprocessing.Process(target = receiver, args=(srfs, twq, lock, 1), name = 'receiver')
+        srfs = init_srfs(bots)
+        # with _.process_with(auto_start = False) as process_queue:
+            # receiver_process = multiprocessing.Process(target = receiver, args=(srfs, queue,), name = 'receiver')
             # process_queue.append(receiver_process)
             # receiver_process.start()
-            manage_process = multiprocessing.Process(target = task_manager, args=(srfs, 30,), name= 'task_manager')
-            process_queue.append(manage_process)
-            manage_process.start()
-            for srf in srfs.values():
-                bot_process = multiprocessing.Process(target = srf.twf.Stream, args=(srf, lock, twq), name = srf.bot_id)
-                process_queue.append(bot_process)
-                bot_process.start()
+            # manage_process = multiprocessing.Process(target = task_manager, args=(srfs, 30,), name= 'task_manager')
+            # process_queue.append(manage_process)
+            # manage_process.start()
+        for bot_id in bots:
+            twf = twtr_functions.TwtrTools(bot_id)
+            bot_process = threading.Thread(target = twf.Stream, args=(q,), name = bot_id)
+            # process_queue.append(bot_process)
+            bot_process.start()
+        receiver(srfs, q)
 
 if __name__ == '__main__':
     main(0)
-    # process = multiprocessing.current_process()
-    # print(process.__dict__)
-
-    # srf = StreamResponseFunctions('LiveAI_Alpaca')
-    # srf.initialize_tasks()
-    # a = operate_sql.search_tasks(when = srf.sync_now(), n = 10)
-    # p(a)
-
-    # p(multiprocessing.cpu_count())
-    # testmain()
-    # np.random.seed()
-    # p(np.random.randint(100))
 
 
 
