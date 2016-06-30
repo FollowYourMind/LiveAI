@@ -1323,6 +1323,8 @@ def receiver(srfs, q,):
                     'updatedAt' : datetime.utcnow()
                     })
                 await asyncio.wait([future])
+            except KeyboardInterrupt:
+                return False
             except:
                 _.log_err()
     async def task_manage(period = 60):
@@ -1336,16 +1338,24 @@ def receiver(srfs, q,):
                         bot_id = task.who
                         if bot_id in srfs:
                             srfs[bot_id].implement_tasks(task._data)
-                except Exception as e:
+                except:
                     _.log_err()
-            # time.sleep(period)
             await asyncio.sleep(period)
-    async def fetch(q):
+    async def fetch(dq):
         while True:
             try:
-                msg = q.get()
-                status, bot_id, event = msg
-                # status = msg
+                # msg = q.get(timeout = 5)
+                len_dq = len(dq)
+                if len_dq < 1:
+                    await asyncio.sleep(0.3)
+                    continue
+                else:
+                    status, bot_id, event = dq.pop()
+                    if len_dq != 1:
+                        if status.id_str == dq[-1][0].id_str:
+                            if status.in_reply_to_screen_name != bot_id:
+                                p('重複簡易排除')
+                                continue
                 status = status._json
                 if event == 'event':
                     future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
@@ -1370,6 +1380,8 @@ def receiver(srfs, q,):
                 # else:
                 #     raise
                 await asyncio.wait(tasks)
+            except KeyboardInterrupt:
+                return False
             except:
                 _.log_err()
         # async_q = asyncio.Queue()
@@ -1382,34 +1394,12 @@ def receiver(srfs, q,):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     asyncio.ensure_future(fetch(q))
-    asyncio.ensure_future(task_manage(period = 60))
+    asyncio.ensure_future(task_manage(period = 30))
     try:
         loop.run_forever()
     finally:
         loop.close()
     print('end')
-def task_manager(srfs, period = 20):
-    try:
-        process = multiprocessing.current_process()
-        print('starting '+ process.name)
-        for srf in srfs.values():
-            srf.initialize_tasks()
-    except Exception as e:
-        _.log_err()
-        return False
-    else:
-        while True:
-            now = datetime.utcnow() + timedelta(hours = 9)
-            tasks = operate_sql.search_tasks(when = now, n = 10)
-            if tasks:
-                try:
-                    for task in tasks:
-                        bot_id = task.who
-                        if bot_id in srfs:
-                            srfs[bot_id].implement_tasks(task._data)
-                except Exception as e:
-                    _.log_err()
-            time.sleep(period)
 def init_srfs(bots):
     def _init_srf(bot_id):
         try:
@@ -1436,28 +1426,22 @@ def main(is_experience = False):
         # shared_ls = manager.list()
         # lock = multiprocessing.Lock()
         # twq = multiprocessing.Queue(maxsize = 0)
-        q = queue.Queue(maxsize = 0)
+        # q = queue.Queue(maxsize = 0)
+        from collections import deque
+        dq = deque()
         # sq = _.SetQueue()
         if not is_experience:
             bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
         else:
-            # bots = ['LiveAI_Alpaca']
-            bots = ['LiveAI_Umi',  'LiveAI_Nico']
+            bots = ['LiveAI_Alpaca']
+            # bots = ['LiveAI_Umi',  'LiveAI_Nico']
         srfs = init_srfs(bots)
-        # with _.process_with(auto_start = False) as process_queue:
-            # receiver_process = multiprocessing.Process(target = receiver, args=(srfs, queue,), name = 'receiver')
-            # process_queue.append(receiver_process)
-            # receiver_process.start()
-            # manage_process = multiprocessing.Process(target = task_manager, args=(srfs, 30,), name= 'task_manager')
-            # process_queue.append(manage_process)
-            # manage_process.start()
         for bot_id in bots:
             twf = twtr_functions.TwtrTools(bot_id)
-            bot_process = threading.Thread(target = twf.Stream, args=(q,), name = bot_id)
+            bot_process = threading.Thread(target = twf.Stream, args=(dq,), name = bot_id)
             # process_queue.append(bot_process)
             bot_process.start()
-        receiver(srfs, q)
-
+        receiver(srfs, dq)
 if __name__ == '__main__':
     main(0)
 

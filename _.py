@@ -560,17 +560,35 @@ def queue_put(q, msg, timeout = 5):
        raise
 if __name__ == '__main__':
   # adjustSize(DIR)
-  sq = SetQueue()
-  sq.put(('a', 3))
-  a = sq.get()
-  p(a)
-  sq.put('a')    
-  sq.put('b')
-  sq.put('b')
-  sq.put('c')
-  while True:
-    a = sq.get()
-    p(a)
+  # sq = SetQueue()
+  from collections import deque
+  # sq = queue.Queue(maxsize = 0)
+  dq = deque()
+  an = MyObject()
+  an.popo = 1111
+  dq.append(an)
+  bn = MyObject()
+  bn.popo = 1112
+  dq.append(bn)
+  dq.append(bn)
+  dq.append(bn)
+  dq.append((124, 'ab'))
+  dq.append((124, 'aa'))
+  dq.append((125, 'aa'))
+  for i in range(10):
+    try:
+      len_dq = len(dq)
+      if len_dq > 0:
+        a = dq.pop()
+        if len_dq == 1:
+          p(a)
+        elif a != dq[-1]:
+          p(a)
+    except:
+      log_err()
+      
+  # for c in sq.pop():
+  #   p(c)
   # reconnect_wifi()
   # import sys, traceback
   # a = a()

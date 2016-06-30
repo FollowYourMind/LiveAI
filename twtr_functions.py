@@ -15,24 +15,30 @@ class StreamListener(tweepy.streaming.StreamListener):
 		# self.srf = main.StreamResponseFunctions(bot_id)
 		self.bot_id = bot_id
 		self.q = q
+		self.keeping_alive_cnt = 0
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
 		# return self.response_main.on_friends_main(friends)
-		pass
+		return True
+	def on_delete(self, status_id, user_id):
+		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
 		# self.srf.on_status_main(status._json)
-		self.q.put((status, self.bot_id, 'status'))
+		self.q.append((status, self.bot_id, 'status'))
+		# self.q.put_nowait((status, self.bot_id, 'status'))
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		# self.twq.put_nowait([status, self.bot_id, 'direct_message'])
+		self.q.append((status, self.bot_id, 'direct_message'))
+		# self.q.put_nowait((status, self.bot_id, 'direct_message'))
 		return True
 	def on_event(self, status):
-		# self.twq.put_nowait([status, self.bot_id, 'event'])
+		self.q.append((status, self.bot_id, 'event'))
+		# self.q.put_nowait((status, self.bot_id, 'event'))
 		return True
 	def on_limit(self, track):
 		p(self.bot_id, 'track', track)
@@ -42,7 +48,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
-		return True
+		return False
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True
@@ -54,6 +60,8 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return False
 	def on_timeout(self):
 		p('timeout...')
+		return False
+	def on_closed(self, resp):
 		return False
 class FilterStreamListener(tweepy.streaming.StreamListener):
 	def __init__(self, twq = None):
@@ -127,8 +135,8 @@ class TwtrTools(MyObject):
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def Stream(self, q):
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, q), timeout = 60, async = True, secure=True)
-		stream.userstream()
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, q), timeout = 300, async = True)
+		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def filter_stream(self, twq = None, track=['python']):
 		auth = self.twtr_auth
@@ -165,15 +173,15 @@ class TwtrTools(MyObject):
 			if imgfile:
 				if not is_debug:
 					tweetStatus = self.twtr_api.update_with_media(imgfile, status = ans2, in_reply_to_status_id = status_id)
-					print('[Tweet.IMG.OK] @', screen_name, ' ', ans2)
+					print(self.bot_id, '[Tweet.IMG.OK] @', screen_name, ' ', ans2)
 				else:
-					print('[Debug][Tweet.IMG.OK] @', screen_name, ' ', ans2)
+					print(self.bot_id, '[Debug][Tweet.IMG.OK] @', screen_name, ' ', ans2)
 			else:
 				if not is_debug:
 					tweetStatus = self.twtr_api.update_status(status = ans2, in_reply_to_status_id = status_id)
-					print('[Tweet.OK] @', screen_name, ' ', ans2)
+					print(self.bot_id, '[Tweet.OK] @', screen_name, ' ', ans2)
 				else:
-					print('[Debug][Tweet.OK] @', screen_name, ' ', ans2)
+					print(self.bot_id, '[Debug][Tweet.OK] @', screen_name, ' ', ans2)
 			# 140字越えの際は、分割ツイート
 			if is_split:
 				if screen_name:
