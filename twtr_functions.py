@@ -10,37 +10,38 @@ import natural_language_processing
 import operate_sql
 import main
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, bot_id = None, q = None):
+	def __init__(self, srf = None, q = None, lock = None):
 		super().__init__()
-		self.srf = main.StreamResponseFunctions(bot_id)
-		self.bot_id = bot_id
+		self.srf = srf
+		# self.srf = main.StreamResponseFunctions(bot_id)
+		self.bot_id = srf.bot_id
 		self.q = q
-		self.keeping_alive_cnt = 0
+		self.lock = lock
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
-		return self.srf.on_friends_main(friends)
+		bot_process = threading.Thread(target = self.srf.on_friends_main, args=(friends,), name = self.bot_id)
+		bot_process.start()
 		return True
 	def on_delete(self, status_id, user_id):
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		# self.srf.on_status_main(status._json)
 		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		# self.q.append((status, self.bot_id, 'status'))
+		self.q.append(status)
 		# self.q.put_nowait((status, self.bot_id, 'status'))
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
 		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
+		self.q.append(status)
 		# self.q.put_nowait((status, self.bot_id, 'direct_message'))
 		return True
 	def on_event(self, status):
-		# self.q.append((status, self.bot_id, 'event'))
 		bot_process = threading.Thread(target = self.srf.on_event_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
 		# self.q.put_nowait((status, self.bot_id, 'event'))
@@ -68,56 +69,6 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return False
 	def on_closed(self, resp):
 		return False
-class FilterStreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, twq = None):
-		super().__init__()
-		# if srf is None:
-		# 	self.srf = main.StreamResponseFunctions(bot_id, lock, twq)
-		# else:
-		# 	self.srf = srf
-		self.bot_id = 'sys'
-		self.twq = twq
-	def __del__(self):
-		p(self.bot_id, 'stopping streaming...')
-	def on_connect(self):
-		return True
-	def on_friends(self, friends):
-		# return self.response_main.on_friends_main(friends)
-		pass
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
-	def on_status(self, status):
-		p(status.text)
-		# self.srf.on_status_main(status._json)
-		# self.twq.put_nowait([status, self.bot_id, 'status'])
-		return True
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
-	def on_direct_message(self,status):
-		self.twq.put_nowait([status, self.bot_id, 'direct_message'])
-		return True
-	def on_event(self, status):
-		self.twq.put_nowait([status, self.bot_id, 'event'])
-		return True
-	def on_limit(self, track):
-		p(self.bot_id, 'track', track)
-		return True
-	def keep_alive(self):
-		p(self.bot_id, 'keep_alive...')
-		return True
-	def on_exception(self, exception):
-		p(exception, self.bot_id, 'exception')
-		return True
-	def on_warning(self, notice):
-		p(notice, 'warning')
-		return True
-	def on_disconnect(self, notice):
-		d(notice, 'disconnect')
-		return False
-	def on_error(self,status):
-		p(status, 'cannot get')
-		return False
-	def on_timeout(self):
-		p('timeout...')
-		return False
 def get_twtr_auth(auth_dic):
 	CONSUMER_KEY = auth_dic['consumer_key']
 	CONSUMER_SECRET = auth_dic['consumer_secret']
@@ -136,11 +87,10 @@ class TwtrTools(MyObject):
 		# self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
-
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	def Stream(self, q):
+	def user_stream(self, srf, q, lock):
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(self.bot_id, q), timeout = 300, async = True)
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, q, lock), timeout = 300, async = True)
 		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def filter_stream(self, twq = None, track=['python']):
@@ -159,9 +109,6 @@ class TwtrTools(MyObject):
 			return self.send_tweet(ans = ans, screen_name = '', status_id = '', imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
 		else:
 			return self.send_tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
-	def tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0):
-		p('old')
-		return self.send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False, try_cnt = 0)
 	def send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0):
 		try:
 			if screen_name:
@@ -228,27 +175,6 @@ class TwtrTools(MyObject):
 			print('[DM.ERR] @', screen_name, ' ', ans)
 			print(e)
 			return False
-
-	# def send_direct_message(self, ans, screen_name = '', tmp = {'tweetStatus': {'is_debug':False, 'isSplitTweet': False, 'tempStop_since':0}}):
-	# 	try:
-	# 		if not tmp['tweetStatus']['is_debug']:
-	# 			tweetStatus = self.twtr_api.send_direct_message(screen_name = screen_name, text = ans)
-	# 			print('[DM.OK] @', screen_name, ' ', ans)
-	# 		else:
-	# 			print('[Debug][DM.OK] @', screen_name, ' ', ans2)
-	# 		return True, tmp
-	# 	except tweepy.error.TweepError as e:
-	# 		print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
-	# 		if e.response and e.response.status == 403:
-	# 			print('403')
-	# 			tmp['tweetStatus']['tempStop_since'] = tmp['now']
-	# 			return False, tmp
-	# 		else:
-	# 			return True, tmp
-	# 	except Exception as e:
-	# 		print('[DM.ERR] @', screen_name, ' ', ans)
-	# 		print(e)
-	# 		return False, tmp
 
 	def getTrendwords(self, mode = 'withoutTag'):
 		# 'locations': [{'woeid': 23424856, 'name': 'Japan'}]

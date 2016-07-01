@@ -131,8 +131,13 @@ def save_tweet_status(status_dic = {
 				'bot_id' : '',
 				'createdAt' : datetime.utcnow(),
 				'updatedAt' : datetime.utcnow()
-			}):
-	tweetstatus, is_created = Tweets.create_or_get(**status_dic)
+			}, lock = None):
+	if not lock is None:
+		with lock:
+			tweetstatus, is_created = Tweets.create_or_get(**status_dic)
+	else:
+		tweetstatus, is_created = Tweets.create_or_get(**status_dic)
+	p('saved', status_dic['status_id'])
 	return tweetstatus
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @twlog_sql.atomic()
@@ -316,8 +321,10 @@ if __name__ == '__main__':
 	# p(locals())
 	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
 	# # p(get_twlog_pool(10))
-	with userinfo_with(screen_name = 'h_y_ok') as userinfo:
-		p(userinfo.__dict__)
+	lock = None
+
+	# with userinfo_with(screen_name = 'h_y_ok') as userinfo:
+	# 	p(userinfo.__dict__)
 	# 	userinfo.name = 'ひよ'
 	# save_userinfo(a)
 	# update_phrase('', ok_add = 0, ng_add = 1)

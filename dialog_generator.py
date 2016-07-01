@@ -1098,7 +1098,8 @@ class DialogObject(MyObject):
             rand_p = tf_idf / per
             d_dic = {text: sim for sim, text in sorted_d_ls}
             ans = np.random.choice([x[1] for x in sorted_d_ls], 1, replace = False, p = rand_p)[0]
-            return ''.join([ans, ' \n(', str(d_dic[ans]-laplace), ')'])
+            return ans
+            # return ''.join([ans, ' \n(', str(d_dic[ans]-laplace), ')'])
 if __name__ == '__main__':
     import sys
     import io
