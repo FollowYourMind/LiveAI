@@ -559,33 +559,14 @@ def queue_put(q, msg, timeout = 5):
        d('tweet_log_sender put() timed out. Queue is Full')
        raise
 if __name__ == '__main__':
-  # adjustSize(DIR)
-  # sq = SetQueue()
-  from collections import deque
-  # sq = queue.Queue(maxsize = 0)
-  dq = deque()
-  an = MyObject()
-  an.popo = 1111
-  dq.append(an)
-  bn = MyObject()
-  bn.popo = 1112
-  dq.append(bn)
-  dq.append(bn)
-  dq.append(bn)
-  dq.append((124, 'ab'))
-  dq.append((124, 'aa'))
-  dq.append((125, 'aa'))
-  for i in range(10):
+  while True:
     try:
-      len_dq = len(dq)
-      if len_dq > 0:
-        a = dq.pop()
-        if len_dq == 1:
-          p(a)
-        elif a != dq[-1]:
-          p(a)
-    except:
-      log_err()
+      p('aa')
+      time.sleep(2)
+    except KeyboardInterrupt:
+      p('yes')
+
+
       
   # for c in sq.pop():
   #   p(c)

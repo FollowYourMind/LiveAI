@@ -1303,7 +1303,7 @@ def test_stream(bot_id):
         i += 1
 import asyncio
 
-def receiver(srfs, q,):
+def receiver(srfs, q, bots):
     # async def parallel_main(loop):
     # TODO -> insert_manyへ。
     async def save_tweets(async_q):
@@ -1324,7 +1324,7 @@ def receiver(srfs, q,):
                     })
                 await asyncio.wait([future])
             except KeyboardInterrupt:
-                return False
+                break
             except:
                 _.log_err()
     async def task_manage(period = 60):
@@ -1344,7 +1344,6 @@ def receiver(srfs, q,):
     async def fetch(dq):
         while True:
             try:
-                # msg = q.get(timeout = 5)
                 len_dq = len(dq)
                 if len_dq < 1:
                     await asyncio.sleep(0.3)
@@ -1352,10 +1351,20 @@ def receiver(srfs, q,):
                 else:
                     status, bot_id, event = dq.pop()
                     if len_dq != 1:
-                        if status.id_str == dq[-1][0].id_str:
-                            if status.in_reply_to_screen_name != bot_id:
-                                p('重複簡易排除')
-                                continue
+                        bot_ids = []
+                        bot_ids.append(bot_id)
+                        if hasattr(status, 'id_str'):
+                            for i in range(len_dq-1):
+                                msg_status, msg_bot_id, msg_event = dq.pop()
+                                if hasattr(msg_status, 'id_str'):
+                                    if status.id_str != msg_status.id_str:
+                                        dq.appendleft((msg_status, msg_bot_id, msg_event))
+                                    elif msg_status.in_reply_to_screen_name == msg_bot_id:
+                                        bot_ids = [msg_bot_id]
+                                    else:
+                                        bot_ids.append(msg_bot_id)
+                                        p(msg_bot_id, '重複')
+                            bot_id = np.random.choice(bot_ids)
                 status = status._json
                 if event == 'event':
                     future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
@@ -1368,7 +1377,7 @@ def receiver(srfs, q,):
                     status['user']['name'] = status['sender']['name']
                     status['user']['id_str'] = status['sender']['id_str']
                     status['in_reply_to_status_id_str'] = None
-                    status['in_reply_to_screen_name'] = self.bot_id
+                    status['in_reply_to_screen_name'] = bot_id
                     status['extended_entities'] = status['entities']
                     status['retweeted'] = False
                     status['is_quote_status'] = False
@@ -1376,12 +1385,9 @@ def receiver(srfs, q,):
                 else:
                     raise
                 tasks = [future1]
-                #     # async_q.put_nowait(status)
-                # else:
-                #     raise
                 await asyncio.wait(tasks)
             except KeyboardInterrupt:
-                return False
+                break
             except:
                 _.log_err()
         # async_q = asyncio.Queue()
@@ -1421,27 +1427,19 @@ def init_srfs(bots):
         return srfs
 
 def main(is_experience = False):
-    # with multiprocessing.Manager() as manager:
-    if True:
-        # shared_ls = manager.list()
-        # lock = multiprocessing.Lock()
-        # twq = multiprocessing.Queue(maxsize = 0)
-        # q = queue.Queue(maxsize = 0)
-        from collections import deque
-        dq = deque()
-        # sq = _.SetQueue()
-        if not is_experience:
-            bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
-        else:
-            bots = ['LiveAI_Alpaca']
-            # bots = ['LiveAI_Umi',  'LiveAI_Nico']
-        srfs = init_srfs(bots)
-        for bot_id in bots:
-            twf = twtr_functions.TwtrTools(bot_id)
-            bot_process = threading.Thread(target = twf.Stream, args=(dq,), name = bot_id)
-            # process_queue.append(bot_process)
-            bot_process.start()
-        receiver(srfs, dq)
+    from collections import deque
+    dq = deque()
+    if not is_experience:
+        bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+    else:
+        # bots = ['LiveAI_Alpaca']
+        bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
+    srfs = init_srfs(bots)
+    for bot_id in bots:
+        twf = twtr_functions.TwtrTools(bot_id)
+        bot_process = threading.Thread(target = twf.Stream, args=(dq,), name = bot_id)
+        bot_process.start()
+    receiver(srfs, dq, bots)
 if __name__ == '__main__':
     main(0)
 
