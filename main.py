@@ -1346,7 +1346,7 @@ def receiver(srfs, q, bots):
             try:
                 len_dq = len(dq)
                 if len_dq < 1:
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.1)
                     continue
                 else:
                     status, bot_id, event = dq.pop()
@@ -1366,26 +1366,30 @@ def receiver(srfs, q, bots):
                                         p(msg_bot_id, '重複')
                             bot_id = np.random.choice(bot_ids)
                 status = status._json
-                if event == 'event':
-                    future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
-                elif event == 'status':
-                    future1 = loop.run_in_executor(None, srfs[bot_id].on_status_main, status)
-                elif event == 'direct_message':
-                    status = status['direct_message']
-                    status['user'] = {}
-                    status['user']['screen_name'] = status['sender_screen_name']
-                    status['user']['name'] = status['sender']['name']
-                    status['user']['id_str'] = status['sender']['id_str']
-                    status['in_reply_to_status_id_str'] = None
-                    status['in_reply_to_screen_name'] = bot_id
-                    status['extended_entities'] = status['entities']
-                    status['retweeted'] = False
-                    status['is_quote_status'] = False
-                    future1 = loop.run_in_executor(None, srfs[bot_id].on_direct_message_main, status)
-                else:
-                    raise
-                tasks = [future1]
-                await asyncio.wait(tasks)
+                # if event == 'event':
+                    # future1 = loop.run_in_executor(None, srfs[bot_id].on_event_main, status)
+                    # bot_process = threading.Thread(target = srfs[bot_id].on_event_main, args=(status,), name = bot_id)
+                    # bot_process.start()
+                if event == 'status':
+                #     future1 = loop.run_in_executor(None, srfs[bot_id].on_status_main, status)
+                    bot_process = threading.Thread(target = srfs[bot_id].on_status_main, args=(status,), name = bot_id)
+                    bot_process.start()
+                # elif event == 'direct_message':
+                #     status = status['direct_message']
+                #     status['user'] = {}
+                #     status['user']['screen_name'] = status['sender_screen_name']
+                #     status['user']['name'] = status['sender']['name']
+                #     status['user']['id_str'] = status['sender']['id_str']
+                #     status['in_reply_to_status_id_str'] = None
+                #     status['in_reply_to_screen_name'] = bot_id
+                #     status['extended_entities'] = status['entities']
+                #     status['retweeted'] = False
+                #     status['is_quote_status'] = False
+                #     future1 = loop.run_in_executor(None, srfs[bot_id].on_direct_message_main, status)
+                # else:
+                #     raise
+                # tasks = [future1]
+                # await asyncio.wait(tasks)
             except KeyboardInterrupt:
                 break
             except:
@@ -1434,12 +1438,12 @@ def main(is_experience = False):
     else:
         # bots = ['LiveAI_Alpaca']
         bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
-    srfs = init_srfs(bots)
+    # srfs = init_srfs(bots)
     for bot_id in bots:
         twf = twtr_functions.TwtrTools(bot_id)
         bot_process = threading.Thread(target = twf.Stream, args=(dq,), name = bot_id)
         bot_process.start()
-    receiver(srfs, dq, bots)
+    # receiver(srfs, dq, bots)
 if __name__ == '__main__':
     main(0)
 

@@ -12,7 +12,7 @@ import main
 class StreamListener(tweepy.streaming.StreamListener):
 	def __init__(self, bot_id = None, q = None):
 		super().__init__()
-		# self.srf = main.StreamResponseFunctions(bot_id)
+		self.srf = main.StreamResponseFunctions(bot_id)
 		self.bot_id = bot_id
 		self.q = q
 		self.keeping_alive_cnt = 0
@@ -28,7 +28,9 @@ class StreamListener(tweepy.streaming.StreamListener):
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
 		# self.srf.on_status_main(status._json)
-		self.q.append((status, self.bot_id, 'status'))
+		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
+		bot_process.start()
+		# self.q.append((status, self.bot_id, 'status'))
 		# self.q.put_nowait((status, self.bot_id, 'status'))
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
