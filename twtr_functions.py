@@ -21,7 +21,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
-		# return self.response_main.on_friends_main(friends)
+		return self.srf.on_friends_main(friends)
 		return True
 	def on_delete(self, status_id, user_id):
 		return True
@@ -35,11 +35,14 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		self.q.append((status, self.bot_id, 'direct_message'))
+		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id)
+		bot_process.start()
 		# self.q.put_nowait((status, self.bot_id, 'direct_message'))
 		return True
 	def on_event(self, status):
-		self.q.append((status, self.bot_id, 'event'))
+		# self.q.append((status, self.bot_id, 'event'))
+		bot_process = threading.Thread(target = self.srf.on_event_main, args=(status._json,), name = self.bot_id)
+		bot_process.start()
 		# self.q.put_nowait((status, self.bot_id, 'event'))
 		return True
 	def on_limit(self, track):

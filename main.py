@@ -273,10 +273,10 @@ class StreamResponseFunctions(MyObject):
                 screen_name = ''
             else:
                 return True
-        elif operate_sql.get_twlog_pool(n = 10).count(text) > 2:
-            ans = ''.join(['\n', text,'(パクツイ便乗)'])
-            if len(''.join([ans,'@',screen_name, ' '])) > 140:
-                ans = text
+        # elif operate_sql.get_twlog_pool(n = 10).count(text) > 2:
+        #     ans = ''.join(['\n', text,'(パクツイ便乗)'])
+        #     if len(''.join([ans,'@',screen_name, ' '])) > 140:
+        #         ans = text
         elif status['in_reply_to_screen_name'] in {None, self.bot_id}:
             special_response_word = _.crowlList(text = text, dic = self.tmp.response)
             if special_response_word:
@@ -940,6 +940,7 @@ class StreamResponseFunctions(MyObject):
             self.send(welcomeans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = mode)
 
         if ans:
+            p(ans)
             if delay_sec > 0:
                 set_time = self.get_time(hours = 0, seconds =  delay_sec, is_noised = True)
                 operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': 'tweet', 'to_whom': screen_name, 'when':set_time, 'tmpid': status_id, 'tmptext': ans})
@@ -1065,7 +1066,17 @@ class StreamResponseFunctions(MyObject):
     @_.forever(exceptions = Exception, is_print = True, is_logging = True)
     def on_direct_message_main(self, status):
         self.stats.DM_cnt += 1
+        status = status['direct_message']
         status['mode'] = 'dm'
+        status['user'] = {}
+        status['user']['screen_name'] = status['sender_screen_name']
+        status['user']['name'] = status['sender']['name']
+        status['user']['id_str'] = status['sender']['id_str']
+        status['in_reply_to_status_id_str'] = None
+        status['in_reply_to_screen_name'] = bot_id
+        status['extended_entities'] = status['entities']
+        status['retweeted'] = False
+        status['is_quote_status'] = False
         if not self.is_ignore(status):
             np.random.seed()
             #ツイートステータス情報追加処理
