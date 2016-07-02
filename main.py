@@ -1127,10 +1127,12 @@ class StreamResponseFunctions(MyObject):
             return False
         if userobject['favourites_count'] < 20:
             return False
-        if (userobject['listed_count'] / userobject['followers_count']) < 0.015:
-            return False
-        # ff_rate = userobject['followers_count'] / userobject['friends_count']
-        # if ff_rate < 0.7:
+        if userobject['followers_count'] > 5000:
+            return True
+        ff_rate = userobject['followers_count'] / userobject['friends_count']
+        if ff_rate < 0.7:
+            if (userobject['listed_count'] / userobject['followers_count']) < 0.02:
+                return False
         #     if userobject['followers_count'] < 1000:
         #         return False
         return True

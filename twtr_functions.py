@@ -41,7 +41,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def on_direct_message(self,status):
 		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		self.q.append(status)
+		# self.q.append(status)
 		# self.q.put_nowait((status, self.bot_id, 'direct_message'))
 		return True
 	def on_event(self, status):
