@@ -17,8 +17,8 @@ def get_ss(url):
 	return datas
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
-@webdata_sql.atomic()
-def get_ss_dialog_within(person = '', kw = 'カバン', n = 100000):
+# @webdata_sql.atomic()
+def get_ss_dialog_within(person = '', kw = 'カバン', n = 1000):
 	dialogs = SSdialog.select().where(SSdialog.text.contains(kw)).limit(n)
 	def _func(obj):
 		try:
@@ -29,7 +29,7 @@ def get_ss_dialog_within(person = '', kw = 'カバン', n = 100000):
 			if not person:
 				response_obj = SSdialog.select().where(SSdialog.id == rel_obj.id3).get()
 			else:
-				response_obj = SSdialog.select().where(SSdialog.id == rel_obj.id3, SSdialog.person.contains(person)).get()
+				response_obj = SSdialog.select().where(SSdialog.id == rel_obj.id3, SSdialog.person == person).get()
 		except DoesNotExist:
 			return None
 		return obj.text, response_obj.text

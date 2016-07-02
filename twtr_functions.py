@@ -10,13 +10,13 @@ import natural_language_processing
 import operate_sql
 import main
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, srf = None, q = None, lock = None):
+	def __init__(self, srf = None, q = None, lock = None, stop_event = None):
 		super().__init__()
 		self.srf = srf
-		# self.srf = main.StreamResponseFunctions(bot_id)
 		self.bot_id = srf.bot_id
 		self.q = q
 		self.lock = lock
+		self.stop_event = stop_event
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	def on_connect(self):
@@ -29,10 +29,13 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
+		# if self.stop_event.is_set():
+		# 	p('stop_event...')
+		# 	return False
+		# else:
 		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
 		self.q.append(status)
-		# self.q.put_nowait((status, self.bot_id, 'status'))
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
@@ -83,16 +86,17 @@ class TwtrTools(MyObject):
 		api_keys = cfg['twtr']
 		twtr_auths = {key: get_twtr_auth(value) for key, value in api_keys.items()}
 		twtr_apis = {key: tweepy.API(value, wait_on_rate_limit = True) for key, value in twtr_auths.items()}
-		# self.lock = lock
-		# self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
 	@_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	def user_stream(self, srf, q, lock):
+	def user_stream(self, srf, q, lock, stop_event):
 		auth = self.twtr_auth
 		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, q, lock), timeout = 300, async = True)
 		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
+		stop_event.wait()
+		p('stopping')
+		stream.running = False
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def filter_stream(self, twq = None, track=['python']):
 		auth = self.twtr_auth

@@ -1015,9 +1015,9 @@ class StreamResponseFunctions(MyObject):
                     tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
     def display_tweets(self, status):
             if not status['in_reply_to_screen_name'] is None:
-                print(''.join([self.default_character,'|', status['user']['name'], '|\n@', status['in_reply_to_screen_name'], status['text']]))
+                print(''.join([self.default_character,'|', status['user']['name'], '|\n@', status['in_reply_to_screen_name'], status['text'], '\n++++++++++++++++++++++++++++++++++']))
             else:
-                print(''.join([self.default_character,'|', status['user']['name'], '|\n', status['text']]))
+                print(''.join([self.default_character,'|', status['user']['name'], '|\n', status['text'], '\n++++++++++++++++++++++++++++++++++']))
     def status_dic(self, status):
         if status['id_str'].isdigit():
             status_dic = {
@@ -1330,7 +1330,7 @@ def test_stream(bot_id):
         i += 1
 import asyncio
 
-def receiver(srfs, q, lock):
+def monitor(bots, q, lock):
     # TODO -> insert_manyへ。
     async def save_tweets(q):
         while True:
@@ -1355,18 +1355,33 @@ def receiver(srfs, q, lock):
                 _.log_err()
     async def task_manage(period = 60):
         while True:
-            now = datetime.utcnow() + timedelta(hours = 9)
-            tasks = operate_sql.search_tasks(when = now, n = 10)
-            p('TASK', now)
-            if tasks:
-                try:
-                    for task in tasks:
-                        bot_id = task.who
-                        if bot_id in srfs:
-                            srfs[bot_id].implement_tasks(task._data)
-                except:
-                    _.log_err()
+            try:
+                now = datetime.utcnow() + timedelta(hours = 9)
+                tasks = operate_sql.search_tasks(when = now, n = 10)
+                p(threading.enumerate())
+                p('TASK', now)
+                if tasks:
+                    try:
+                        for task in tasks:
+                            bot_id = task.who
+                            if bot_id in bots:
+                                bots[bot_id].srf.implement_tasks(task._data)
+                    except:
+                        _.log_err()
+                await asyncio.sleep(period)
+            except KeyboardInterrupt:
+                break
+            except:
+                _.log_err()
+    async def restarter(period = 1800):
+        while True:
+            for bot_id, bot in bots.items():
+                await asyncio.sleep(20)
+                bot.restart()
             await asyncio.sleep(period)
+    async def _test(period = 20):
+        print('test')
+        await asyncio.sleep(period)
     async def fetch(dq, lock):
         while True:
             try:
@@ -1411,6 +1426,8 @@ def receiver(srfs, q, lock):
     asyncio.set_event_loop(loop)
     # asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
+    asyncio.ensure_future(restarter(period = 1800))#1800
+    # asyncio.ensure_future(_test(period = 20))
     try:
         loop.run_forever()
     finally:
@@ -1436,23 +1453,69 @@ def init_srfs(bots):
         loop.close()
         return srfs
 
+class LiveAI_Async(MyObject):
+    def __init__(self, bot_id, srfs, q, lock):
+        self.bot_id = bot_id
+        self.twf = twtr_functions.TwtrTools(bot_id)
+        self.srfs = srfs
+        self.srf = self.srfs[self.bot_id]
+        self.q = q
+        self.lock = lock
+        self.stop_event = threading.Event()
+        self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.stop_event), name = self.bot_id)
+    def run(self):
+        p('running thread')
+        self.bot_thread.start()
+    def stop(self):
+        p('stopping thread')
+        self.stop_event.set()
+        self.bot_thread.join()
+        self.stop_event.clear()
+    def restart(self):
+        p('restarting thread')
+        self.stop()
+        if not self.bot_thread.is_alive():
+            self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.stop_event), name = self.bot_id)
+            self.run()
+        else:
+            p('bot is aliving.. err')
+
 def main(is_experience = False):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
     if not is_experience:
-        bots = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+        bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     else:
-        bots = ['LiveAI_Alpaca']
+        bot_ids = ['LiveAI_Alpaca']
         # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
-    srfs = init_srfs(bots)
-    for bot_id in bots:
-        twf = twtr_functions.TwtrTools(bot_id)
-        bot_process = threading.Thread(target = twf.user_stream, args=(srfs[bot_id], dq, lock), name = bot_id)
-        bot_process.start()
-    receiver(srfs, dq, lock)
+    srfs = init_srfs(bot_ids)
+    bots = {}
+    for bot_id in bot_ids:
+        bot = LiveAI_Async(bot_id, srfs, dq, lock)
+        bots[bot_id] = bot
+        bot.run()
+    monitor(bots, dq, lock)
 if __name__ == '__main__':
     main(0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

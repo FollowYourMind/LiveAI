@@ -6,6 +6,8 @@ import _
 from _ import p, d, MyObject, MyException
 import operate_sql
 import queue
+# import concurrent.futures
+import random
 
 # from sklearn.cluster import KMeans
 # def kmeans(features, k=10):
@@ -852,11 +854,14 @@ class DialogObject(MyObject):
         self.s = s
         self.nlp_data = self.nlp_datas.main
         self.cleaned_s = _.clean_text(self.nlp_data.text, isKaigyouOFF = False)
-        self.keygen = self.keywords_gen()
-        # self.keywords = self._get_keywords(s)
+        # self.keygen = self.keywords_gen()
+        self.keywords = []
+        self.rel_words = []
+        self.tfidf = TFIDF()
+        self.get_kw_thread = threading.Thread(target = self._get_keywords, args=(s, ), name='get_kw')
+        self.get_kw_thread.start()
         if self.nlp_data.summary.function == '断定':
             self.save_fact()
-        self.tfidf = TFIDF()
     def is_fact(self):
         # talk_sql.create_tables([FactModel], True)
         try:
@@ -922,62 +927,50 @@ class DialogObject(MyObject):
                     wn_keywords = _.flatten(wn_dic.values())
                     for keyword in wn_keywords:
                         yield keyword
+    #
     def _get_keywords(self, s, needs= {'名詞', '固有名詞'}):
-        keywords = ''
-        if not keywords:
-            s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
-            keywords = self.tfidf.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
-            keywords = [kw for kw in keywords if not '@' in kw]
-        if keywords:
-            kw = keywords[0]
-            wn_dic = operate_sql.get_wordnet_result(lemma = kw)
-            if wn_dic:
-                keywords = _.flatten(wn_dic.values())
-        return keywords
+        s = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', s)
+        keywords = self.tfidf.extract_keywords_from_text(s, threshold = 50, n = 5, length = 1, is_print = False, needs = needs, random_cnt = 5)
+        keywords = [kw for kw in keywords if not '@' in kw]
+        self.keywords.extend(keywords)
+        if not self.keywords:
+            self.keywords = ['']
+        else:
+            random.shuffle(self.keywords)
+
+    def _get_rel_words(self):
+        if self.keywords:
+            for kw in self.keywords:
+                wn_dic = operate_sql.get_wordnet_result(lemma = kw)
+                if wn_dic:
+                    self.rel_words.extend(_.flatten(wn_dic.values()))
+
     @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
     @webdata_sql.atomic()
-    def ss_log_sender(self, q, person = '', n = 100):
+    def ss_log_sender(self, kw, q, person = '', n = 100):
         dialogs = None
-        try:
-            for i in range(3):
-                try:
-                    kw = next(self.keygen)
-                except StopIteration:
-                    break
-                dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
-                if not dialogs is None:
-                    for d in dialogs:
-                        msg = [d[0][1:-1], d[1][1:-1]]
-                        _.queue_put(q, msg, timeout = 5)
-        finally:
-            q.close()
-            q.join_thread()
+        dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
+        if not dialogs is None:
+            for d in dialogs:
+                q.append((d[0][1:-1], d[1][1:-1]))
     @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
     @twlog_sql.atomic()
-    def tweet_log_sender(self, q, UserList = [], BlackList = [], n = 100):
+    def tweet_log_sender(self, kw, q, UserList = [], BlackList = [], n = 100):
         dialogs = None
         try:
-            for i in range(10):
-                try:
-                    kw = next(self.keygen)
-                except StopIteration:
-                    break
-                try:
-                    if not UserList:
-                        dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
-                    else:
-                        dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
-                except DoesNotExist:
-                    continue
-                else:
-                    if not dialogs is None:
-                        for d in dialogs:
-                            msg = [d.textA, d.textB]
-                            _.queue_put(q, msg, timeout = 5)
-        finally:
-            q.close()
-            q.join_thread()
+            if not UserList:
+                dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList).order_by(TwDialog.posi.desc()).limit(n)
+            else:
+                dialogs = TwDialog.select().where(TwDialog.textA.contains(kw), ~TwDialog.nameB << BlackList, TwDialog.nameB << UserList).order_by(TwDialog.posi.desc()).limit(n)
+        except DoesNotExist:
+            pass
+        else:
+            if not dialogs is None:
+                for d in dialogs:
+                    q.append((d.textA, d.textB))
     def adjust_ans(self, ans):
+        if ans is None:
+            return ''
         ans = self._get_longest_split(ans, split_word = '」')
         ans = self._get_longest_split(ans, split_word = '「')
         ans = self._get_longest_split(ans, split_word = '。')
@@ -1028,36 +1021,49 @@ class DialogObject(MyObject):
         s = _.clean_text(s, isKaigyouOFF = False)
         self.cleaned_s = s
         d_ls = []
-        senders = []
-        receivers = []
+        threads = []
         try:
-            self.tfidf.precalc_s1_tfidf(self.cleaned_s)
-            q = multiprocessing.Queue(maxsize = 0)
-            parent_conn, child_conn = multiprocessing.Pipe()
+            self.get_kw_thread.join()
+            precalc_thread = threading.Thread(target = self.tfidf.precalc_s1_tfidf, args=(self.cleaned_s, ), name='pre_calc')
+            precalc_thread.daemon = True
+            threads.append(precalc_thread)
+            precalc_thread.start()
+            q = []
+            need_cnt = 3
+            #########################
+            #I/O operations
             if 'SS' in tools:
                 if character == 'sys':
                     person = ''
                 else:
                     person = character
-                process = multiprocessing.Process(target = self.ss_log_sender, args=(q, person, 400), name='Sender-SS')
-                senders.append(process)
-                process.start()
-            if 'LOG' in tools:
-                process = multiprocessing.Process(target = self.tweet_log_sender, args=(q, UserList, BlackList, 20), name='Sender-Twlog')
-                senders.append(process)
-                process.start()
+                for kw in self.keywords[:need_cnt]:
+                    process = threading.Thread(target = self.ss_log_sender, args=(kw, q, person, 400), name='Sender-SSrel[{}]'.format(kw))
+                    threads.append(process)
+                    process.start()
+            kw_cnt = len(self.keywords)
+            short_kw = need_cnt - kw_cnt
+            if short_kw > 0:
+                self._get_rel_words()
+                for kw in self.rel_words[:short_kw]:
+                    process = threading.Thread(target = self.ss_log_sender, args=(kw, q, person, 400), name='Sender-SSrel[{}]'.format(kw))
+                    threads.append(process)
+                    process.start()
+            # if 'LOG' in tools:
+            #     process = threading.Thread(target = self.tweet_log_sender, args=(q, UserList, BlackList, 20), name='Sender-Twlog')
+            #     threads.append(process)
+            #     process.start()
+            for thread in threads:
+                if thread.is_alive():
+                    thread.join()
             #Receiver
             ans  = self.receiver(q, min_similarity = min_similarity)
-            for rest_process in senders + receivers:
-                rest_process.join()
             if not ans:
                 if 'MC' in tools:
                     trigram_markov_chain_instance = TrigramMarkovChain(character)
-                    ans = trigram_markov_chain_instance.generate(word = next(self.keygen), is_randomize_metasentence = is_randomize_metasentence)
-            if not ans:
-                if 'MC' in tools:
-                    trigram_markov_chain_instance = TrigramMarkovChain(character)
-                    ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = is_randomize_metasentence)
+                    ans = trigram_markov_chain_instance.generate(word = self.keywords.pop(), is_randomize_metasentence = is_randomize_metasentence)
+                    if not ans:
+                        ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = is_randomize_metasentence)
             if not ans:
                 raise
         except StopIteration as e:
@@ -1075,15 +1081,8 @@ class DialogObject(MyObject):
 
     def receiver(self, q, min_similarity = 0, laplace = 0.02):
         d_ls = []
-        while True:
-            try:
-                d_msg = q.get(timeout = 5)
-            except queue.Empty:
-                break
-            else:
-                if d_msg:
-                    cos_sim = self.tfidf.calc_cosine_similarity(s1 = self.cleaned_s, s2 = d_msg[0])
-                    d_ls.append((cos_sim, d_msg[1]))
+        if q:
+            d_ls = [(self.tfidf.calc_cosine_similarity(s1 = self.cleaned_s, s2 = msg[0]), msg[1]) for msg in q]
         if d_ls:
             sorted_d_ls = sorted(d_ls, key = lambda x: x[0], reverse = True)
             if not sorted_d_ls:
@@ -1092,21 +1091,19 @@ class DialogObject(MyObject):
             if not sorted_d_ls:
                 return ''
             sorted_d_ls = _.f7(sorted_d_ls)
-            kwcnt = len(sorted_d_ls)
+            texts = np.array([x[1] for x in sorted_d_ls])
             tf_idf = np.array([float(x[0]) for x in sorted_d_ls])
             per = np.sum(tf_idf)
             rand_p = tf_idf / per
-            d_dic = {text: sim for sim, text in sorted_d_ls}
-            ans = np.random.choice([x[1] for x in sorted_d_ls], 1, replace = False, p = rand_p)[0]
+            ans = np.random.choice(texts, 1, replace = False, p = rand_p)[0]
             return ans
-            # return ''.join([ans, ' \n(', str(d_dic[ans]-laplace), ')'])
 if __name__ == '__main__':
     import sys
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''暑い''' 
+    text = '''おっぱい''' 
     UserLists = {
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
@@ -1127,10 +1124,11 @@ if __name__ == '__main__':
     # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
     # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
     # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
+    person = '海未'
     while True:
         d_obj = DialogObject(text)
-        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '花陽', tools = 'SSMC', username = '@〜〜')
-        p('海未', ansu)
+        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'SSMC', username = '@〜〜')
+        p(person, ansu)
         break
         # d_obj = DialogObject(ansu)
         # ansh = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '穂乃果', tools = 'SSMC', username = '@〜〜')
