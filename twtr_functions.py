@@ -54,7 +54,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
-		return False
+		raise exception
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True
@@ -87,6 +87,7 @@ class TwtrTools(MyObject):
 		# self.twq = twq
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
+	@_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def user_stream(self, srf, q, lock):
 		auth = self.twtr_auth

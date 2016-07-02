@@ -1129,10 +1129,10 @@ class StreamResponseFunctions(MyObject):
             return False
         if (userobject['listed_count'] / userobject['followers_count']) < 0.015:
             return False
-        ff_rate = userobject['followers_count'] / userobject['friends_count']
-        if ff_rate < 0.7:
-            if userobject['followers_count'] < 1000:
-                return False
+        # ff_rate = userobject['followers_count'] / userobject['friends_count']
+        # if ff_rate < 0.7:
+        #     if userobject['followers_count'] < 1000:
+        #         return False
         return True
     @_.forever(exceptions = Exception, is_print = False, is_logging = True, ret = True)
     def monitoring(self):
@@ -1409,7 +1409,7 @@ def receiver(srfs, q, lock):
     print('starting '+ process.name)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.ensure_future(multi_fetch(q, lock))
+    # asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
     try:
         loop.run_forever()
