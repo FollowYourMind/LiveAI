@@ -1076,7 +1076,7 @@ class StreamResponseFunctions(MyObject):
         status['user']['name'] = status['sender']['name']
         status['user']['id_str'] = status['sender']['id_str']
         status['in_reply_to_status_id_str'] = None
-        status['in_reply_to_screen_name'] = bot_id
+        status['in_reply_to_screen_name'] = self.bot_id
         status['extended_entities'] = status['entities']
         status['retweeted'] = False
         status['is_quote_status'] = False
@@ -1181,14 +1181,13 @@ class StreamResponseFunctions(MyObject):
         #     post20min = self.get_time(minutes = 30)
         #     operate_sql.update_task(who_ls = [self.bot_id], kinds = [todo], taskdict = {'status': 'end'})
         #     operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
-        # elif todo == 'teikiMC':
-        #     p('MC')
-        #     ans = ''
-        #     trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
-        #     ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
-        #     p(ans)
-        #     ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
-        #     task_restart()
+        elif todo == 'teikiMC':
+            p('MC')
+            ans = ''
+            trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
+            ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
+            ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
+            task_restart()
         # elif todo == 'teiki.trendword':
         #     trendwords = self.twf.getTrendwords()
         #     trendword = np.random.choice(trendwords)
@@ -1373,7 +1372,7 @@ def monitor(bots, q, lock):
                 break
             except:
                 _.log_err()
-    async def restarter(period = 1800):
+    async def restarter(period = 1200):
         while True:
             await asyncio.sleep(period)
             for bot_id, bot in bots.items():
@@ -1424,7 +1423,7 @@ def monitor(bots, q, lock):
     print('starting '+ process.name)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    # asyncio.ensure_future(multi_fetch(q, lock))
+    asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
     asyncio.ensure_future(restarter(period = 1800))#1800
     # asyncio.ensure_future(_test(period = 20))
