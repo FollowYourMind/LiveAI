@@ -1181,13 +1181,13 @@ class StreamResponseFunctions(MyObject):
         #     post20min = self.get_time(minutes = 30)
         #     operate_sql.update_task(who_ls = [self.bot_id], kinds = [todo], taskdict = {'status': 'end'})
         #     operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
-        elif todo == 'teikiMC':
-            p('MC')
-            ans = ''
-            trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
-            ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
-            ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
-            task_restart()
+        # elif todo == 'teikiMC':
+        #     p('MC')
+        #     ans = ''
+        #     trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
+        #     ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
+        #     ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
+        #     task_restart()
         # elif todo == 'teiki.trendword':
         #     trendwords = self.twf.getTrendwords()
         #     trendword = np.random.choice(trendwords)
@@ -1235,16 +1235,13 @@ class StreamResponseFunctions(MyObject):
         elif todo == 'reconnect_wifi':
             _.reconnect_wifi()
             task_restart()
-        elif todo == 'reload_modules':
-            importlib.reload(natural_language_processing)
-            importlib.reload(dialog_generator)
-            importlib.reload(game_functions)
-            # importlib.reload(twtr_functions)
-            task_restart()
-        elif todo == 'restart_program':
-            print('restrarting_program...')
-            # _.restart_program()
-            raise KeyboardInterrupt
+        # elif todo == 'reload_modules':
+        #     importlib.reload(natural_language_processing)
+        #     importlib.reload(dialog_generator)
+        #     importlib.reload(game_functions)
+        #     # importlib.reload(twtr_functions)
+        #     task_restart()
+
         elif todo == 'update_userprofile':
             # self.bot_profile = self.twf.twtr_api.me()
             # if not 'まねっこ' in self.bot_profile.location:
@@ -1496,7 +1493,7 @@ def main(is_experience = False):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(0)
+    main(1)
 
 
 
