@@ -1358,7 +1358,7 @@ def monitor(bots, q, lock):
             try:
                 now = datetime.utcnow() + timedelta(hours = 9)
                 tasks = operate_sql.search_tasks(when = now, n = 10)
-                p(threading.enumerate())
+                # p(threading.enumerate())
                 p('TASK', now)
                 if tasks:
                     try:
@@ -1375,10 +1375,10 @@ def monitor(bots, q, lock):
                 _.log_err()
     async def restarter(period = 1800):
         while True:
+            await asyncio.sleep(period)
             for bot_id, bot in bots.items():
                 await asyncio.sleep(20)
                 bot.restart()
-            await asyncio.sleep(period)
     async def _test(period = 20):
         print('test')
         await asyncio.sleep(period)
