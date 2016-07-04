@@ -103,6 +103,8 @@ class StreamResponseFunctions(MyObject):
             self.default_character = '希'
         if bot_id == 'LiveAI_Nico':
             self.default_character = 'にこ'
+        if bot_id == 'LiveAI_Yukiho':
+            self.default_character = '雪穂'
         if bot_id == 'LiveAI_Alpaca':
             self.default_character = 'sys'
         self.bot_id = bot_id
@@ -521,39 +523,41 @@ class StreamResponseFunctions(MyObject):
                 filenames = _.saveMedias(status, ID = fileID, DIR = DIRIMGtmp)
                 filename = filenames[0]
                 label = ''
-                # pic = opencv_functions.read_img(filename)
-                # p('readed')
-                # is_bar_detected, zbarans = opencv_functions.passzbar(pic)
-                # if is_bar_detected:
-                #     img_kind = zbarans[0].decode('utf-8')
-                #     zbarans = zbarans[1].decode('utf-8')
-                # else:
-                # label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR = '')
-                # p(img_kind)
-                ans = 'saved工事中'
-                # if img_kind in {'QR-Code'}:
-                #     ans = zbarans
-                #     filename = ''
-                # elif img_kind == 'anime':
-                #     p('anime')
-                #     ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
-                #     drc = '/'.join([DIRIMGfeedback, label])
-                #     if os.path.exists(drc) == False:
-                #         os.mkdir(drc)
-                #     shutil.copy(filename, drc)
-                #     userinfo.mode = 'confirm.tag.img'
-                #     userinfo.tmpFile = '/'.join([drc, filename.split('/')[-1]])
-                #     filename = IMGfile
-                # elif img_kind == 'cat':
-                #     ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
-                #     filename = IMGfile
-                # else:
-                #     ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
-                #     filename = ''
-                #     userinfo.mode = 'dialog'
-                # p(ans)
-                # if not ans:
-                #     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
+                pic = opencv_functions.read_img(filename)
+                p('readed')
+                try:
+                    is_bar_detected, zbarans = opencv_functions.passzbar(pic)
+                    if is_bar_detected:
+                        img_kind = zbarans[0].decode('utf-8')
+                        zbarans = zbarans[1].decode('utf-8')
+                    else:
+                        label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR  = '')
+                    if img_kind in {'QR-Code'}:
+                        ans = zbarans
+                        filename = ''
+                    elif img_kind == 'anime':
+                        p('anime')
+                        ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
+                        drc = '/'.join([DIRIMGfeedback, label])
+                        if os.path.exists(drc) == False:
+                            os.mkdir(drc)
+                        shutil.copy(filename, drc)
+                        userinfo.mode = 'confirm.tag.img'
+                        userinfo.tmpFile = '/'.join([drc, filename.split('/')[-1]])
+                        filename = IMGfile
+                    elif img_kind == 'cat':
+                        ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
+                        filename = IMGfile
+                    else:
+                        ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
+                        filename = ''
+                        userinfo.mode = 'dialog'
+                    p(ans)
+                except:
+                    _.log_err()
+                    ans = ''
+                if not ans:
+                    ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
         elif userinfo.cnt > 6 and mode != 'dm':
             ans = operate_sql.get_phrase(status =  'cntOver', n = 20, character = character)
@@ -1183,13 +1187,12 @@ class StreamResponseFunctions(MyObject):
         #     post20min = self.get_time(minutes = 30)
         #     operate_sql.update_task(who_ls = [self.bot_id], kinds = [todo], taskdict = {'status': 'end'})
         #     operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': todo, 'to_whom': '', 'when':post20min})
-        # elif todo == 'teikiMC':
-        #     p('MC')
-        #     ans = ''
-        #     trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
-        #     ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
-        #     ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
-        #     task_restart()
+        elif todo == 'teikiMC':
+            ans = ''
+            trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
+            ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
+            ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
+            task_restart()
         # elif todo == 'teiki.trendword':
         #     trendwords = self.twf.getTrendwords()
         #     trendword = np.random.choice(trendwords)
@@ -1483,9 +1486,9 @@ def main(is_experience = False):
     dq = deque()
     lock = threading.Lock()
     if not is_experience:
-        bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+        bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico', 'LiveAI_Yukiho']
     else:
-        bot_ids = ['LiveAI_Alpaca']
+        bot_ids = ['LiveAI_Yukiho']
         # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
     srfs = init_srfs(bot_ids)
     bots = {}
@@ -1495,7 +1498,10 @@ def main(is_experience = False):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(1)
+    main(0)
+    # trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain('雪穂')
+    # ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
+    # p(ans)
 
 
 

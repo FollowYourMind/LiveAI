@@ -6,6 +6,7 @@ from _ import p, d, MyObject, MyException
 import urllib
 import os
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 import bs4
 # MY PROGRAMs
@@ -28,6 +29,19 @@ def get_bs4soup(url):
 	# ss = driver.execute_script('return loadDisqus();')
 	# p(ss)
 	return soup
+def get_googlemap(url = 'https://notendur.hi.is/~sfg6/google_maps_example/'):
+	USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+	phantomjs_path = '/usr/local/bin/phantomjs'
+	driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
+	# get a HTML response
+	driver.set_window_size(1280, 800)
+	driver.get(url)
+	html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+	soup = bs4.BeautifulSoup(html, 'lxml')
+	p(soup)
+	time.sleep(5)
+	driver.save_screenshot('test_google_maps_api_screenshot.png')
+
 def extract_ss(url = 'http://www.lovelive-ss.com/?p={}'):
 	soup = get_bs4soup(url)
 	title = soup.find('h1', class_="entry-title")
@@ -133,22 +147,68 @@ if __name__ == '__main__':
 	site_url = 'http://www.lovelive-ss.com/?p={}'
 	# range(4538, 8000):
 	# reg = natural_language_processing.RegexTools()
-	# for ss_number in range(4557, 8000):
-	# 	p(ss_number)
-	# 	try:
-	# 		url = site_url.format(ss_number)
-	# 		ss_ls = extract_ss(url = url)
-	# 		if ss_ls:
-	# 			operate_sql.save_ss(url = url, texts = ss_ls)
-	# 		# datas = operate_sql.get_ss(url = url)
-	# 		# text = ''.join([data.text for data in datas])
-	# 		# p(reg.extract_discorse(text))
-	# 		# operate_sql.save_ss_dialog(url)
-	# 	except Exception as e:
-			# d(e)
+	# filename = '/Users/masaMikam/Dropbox/Project/LiveAI/test_google_maps_api_screenshot.png'
+	# url = 'https://www.google.co.jp/searchbyimage?image_url={}&encoded_image=&image_content=&filename=&hl=ja'.format(filename)
+	# soup = get_bs4soup(url)
+	# p(soup)
+	xkey = '海未'
+	# converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
+	# g_url = 'https://www.google.co.jp/search?q={}&tbm=isch'.format(converted_word)
+	# get_googlemap(url = g_url)
+
+	 # リアルタイム検索
+	# USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+	# phantomjs_path = '/usr/local/bin/phantomjs'
+	# driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
+	# driver.get("http://realtime.search.yahoo.co.jp/realtime")
+	# elem = driver.find_element_by_name('p')
+	# elem.clear()
+	# elem.send_keys(xkey)
+	# # driver.find_element_by_name("input.b").click()
+	# elem.send_keys(Keys.RETURN)
+	# # driver.find_element_by_tag_name("body")
+	# time.sleep(1)
+	# html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+	# soup = bs4.BeautifulSoup(html, 'lxml')
+	# ptext = soup.findAll('script')
+	# pstr = ''.join([p.get_text() for p in ptext])
+	# reg = 'YAHOO.JP.srch.rt.sentiment = (?P<json>.+)'
+	# compiled_reg = re.compile(reg, re.M)
+	# reg_ls = compiled_reg.search(pstr)
+	# if reg_ls:
+	# 	reg_ls_json = reg_ls.groupdict()
+	# 	senti_json = reg_ls_json['json']
+	# 	if senti_json:
+	# 		sentiment_dic = json.loads(senti_json)
+	# 		p(sentiment_dic)
+
+
+
+	# return sentiment_dic
+	# import threading
+	# threads = []
+	for ss_number in range(4561, 10000):
+		p(ss_number)
+		try:
+			url = site_url.format(ss_number)
+			ss_ls = extract_ss(url = url)
+			# if ss_ls:
+			# 	operate_sql.save_ss(url, ss_ls)
+
+			datas = operate_sql.get_ss(url = url)
+			text = ''.join([data.text for data in datas])
+			# p(reg.extract_discorse(text))
+			operate_sql.save_ss_dialog(url)
+		except Exception as e:
+			d(e)
 		# time.sleep(1+np.random.rand()*3)
+	# for thread in threads:
+	# 	if thread.is_alive():
+	# 		thread.join()
+
+
 	# p(1+np.random.rand()*3)
-	operate_sql.save_ss(url = url, texts = ['a', 'ss'])
+	# operate_sql.save_ss(url = url, texts = ['a', 'ss'])
 	# extract_ss(url = 'http://www.lovelive-ss.com/?p=22')
 	# p(os.environ['PATH'])
 	# print(search_wiki(word = '官僚制'))

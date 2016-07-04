@@ -9,6 +9,15 @@ from _ import p, d, MyObject, MyException
 import threading
 from contextlib import contextmanager
 # @_.timeit
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
+# @webdata_sql.atomic()
+def save_ss(url, texts):
+	data_source = [{'url': url, 'text': text} for text in texts]
+	# SS.insert_many(row_dicts).execute()
+	with webdata_sql.atomic():
+    		for data_dict in data_source:
+        			SS.create(**data_dict)
+
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @webdata_sql.atomic()
@@ -34,8 +43,9 @@ def get_ss_dialog_within(person = '', kw = 'カバン', n = 1000):
 			return None
 		return obj.text, response_obj.text
 	return _.compact([_func(dialog_obj) for dialog_obj in dialogs])
+	
+reg = natural_language_processing.RegexTools()
 def save_ss_dialog(url):
-	reg = natural_language_processing.RegexTools()
 	@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 	@webdata_sql.atomic()
 	def _save_ssdialog():

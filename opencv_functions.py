@@ -143,18 +143,18 @@ def FaceRecognition(filename = testpic, isShow = True, saveStyle = 'icon', workD
 			thickness = frameSetting['thickness']
 			image = frame[Ftop+thickness: Fbottom-thickness, Fleft+thickness:Fright-thickness]
 			margin = int(min((Fbottom-Ftop)/4, Ftop, height-Fbottom, Fleft, width-Fright))
-			p(margin)
+			# p(margin)
 			icon = frame[Ftop-margin:Fbottom+margin, Fleft-margin:Fright+margin]
 			# cv2.rectangle(frame, (Fleft, Ftop), (Fright, Fbottom), frameSetting['color'], thickness = thickness)
 			if not saveStyle:
+				altfilename = filename
+			else:
 				altfilename = getAltName(filename, workDIR = workDIR, kind1 = 'CV_', kind2 = 'FACE_', kind3 = saveStyle + str(i))
 				if saveStyle == 'icon':
 					cv2.imwrite(altfilename, image)
 				else:
 					cv2.rectangle(frame, (Fleft, Ftop), (Fright, Fbottom), frameSetting['color'], thickness = thickness)
 					cv2.imwrite(altfilename, frame)
-			else:
-				altfilename = filename
 		else:
 			image = frame 
 			altfilename = filename
