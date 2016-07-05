@@ -497,6 +497,7 @@ class StreamResponseFunctions(MyObject):
         elif 'media' in status['entities'] and status['in_reply_to_screen_name'] in {self.bot_id}:
             userinfo.cnt = 0
             fileID = self.now.strftime('%Y%m%d%H%M%S')
+            self.twf.give_fav(status_id)
             if 'update' in text:
                 if 'icon' in text or 'アイコン' in text:
                     self.bot_profile.abs_icon_filename = _.saveImg(media_url = status['extended_entities']['media'][0]['media_url'].replace('_normal', ''), DIR = ''.join([DIRusers,'/',self.bot_id]), filename = '_'.join([screen_name, fileID, 'icon.jpg']))
@@ -524,7 +525,6 @@ class StreamResponseFunctions(MyObject):
                 filename = filenames[0]
                 label = ''
                 pic = opencv_functions.read_img(filename)
-                p('readed')
                 try:
                     is_bar_detected, zbarans = opencv_functions.passzbar(pic)
                     if is_bar_detected:
@@ -536,7 +536,6 @@ class StreamResponseFunctions(MyObject):
                         ans = zbarans
                         filename = ''
                     elif img_kind == 'anime':
-                        p('anime')
                         ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
                         drc = '/'.join([DIRIMGfeedback, label])
                         if os.path.exists(drc) == False:
@@ -872,6 +871,18 @@ class StreamResponseFunctions(MyObject):
                     ans = '\n- '.join(['[現在のトレンドワード]']+self.tmp.trendwords_ls[:10])
                 elif nlp_summary.akkusativ in {'経験値', 'exp', 'EXP', 'Exp'}:
                     ans = '\n'.join(['[現在の経験値]:', str(userinfo.exp)])
+        elif nlp_summary.value in {'分析する', '感情分析する'}:
+            if nlp_summary.has_function('希望', '要望'):        
+                self.twf.give_fav(status_id)  
+                sentiment_dic = crawling.analyse_sentiment_yahoo(word = nlp_summary.akkusativ)
+                active = sentiment_dic['active']
+                if active == 'negative':
+                    senti_icon = '😡'
+                elif active == 'positive':
+                    senti_icon = '😊'
+                else:
+                    senti_icon = '🐥'
+                ans = '\n感情分析: {word} {senti_icon}{active}\n{posiscore}%がポジティブ\n{neutralscore}%が中立\n{negascore}%がネガティブ'.format(word = nlp_summary.akkusativ, senti_icon = senti_icon, active = active, posiscore = sentiment_dic['scores']['positive'], neutralscore = sentiment_dic['scores']['neutral'], negascore = sentiment_dic['scores']['negative'])
         #----------------
         # Omikuji
         elif nlp_summary.value in {'御籤する', '占う'}:
@@ -1193,12 +1204,21 @@ class StreamResponseFunctions(MyObject):
             ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
             ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
             task_restart()
-        # elif todo == 'teiki.trendword':
-        #     trendwords = self.twf.getTrendwords()
-        #     trendword = np.random.choice(trendwords)
+        elif todo == 'teiki.trendword':
+            trendwords = self.twf.getTrendwords()
+            trendword = np.random.choice(trendwords)
+            sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
+            active = sentiment_dic['active']
+            if active == 'negative':
+                senti_icon = '😡'
+            elif active == 'positive':
+                senti_icon = '😊'
+            else:
+                senti_icon = '🐥'
+            ans = 'トレンドワード感情分析: {trendword} {senti_icon}\n{score}%が{active}'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
         #     ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
-        #     self.tmp.trendwords_ls = trendwords
-        #     task_restart()
+            self.tmp.trendwords_ls = trendwords
+            task_restart()
         elif todo == 'followback_check':
             followers = self.twf.get_followers_all(self.bot_id)
             not_followbacked_followers_objects = [obj._json for obj in followers if obj._json['following'] != True and self.check_if_follow(obj._json)]
@@ -1488,7 +1508,7 @@ def main(is_experience = False):
     if not is_experience:
         bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico', 'LiveAI_Yukiho']
     else:
-        bot_ids = ['LiveAI_Yukiho']
+        bot_ids = ['LiveAI_Alpaca']
         # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
     srfs = init_srfs(bot_ids)
     bots = {}
@@ -1498,7 +1518,18 @@ def main(is_experience = False):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(0)
+    main(1)
+    # trendword = 'スクフェス'
+    # sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
+    # active = sentiment_dic['active']
+    # if active == 'negative':
+    #     senti_icon = '😡'
+    # elif active == 'positive':
+    #     senti_icon = '😊'
+    # else:
+    #     senti_icon = '🐥'
+    # ans = 'トレンドワード感情分析: {trendword} {senti_icon}\n{score}%が{active}'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
+    # p(ans)
     # trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain('雪穂')
     # ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
     # p(ans)

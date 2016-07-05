@@ -1120,21 +1120,21 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''海未（この待ち時間、というのも風俗の醍醐味の一つではありますね。）   '''    # text = 'したい'
+    text = '''「スクフェス」を分析して   '''    # text = 'したい'
     # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
     # p(np.random.choice(a))
     # reg = RegexTools()
     # p(reg.extract_discorse(text))
-    text = 'a'
-    p(text[:3])
+    # text = 'a'
+    # p(text[:3])
     # aa = ['a', tmp, 'b', 'a', 'c', 'd', 'e']
     # import random
     # p(random.sample(aa, 3))
     # p(MA.get_mecab_ls(text))
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
-    # nlp_data = NLPdatas(text).main
-    # p(nlp_data.summary)
+    nlp_data = NLPdatas(text).main
+    p(nlp_data.summary)
     # p(nlp_data.summary.has_function('希望', '要望', '勧誘'))
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =  'yes', character = character)

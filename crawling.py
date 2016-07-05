@@ -127,6 +127,30 @@ def get_ss(word = 'クロマニョン人'):
 	except Exception as e:
 		d(e)
 		return ''.join(['\'', word, '\'に一致する語は見つかりませんでした。'])
+def analyse_sentiment_yahoo(word = ''):
+	 # リアルタイム検索
+	USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+	phantomjs_path = '/usr/local/bin/phantomjs'
+	driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
+	driver.get("http://realtime.search.yahoo.co.jp/realtime")
+	elem = driver.find_element_by_name('p')
+	elem.clear()
+	elem.send_keys(word)
+	elem.send_keys(Keys.RETURN)
+	time.sleep(1)
+	html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+	soup = bs4.BeautifulSoup(html, 'lxml')
+	ptext = soup.findAll('script')
+	pstr = ''.join([p.get_text() for p in ptext])
+	reg = 'YAHOO.JP.srch.rt.sentiment = (?P<json>.+)'
+	compiled_reg = re.compile(reg, re.M)
+	reg_ls = compiled_reg.search(pstr)
+	if reg_ls:
+		reg_ls_json = reg_ls.groupdict()
+		senti_json = reg_ls_json['json']
+		if senti_json:
+			sentiment_dic = json.loads(senti_json)
+			return sentiment_dic
 if __name__ == '__main__':
 	import sys
 	import io
@@ -151,56 +175,32 @@ if __name__ == '__main__':
 	# url = 'https://www.google.co.jp/searchbyimage?image_url={}&encoded_image=&image_content=&filename=&hl=ja'.format(filename)
 	# soup = get_bs4soup(url)
 	# p(soup)
-	xkey = '海未'
+	xkey = 'スクフェスのアイコン'
 	# converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
 	# g_url = 'https://www.google.co.jp/search?q={}&tbm=isch'.format(converted_word)
 	# get_googlemap(url = g_url)
-
-	 # リアルタイム検索
-	# USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
-	# phantomjs_path = '/usr/local/bin/phantomjs'
-	# driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
-	# driver.get("http://realtime.search.yahoo.co.jp/realtime")
-	# elem = driver.find_element_by_name('p')
-	# elem.clear()
-	# elem.send_keys(xkey)
-	# # driver.find_element_by_name("input.b").click()
-	# elem.send_keys(Keys.RETURN)
-	# # driver.find_element_by_tag_name("body")
-	# time.sleep(1)
-	# html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
-	# soup = bs4.BeautifulSoup(html, 'lxml')
-	# ptext = soup.findAll('script')
-	# pstr = ''.join([p.get_text() for p in ptext])
-	# reg = 'YAHOO.JP.srch.rt.sentiment = (?P<json>.+)'
-	# compiled_reg = re.compile(reg, re.M)
-	# reg_ls = compiled_reg.search(pstr)
-	# if reg_ls:
-	# 	reg_ls_json = reg_ls.groupdict()
-	# 	senti_json = reg_ls_json['json']
-	# 	if senti_json:
-	# 		sentiment_dic = json.loads(senti_json)
-	# 		p(sentiment_dic)
+	a = analyse_sentiment_yahoo(word = xkey)
+	p(a)
 
 
 
 	# return sentiment_dic
 	# import threading
 	# threads = []
-	for ss_number in range(4561, 10000):
-		p(ss_number)
-		try:
-			url = site_url.format(ss_number)
-			ss_ls = extract_ss(url = url)
-			# if ss_ls:
-			# 	operate_sql.save_ss(url, ss_ls)
+	# for ss_number in range(4561, 10000):
+	# 	p(ss_number)
+	# 	try:
+	# 		url = site_url.format(ss_number)
+	# 		ss_ls = extract_ss(url = url)
+	# 		# if ss_ls:
+	# 		# 	operate_sql.save_ss(url, ss_ls)
 
-			datas = operate_sql.get_ss(url = url)
-			text = ''.join([data.text for data in datas])
-			# p(reg.extract_discorse(text))
-			operate_sql.save_ss_dialog(url)
-		except Exception as e:
-			d(e)
+	# 		datas = operate_sql.get_ss(url = url)
+	# 		text = ''.join([data.text for data in datas])
+	# 		# p(reg.extract_discorse(text))
+	# 		operate_sql.save_ss_dialog(url)
+	# 	except Exception as e:
+	# 		d(e)
 		# time.sleep(1+np.random.rand()*3)
 	# for thread in threads:
 	# 	if thread.is_alive():
