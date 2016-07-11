@@ -1423,7 +1423,7 @@ def monitor(bots, q, lock):
     print('starting '+ process.name)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.ensure_future(multi_fetch(q, lock))
+    # asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
     asyncio.ensure_future(restarter(period = 1800))#1800
     # asyncio.ensure_future(_test(period = 20))
@@ -1483,7 +1483,7 @@ def main(cmd = 1):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
-    bot_ids = ['LiveAI_Alpaca']
+    bot_ids = []
     if cmd > 0:
         bot_ids += ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     if cmd > 1:
