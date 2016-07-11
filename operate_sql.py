@@ -27,6 +27,12 @@ def get_ss(url):
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 # @webdata_sql.atomic()
+def get_ss_dialog(person = '', n = 1000):
+	dialogs = SSdialog.select().where(SSdialog.person == person).limit(n)
+	return dialogs
+
+@_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
+# @webdata_sql.atomic()
 def get_ss_dialog_within(person = '', kw = 'カバン', n = 1000):
 	dialogs = SSdialog.select().where(SSdialog.text.contains(kw)).limit(n)
 	def _func(obj):
@@ -86,7 +92,7 @@ def upsert_core_info(whose_info = '', info_label = '', kwargs = {'Char1': '', 'C
 
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
-def save_task(taskdict = {'who':'_mmKm', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
+def save_task(taskdict = {'who':'kaihatsu_paka', 'what': 'call', 'to_whom': '_apkX', 'when':datetime.utcnow()}):
 	t = Task.create(**taskdict)
 	return t
 
@@ -322,16 +328,20 @@ def count_words():
 	wordscnt = TFIDFModel.select().where(TFIDFModel.hinshi << ['名詞', '固有名詞'], TFIDFModel.yomi != '*', ~TFIDFModel.hinshi2 << ['数', '接尾']).	count()
 	return wordscnt
 if __name__ == '__main__':
-	# a = read_userinfo('h_y_okaaaaaaaaaaaa')/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg
+	# a = read_userinfo('h_y_okaaaaaaaaaaaa')/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/kaihatsu_paka_20160605015744_banner.jpg
 	# a = np.random.choice(get_twlog_users(n = 100, screen_name = 'ci_nq'))
 	# p(a)
-	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/_mmKm_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
+	# a = upsert_core_info(whose_info = 'LiveAI_Umi', info_label = 'abs_banner_filename', kwargs = {'Char1': '/Users/masaMikam/Desktop/Data/user/LiveAI_Umi/kaihatsu_paka_20160605015744_banner.jpg', 'Char2': '', 'Char3': '', 'Int1':0, 'Int2':0}, is_update = True)._data['Char1']
 	# a = get_phrase(status = 'kusorip', character = 'sys')
 	# p(a)
 	# p(locals())
-	# a = search_tasks(when = datetime.now(), who = '_mmKm', n = 10)
+	# a = search_tasks(when = datetime.now(), who = 'kaihatsu_paka', n = 10)
 	# # p(get_twlog_pool(10))
-	lock = None
+	# lock = None
+	umis = get_ss_dialog(person = '海未', n = 10)
+	# [umi.delete_instance() for umi in umis]
+	p( [umi.W1 for umi in umis])
+
 
 	# with userinfo_with(screen_name = 'h_y_ok') as userinfo:
 	# 	p(userinfo.__dict__)

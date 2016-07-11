@@ -370,6 +370,6 @@ class Xlink(WordNetModel):
         )
 if __name__ == '__main__':
     s = ''
-    core_sql.create_tables([Task], True)
+    talk_sql.create_tables([TrigramModel], True)
 
 

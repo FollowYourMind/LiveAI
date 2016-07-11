@@ -10,10 +10,18 @@ https://twitter.com/LiveAI_Hanayo
 https://twitter.com/LiveAI_Eli
 https://twitter.com/LiveAI_Nozomi
 https://twitter.com/LiveAI_Nico
+
+https://twitter.com/LiveAI_Chika
+https://twitter.com/LiveAI_You
+https://twitter.com/LiveAI_Ruby
+https://twitter.com/LiveAI_Riko
+https://twitter.com/LiveAI_Yoshiko
+https://twitter.com/LiveAI_Mari
+
 https://twitter.com/LiveAI_Alpaca
 
 - ご意見ご要望があれば下までどうぞ。
-    - 作者アカウント https://twitter.com/_mmKm @_mmKm
+    - 作者アカウント https://twitter.com/kaihatsu_paka @kaihatsu_paka
 
 ## Concept
 - 作者の「趣味的で私的な」プログラムのお勉強

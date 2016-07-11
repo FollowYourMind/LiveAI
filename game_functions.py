@@ -15,7 +15,7 @@ class Shiritori(MyObject):
 		self.game_mode = 'normal'
 		self.len_rule = 2
 		if user is None:
-			self.user = '_mmKm'
+			self.user = 'kaihatsu_paka'
 		else:
 			self.user = user
 		self.srtrdb = operate_sql.upsert_shiritori(name = self.user, kwargs = {'name': self.user, 'mode': self.game_mode, 'word_stream': '', 'kana_stream': '', 'len_rule': self.len_rule}, is_update = False)

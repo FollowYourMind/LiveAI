@@ -84,32 +84,30 @@ class TweetLogPool(MyObject):
 class StreamResponseFunctions(MyObject):
     def __init__(self, bot_id):
         debug_style = ''
-        self.default_character = 'sys'
-        if bot_id == 'LiveAI_Umi':
-            self.default_character = '海未'
-        if bot_id == 'LiveAI_Honoka':
-            self.default_character = '穂乃果'
-        if bot_id == 'LiveAI_Kotori':
-            self.default_character = 'ことり'
-        if bot_id == 'LiveAI_Rin':
-            self.default_character = '凛'
-        if bot_id == 'LiveAI_Eli':
-            self.default_character = '絵里'
-        if bot_id == 'LiveAI_Maki':
-            self.default_character = '真姫'
-        if bot_id == 'LiveAI_Hanayo':
-            self.default_character = '花陽'
-        if bot_id == 'LiveAI_Nozomi':
-            self.default_character = '希'
-        if bot_id == 'LiveAI_Nico':
-            self.default_character = 'にこ'
-        if bot_id == 'LiveAI_Yukiho':
-            self.default_character = '雪穂'
-        if bot_id == 'LiveAI_Alpaca':
+        bot_chara_dic = { 'LiveAI_Umi': '海未', 
+            'LiveAI_Honoka': '穂乃果', 
+            'LiveAI_Kotori': 'ことり', 
+            'LiveAI_Rin': '凛', 
+            'LiveAI_Eli': '絵里', 
+            'LiveAI_Maki': '真姫', 
+            'LiveAI_Hanayo': '花陽', 
+            'LiveAI_Nozomi': '希', 
+            'LiveAI_Nico': 'にこ', 
+            'LiveAI_Yukiho':'雪穂', 
+            'LiveAI_Alpaca': 'sys', 
+            'LiveAI_Chika': '千歌', 
+            'LiveAI_Yoshiko': '善子', 
+            'LiveAI_You': '曜', 
+            'LiveAI_Riko': '梨子', 
+            'LiveAI_Mari': '鞠莉'
+        }
+        if not bot_id in bot_chara_dic:
             self.default_character = 'sys'
+        else:
+            self.default_character = bot_chara_dic[bot_id]
         self.bot_id = bot_id
         self.atmarked_bot_id = ''.join(['@', self.bot_id])
-        self.manager_id = '_mmKm'
+        self.manager_id = 'kaihatsu_paka'
         self.twf = twtr_functions.TwtrTools(self.bot_id)
         #CLASS
         self.bot_profile = operate_sql.BotProfile(self.bot_id)
@@ -124,18 +122,9 @@ class StreamResponseFunctions(MyObject):
         if not os.path.exists(self.bot_dir):
             os.mkdir(self.bot_dir)
         self.on_initial_main()
-        # monitor_threads = threading.Thread(target = self.monitoring, args=(), name = self.bot_id + 'monitoring')
-        # monitor_threads.daemon = True
-        # monitor_threads.start()
-    def convert_text_as_character(self, text):
-        if self.bot_id == 'LiveAI_Rin':
-            text = text.replace('です', 'だにゃ').replace('ます', 'にゃ')
-        return text
     def send(self, ans, screen_name = '', imgfile = '', status_id = '', mode = 'dm', try_cnt = 0):
-        # self.is_enable_tweet = False
         if self.stats.tweet_cnt_hour is None:
             self.stats.tweet_cnt_hour = 0
-        p(self.stats.tweet_cnt_hour)
         # 1時間あたりのツイート数が100を上回る場合、ツイートしない。
         if self.stats.tweet_cnt_hour > 100:
             duration = try_cnt + 1
@@ -156,6 +145,8 @@ class StreamResponseFunctions(MyObject):
     def default_profile(self):
         try:
             # self.sync_json('config', is_save = False)
+            if 'まねっこ' in self.bot_profile.location:
+                self.bot_profile.location = '...'
             self.twf.update_profile(name = self.bot_profile.name, description = self.bot_profile.description, location= self.bot_profile.location, url = self.bot_profile.url, filename = self.bot_profile.abs_icon_filename, BGfilename = '', Bannerfilename = self.bot_profile.abs_banner_filename)
             return True
         except Exception as e:
@@ -171,13 +162,9 @@ class StreamResponseFunctions(MyObject):
         self.tmp.imitating = self.bot_id
         self.tmp.manager_id = self.manager_id
         self.tmp.bots_list = self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT')
-        self.tmp.KARAMIx2 = self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2')
         self.tmp.response_exception = self.twf.get_listmembers_all(username = self.bot_id, listname = 'responseException')
-        self.tmp.feedback_exception = self.twf.get_listmembers_all(username = self.bot_id, listname = 'feedbackException')
         self.bots_set = set(self.tmp.bots_list)
-        self.karamix2_set = set(self.tmp.KARAMIx2)
         self.response_exception_set = set(self.tmp.response_exception)
-        self.feedback_exception_set = set(self.tmp.feedback_exception)
         self.tmp.trendwords_ls = self.twf.getTrendwords()
         self.eew_ids_set = {0}
         self.tmp.friend_ids = {}
@@ -242,12 +229,10 @@ class StreamResponseFunctions(MyObject):
         if status['user']['screen_name'] == 'eewbot':
             screen_name = ''
             ans = self.response_eew(csv = text, standard = 0)
-        elif 'LiveAI_' in screen_name:
-            return False
         elif self.stats.tweet_cnt_hour > 100:
-            return False
+            return True
         elif status['entities']['urls']:
-            return False
+            return True
         elif status['user']['screen_name'] in self.bots_set:
             return False
         elif '#とは' in status['text']:
@@ -259,6 +244,8 @@ class StreamResponseFunctions(MyObject):
                 while len(ans) > 130:
                     ans = '。'.join(ans.split('。')[:-2])
                 ans = ''.join([ans, '。'])
+                if ans == '。。':
+                    ans = ''
         elif '#makeQR' in status['text']:
             qrdata = status['text'].replace('@'+ self.bot_id, '').replace('#makeQR', '')
             filename = opencv_functions.make_qrcode(data = qrdata)
@@ -266,22 +253,14 @@ class StreamResponseFunctions(MyObject):
                 ans = 'QR-Codeをつくりました。'
             else:
                 ans = 'QR-Code作成に失敗'
-        elif 'add' in text:
-            return False
-        elif 'respon' in text:
-            return False
         elif is_kusoripu(text):
             operate_sql.save_phrase(phrase = text, author = screen_name, status = 'kusoripu', character = 'sys', s_type = 'AutoLearn')
             rand = np.random.rand()
-            if rand < 0.08:
+            if rand < 0.1:
                 ans = get_kusoripu(tg1 = screen_name)
                 screen_name = ''
             else:
                 return True
-        # elif operate_sql.get_twlog_pool(n = 10).count(text) > 2:
-        #     ans = ''.join(['\n', text,'(パクツイ便乗)'])
-        #     if len(''.join([ans,'@',screen_name, ' '])) > 140:
-        #         ans = text
         elif status['in_reply_to_screen_name'] in {None, self.bot_id}:
             special_response_word = _.crowlList(text = text, dic = self.tmp.response)
             if special_response_word:
@@ -505,7 +484,7 @@ class StreamResponseFunctions(MyObject):
                 elif 'banner' in text or '背景' in text:
                     self.bot_profile.abs_banner_filename =  _.saveImg(media_url = status['extended_entities']['media'][0]['media_url'].replace('_normal', ''), DIR = ''.join([DIRusers,'/',self.bot_id]), filename = '_'.join([screen_name, fileID, 'banner.jpg']))
                     ans = operate_sql.get_phrase(status =  'update.icon.banner', character = character)
-                if screen_name == '_mmKm':
+                if screen_name == 'kaihatsu_paka':
                     self.bot_profile.save()
                 else:
                     set_time = self.now + timedelta(hours=0, minutes=10)
@@ -937,8 +916,8 @@ class StreamResponseFunctions(MyObject):
             if self.tmp.imitating != self.bot_id:
                 ans = np.random.choice(operate_sql.get_twlog_users(n = 100, screen_name = self.tmp.imitating))
             else:
-                ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = self.tmp.feedback_exception, min_similarity = 0.2, character = character, tools = 'SS,LOG,MC', username = '@〜〜')
-                ans = self.convert_text_as_character(ans).replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
+                ans = dialog_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.2, character = character, tools = 'SS,MC', username = '@〜〜')
+                ans = ans.replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
                 if not ans:
                     ans = '...'
         if ans == 'ignore':
@@ -958,7 +937,6 @@ class StreamResponseFunctions(MyObject):
             self.send(welcomeans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = mode)
 
         if ans:
-            p(ans)
             if delay_sec > 0:
                 set_time = self.get_time(hours = 0, seconds =  delay_sec, is_noised = True)
                 operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': 'tweet', 'to_whom': screen_name, 'when':set_time, 'tmpid': status_id, 'tmptext': ans})
@@ -991,6 +969,8 @@ class StreamResponseFunctions(MyObject):
         if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '定期', '【', 'ポストに到達', 'リプライ数']]):
             if status['mode'] != 'dm':
                 return True
+        if 'LiveAI_' in screen_name:
+            return True
         return False
 
     @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = False)
@@ -1202,7 +1182,7 @@ class StreamResponseFunctions(MyObject):
             ans = ''
             trigram_markov_chain_instance = dialog_generator.TrigramMarkovChain(self.default_character)
             ans = trigram_markov_chain_instance.generate(word = '', is_randomize_metasentence = True)
-            ans = self.convert_text_as_character(ans).replace(self.atmarked_bot_id, '')
+            ans = ans.replace(self.atmarked_bot_id, '')
             task_restart()
         elif todo == 'teiki.trendword':
             trendwords = self.twf.getTrendwords()
@@ -1215,7 +1195,7 @@ class StreamResponseFunctions(MyObject):
                 senti_icon = '😊'
             else:
                 senti_icon = '🐥'
-            ans = 'トレンドワード感情分析: {trendword} {senti_icon}\n{score}%が{active}'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
+            ans = '「{trendword}」{senti_icon}({score}%)'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
         #     ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
             self.tmp.trendwords_ls = trendwords
             task_restart()
@@ -1241,9 +1221,7 @@ class StreamResponseFunctions(MyObject):
             bot_id = userinfo_me.screen_name
             self.bot_id = bot_id
             self.bots_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'BOT'))
-            self.karamix2_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'KARAMIx2'))
             self.response_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'responseException'))
-            self.feedback_exception_set = set(self.twf.get_listmembers_all(username = self.bot_id, listname = 'feedbackException'))
             task_restart()
         elif todo == 'del.response':
             try:
@@ -1289,7 +1267,7 @@ class StreamResponseFunctions(MyObject):
         task_duration_dic = {
             # 'teiki': 30,
             'teikiMC': 20,
-            'teiki.trendword': 60,
+            'teiki.trendword': 120,
             'erase.tmp.stats.tweet_cnt_hour': 60,
             'followback_check': 30,
             'update.lists': 30,
@@ -1501,14 +1479,17 @@ class LiveAI_Async(MyObject):
         else:
             p('bot is aliving.. err')
 
-def main(is_experience = False):
+def main(cmd = 1):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
-    if not is_experience:
-        bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico', 'LiveAI_Yukiho']
-    else:
-        bot_ids = ['LiveAI_Alpaca']
+    bot_ids = ['LiveAI_Alpaca']
+    if cmd > 0:
+        bot_ids += ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+    if cmd > 1:
+        bot_ids += ['LiveAI_Yukiho']
+    if cmd > 2:
+        bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Mari']
         # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
     srfs = init_srfs(bot_ids)
     bots = {}
@@ -1518,7 +1499,7 @@ def main(is_experience = False):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(1)
+    main(3)
     # trendword = 'スクフェス'
     # sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
     # active = sentiment_dic['active']

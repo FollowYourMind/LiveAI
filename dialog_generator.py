@@ -1032,11 +1032,10 @@ class DialogObject(MyObject):
             need_cnt = 3
             #########################
             #I/O operations
+            person = ''
+            if character != 'sys':
+                person = character
             if 'SS' in tools:
-                if character == 'sys':
-                    person = ''
-                else:
-                    person = character
                 for kw in self.keywords[:need_cnt]:
                     process = threading.Thread(target = self.ss_log_sender, args=(kw, q, person, 400), name='Sender-SSrel[{}]'.format(kw))
                     threads.append(process)
@@ -1103,31 +1102,56 @@ if __name__ == '__main__':
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''おっぱい''' 
+    text = '''''' 
     UserLists = {
-    # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_']
+    # '鞠莉': [''],
+    # '花丸': [''],
+    # 'ルビィ': [''],
+    # 'ダイヤ': [''],
+    # 'ヨハネ': [''],
+    # '曜': [''],
+    # '千歌': [''],
+    # '梨子': [''],
+    # '果南': [''],
+    # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_'],
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
-    # '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin', ]
-    'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
-    '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
-    '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
-    '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
+    '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin'],
+    # 'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
+    # '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
+    # '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
+    # '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
     '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
-    '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
-    '雪穂': ['yukiho_h_bot_', 'haijin_yukiho'],
-    'ちゃんあ': ['chana1031'],
+    # '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
+    # '雪穂': ['yukiho_h_bot_', 'haijin_yukiho']
     }
     # for chara, userlist in UserLists.items():
     #     p(chara, userlist)
-    #     s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
+    #     # s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
+    # # chara = '絵里'
+    #     ssd = operate_sql.get_ss_dialog(person = chara, n = 1000000)
+    #     s_ls = [s.text[1:-1] for s in ssd]
     #     learn_trigram(s_ls, character = chara, over = 0)
+
+    # task = TrigramModel.update(**{'character': '善子'}).where(TrigramModel.character == 'ヨハネ')
+    # task.execute()
+    # p(TrigramModel.select().where(TrigramModel.character == 'ヨハネ').count())
+    # p(umis)
+    # for umi in umis:
+    #     umi.character = '凛2'
+    #     umi.save()
+    # @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
+    # def deldata(data):
+    #     data.delete_instance()
+
+    # for umi in umis:
+    #     deldata(umi)
     # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
     # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
     # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
-    person = '海未'
+    person = '善子'
     while True:
         d_obj = DialogObject(text)
-        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'SSMC', username = '@〜〜')
+        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'MC', username = '@〜〜')
         p(person, ansu)
         break
         # d_obj = DialogObject(ansu)
