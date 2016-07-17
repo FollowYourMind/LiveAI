@@ -1115,14 +1115,15 @@ if __name__ == '__main__':
     # '果南': [''],
     # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_'],
     # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
-    '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin'],
+    # '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin'],
     # 'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
     # '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
     # '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
     # '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
-    '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
+    # '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
     # '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
-    # '雪穂': ['yukiho_h_bot_', 'haijin_yukiho']
+    # '雪穂': ['yukiho_h_bot_', 'haijin_yukiho'],
+    '亜里沙': ['']
     }
     # for chara, userlist in UserLists.items():
     #     p(chara, userlist)
@@ -1148,7 +1149,7 @@ if __name__ == '__main__':
     # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
     # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
     # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
-    person = '善子'
+    person = '果南'
     while True:
         d_obj = DialogObject(text)
         ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'MC', username = '@〜〜')

@@ -93,13 +93,18 @@ class StreamResponseFunctions(MyObject):
             'LiveAI_Hanayo': '花陽', 
             'LiveAI_Nozomi': '希', 
             'LiveAI_Nico': 'にこ', 
-            'LiveAI_Yukiho':'雪穂', 
+            'LiveAI_Yukiho':'雪穂',
+            'LiveAI_Alisa': '亜里沙',
             'LiveAI_Alpaca': 'sys', 
             'LiveAI_Chika': '千歌', 
             'LiveAI_Yoshiko': '善子', 
             'LiveAI_You': '曜', 
             'LiveAI_Riko': '梨子', 
-            'LiveAI_Mari': '鞠莉'
+            'LiveAI_Mari': '鞠莉',
+            'LiveAI_Ruby': 'ルビィ',
+            'LiveAI_Dia': 'ダイヤ',
+            'LiveAI_Kanan': '果南',
+            'LiveAI_Hanamaru': '花丸',
         }
         if not bot_id in bot_chara_dic:
             self.default_character = 'sys'
@@ -229,6 +234,8 @@ class StreamResponseFunctions(MyObject):
         if status['user']['screen_name'] == 'eewbot':
             screen_name = ''
             ans = self.response_eew(csv = text, standard = 0)
+            self.send(ans, screen_name = screen_name, status_id = status['id_str'], imgfile = filename, mode = 'tweet')
+            return True
         elif self.stats.tweet_cnt_hour > 100:
             return True
         elif status['entities']['urls']:
@@ -1487,9 +1494,9 @@ def main(cmd = 1):
     if cmd > 0:
         bot_ids += ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     if cmd > 1:
-        bot_ids += ['LiveAI_Yukiho']
+        bot_ids += ['LiveAI_Yukiho', 'LiveAI_Alisa']
     if cmd > 2:
-        bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Mari']
+        bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Dia', 'LiveAI_Mari', 'LiveAI_Kanan']
         # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
     srfs = init_srfs(bot_ids)
     bots = {}
