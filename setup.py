@@ -109,7 +109,16 @@ NICKNAMES = {
 	'おてつだいにこ': 'にこ',
 	'おて雪穂': '雪穂',
 	'おてつだい雪穂': '雪穂',
-	'おてゆきほ': '雪穂'
+	'おてゆきほ': '雪穂',
+	'おてあり': '亜里沙',
+	'おてこ': '善子',
+	'おてちか': '千歌',
+	'おてよ': '曜',
+	'おてりこ': '梨子',
+	'おてまり': '鞠莉',
+	'おてるび': 'ルビィ',
+	'おてだい': 'ダイヤ',
+	'おてかなん': '果南',
 }
 def iscalledBOT(text, select_set = {''}):
 	bot_called_ls = [(bot_key in text and bot_value in select_set, bot_value) for bot_key, bot_value in NICKNAMES.items()]

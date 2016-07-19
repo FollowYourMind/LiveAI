@@ -139,6 +139,7 @@ def analyse_sentiment_yahoo(word = ''):
 	elem.send_keys(Keys.RETURN)
 	time.sleep(1)
 	html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+	driver.quit()
 	soup = bs4.BeautifulSoup(html, 'lxml')
 	ptext = soup.findAll('script')
 	pstr = ''.join([p.get_text() for p in ptext])
@@ -151,6 +152,44 @@ def analyse_sentiment_yahoo(word = ''):
 		if senti_json:
 			sentiment_dic = json.loads(senti_json)
 			return sentiment_dic
+
+class ShindanMaker(MyObject):
+	def __init__(self):
+		USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+		phantomjs_path = '/usr/local/bin/phantomjs'
+		self.driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'	phantomjs.page.settings.userAgent':USER_AGENT})
+
+	def result(self, form = 'あるぱか', url = None):
+		try:
+			if not url is None:
+				self.url = url
+			self.driver.get(self.url)
+			elem = self.driver.find_element_by_id('form')
+			tag = self.driver.find_elements_by_class_name('input-lg')[0]
+			tag.clear()
+			tag.send_keys(form)
+			tag.send_keys(Keys.RETURN)
+			time.sleep(0.5)
+			shindan_result = self.driver.find_element_by_id('copy_text_140').text
+			self.driver.quit()
+			return shindan_result
+		except:
+			return ''
+	
+	def get_hot_shindan(self, n = 10):
+		try:
+			hot_ranking_url = 'https://shindanmaker.com/c/list?mode=hot'
+			url_base = 'https://shindanmaker.com/a'
+			self.driver.get(hot_ranking_url)
+			html = self.driver.page_source.encode('utf-8')  # more sophisticated methods may be available
+			soup = bs4.BeautifulSoup(html, 'lxml')
+			hots = soup.findAll('a', class_ = 'list_title')
+			rand = np.random.randint(n)
+			href = hots[rand].get('href')
+			self.url = ''.join([url_base, href])
+		except:
+			return ''
+
 if __name__ == '__main__':
 	import sys
 	import io
@@ -179,8 +218,8 @@ if __name__ == '__main__':
 	# converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
 	# g_url = 'https://www.google.co.jp/search?q={}&tbm=isch'.format(converted_word)
 	# get_googlemap(url = g_url)
-	a = analyse_sentiment_yahoo(word = xkey)
-	p(a)
+	# a = analyse_sentiment_yahoo(word = xkey)
+	# p(a)
 
 
 

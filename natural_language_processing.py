@@ -1120,7 +1120,7 @@ if __name__ == '__main__':
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = ''''''    # text = 'したい'
+    text = '''643920の診断メーカーをやって'''    # text = 'したい'
     # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
     # p(np.random.choice(a))
     # reg = RegexTools()
@@ -1134,7 +1134,8 @@ if __name__ == '__main__':
     # p(MA.get_mecab_coupled(text))
     # # p(NLPdata(text).regex_analysis.__dict__)
     nlp_data = NLPdatas(text).main
-    p(nlp_data.__dict__)
+    p(nlp_data.summary)
+    # p([ma for ma in nlp_data.mas if ma[2] == '数'][0][0])
     # p(nlp_data.summary.has_function('希望', '要望', '勧誘'))
     # p(nlp_data.summary.has_function('疑問'))
     # ans = operate_sql.get_phrase(status =  'yes', character = character)

@@ -894,6 +894,21 @@ class StreamResponseFunctions(MyObject):
                         ans = operate_sql.get_phrase(status =  'followback.error', character = character)
                 else:
                     ans = operate_sql.get_phrase(status =  'followback.already', character = character)
+        #----------------
+        # 診断
+        elif nlp_summary.value in {'やる', 'する'}:
+            if nlp_summary.has_function('希望', '要望', '勧誘'):
+                if nlp_summary.akkusativ == '診断メーカー':
+                    self.twf.give_fav(status_id) 
+                    SM = crawling.ShindanMaker()
+                    try:
+                        url_id = [ma for ma in dialog_obj.nlp_data.mas if ma[2] == '数'][0][0]
+                        p(url_id)
+                        ans = SM.result(url = '/'.join(['https://shindanmaker.com/a', url_id]), form = ''.join(['お手伝い', self.default_character]))
+                    except Exception as e:
+                        p(e)
+                        SM.get_hot_shindan(n = 10)
+                        ans = SM.result(form = ''.join(['お手伝い', self.default_character]))
         ##############
         # Rest Functions
         ##############
@@ -1245,6 +1260,11 @@ class StreamResponseFunctions(MyObject):
         elif todo == 'reconnect_wifi':
             _.reconnect_wifi()
             task_restart()
+        elif todo == 'hot_shindan_maker':
+            SM = crawling.ShindanMaker()
+            SM.get_hot_shindan(n = 3)
+            ans = SM.result(form = ''.join(['お手伝い', self.default_character]))
+            task_restart()
         # elif todo == 'reload_modules':
         #     importlib.reload(natural_language_processing)
         #     importlib.reload(dialog_generator)
@@ -1279,7 +1299,8 @@ class StreamResponseFunctions(MyObject):
             'followback_check': 30,
             'update.lists': 30,
             'update_userprofile' : 10,
-            'save_stats': 20
+            'save_stats': 20,
+            'hot_shindan_maker': 120
             }
         if self.bot_id == 'LiveAI_Umi':
             task_duration_dic['reconnect_wifi'] = 3
@@ -1490,14 +1511,13 @@ def main(cmd = 1):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
-    bot_ids = []
+    bot_ids = ['LiveAI_Alpaca']
     if cmd > 0:
-        bot_ids += ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
+        bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     if cmd > 1:
         bot_ids += ['LiveAI_Yukiho', 'LiveAI_Alisa']
     if cmd > 2:
         bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Dia', 'LiveAI_Mari', 'LiveAI_Kanan']
-        # bots = ['LiveAI_Umi',  'LiveAI_Nico', 'LiveAI_Rin']
     srfs = init_srfs(bot_ids)
     bots = {}
     for bot_id in bot_ids:
