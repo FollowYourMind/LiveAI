@@ -57,7 +57,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
-		raise exception
+		return False
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True

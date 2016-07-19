@@ -133,13 +133,15 @@ def analyse_sentiment_yahoo(word = ''):
 	phantomjs_path = '/usr/local/bin/phantomjs'
 	driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
 	driver.get("http://realtime.search.yahoo.co.jp/realtime")
-	elem = driver.find_element_by_name('p')
+	try:
+		elem = driver.find_element_by_name('p')
+	except:
+		return False
 	elem.clear()
 	elem.send_keys(word)
 	elem.send_keys(Keys.RETURN)
 	time.sleep(1)
 	html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
-	driver.quit()
 	soup = bs4.BeautifulSoup(html, 'lxml')
 	ptext = soup.findAll('script')
 	pstr = ''.join([p.get_text() for p in ptext])
@@ -175,7 +177,7 @@ class ShindanMaker(MyObject):
 			return shindan_result
 		except:
 			return ''
-	
+
 	def get_hot_shindan(self, n = 10):
 		try:
 			hot_ranking_url = 'https://shindanmaker.com/c/list?mode=hot'

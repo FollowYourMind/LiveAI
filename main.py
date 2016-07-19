@@ -84,22 +84,22 @@ class TweetLogPool(MyObject):
 class StreamResponseFunctions(MyObject):
     def __init__(self, bot_id):
         debug_style = ''
-        bot_chara_dic = { 'LiveAI_Umi': '海未', 
-            'LiveAI_Honoka': '穂乃果', 
-            'LiveAI_Kotori': 'ことり', 
-            'LiveAI_Rin': '凛', 
-            'LiveAI_Eli': '絵里', 
-            'LiveAI_Maki': '真姫', 
-            'LiveAI_Hanayo': '花陽', 
-            'LiveAI_Nozomi': '希', 
-            'LiveAI_Nico': 'にこ', 
+        bot_chara_dic = { 'LiveAI_Umi': '海未',
+            'LiveAI_Honoka': '穂乃果',
+            'LiveAI_Kotori': 'ことり',
+            'LiveAI_Rin': '凛',
+            'LiveAI_Eli': '絵里',
+            'LiveAI_Maki': '真姫',
+            'LiveAI_Hanayo': '花陽',
+            'LiveAI_Nozomi': '希',
+            'LiveAI_Nico': 'にこ',
             'LiveAI_Yukiho':'雪穂',
             'LiveAI_Alisa': '亜里沙',
-            'LiveAI_Alpaca': 'sys', 
-            'LiveAI_Chika': '千歌', 
-            'LiveAI_Yoshiko': '善子', 
-            'LiveAI_You': '曜', 
-            'LiveAI_Riko': '梨子', 
+            'LiveAI_Alpaca': 'sys',
+            'LiveAI_Chika': '千歌',
+            'LiveAI_Yoshiko': '善子',
+            'LiveAI_You': '曜',
+            'LiveAI_Riko': '梨子',
             'LiveAI_Mari': '鞠莉',
             'LiveAI_Ruby': 'ルビィ',
             'LiveAI_Dia': 'ダイヤ',
@@ -858,8 +858,8 @@ class StreamResponseFunctions(MyObject):
                 elif nlp_summary.akkusativ in {'経験値', 'exp', 'EXP', 'Exp'}:
                     ans = '\n'.join(['[現在の経験値]:', str(userinfo.exp)])
         elif nlp_summary.value in {'分析する', '感情分析する'}:
-            if nlp_summary.has_function('希望', '要望'):        
-                self.twf.give_fav(status_id)  
+            if nlp_summary.has_function('希望', '要望'):
+                self.twf.give_fav(status_id)
                 sentiment_dic = crawling.analyse_sentiment_yahoo(word = nlp_summary.akkusativ)
                 active = sentiment_dic['active']
                 if active == 'negative':
@@ -899,7 +899,7 @@ class StreamResponseFunctions(MyObject):
         elif nlp_summary.value in {'やる', 'する'}:
             if nlp_summary.has_function('希望', '要望', '勧誘'):
                 if nlp_summary.akkusativ == '診断メーカー':
-                    self.twf.give_fav(status_id) 
+                    self.twf.give_fav(status_id)
                     SM = crawling.ShindanMaker()
                     try:
                         url_id = [ma for ma in dialog_obj.nlp_data.mas if ma[2] == '数'][0][0]
@@ -1210,14 +1210,15 @@ class StreamResponseFunctions(MyObject):
             trendwords = self.twf.getTrendwords()
             trendword = np.random.choice(trendwords)
             sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
-            active = sentiment_dic['active']
-            if active == 'negative':
-                senti_icon = '😡'
-            elif active == 'positive':
-                senti_icon = '😊'
-            else:
-                senti_icon = '🐥'
-            ans = '「{trendword}」{senti_icon}({score}%)'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
+            if sentiment_dic:
+                active = sentiment_dic['active']
+                if active == 'negative':
+                    senti_icon = '😡'
+                elif active == 'positive':
+                    senti_icon = '😊'
+                else:
+                    senti_icon = '🐥'
+                ans = '「{trendword}」{senti_icon}({score}%)'.format(trendword = trendword, senti_icon = senti_icon, active = active, score = sentiment_dic['scores'][active])
         #     ans = operate_sql.get_phrase(status = 'トレンドワード', character= self.default_character).format(trendword)
             self.tmp.trendwords_ls = trendwords
             task_restart()
