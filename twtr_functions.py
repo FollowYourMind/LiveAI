@@ -35,7 +35,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		# else:
 		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		self.q.append(status)
+		# self.q.append(status)
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
