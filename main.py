@@ -1512,13 +1512,13 @@ def main(cmd = 1):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
-    bot_ids = ['LiveAI_Alpaca']
+    bot_ids = ['LiveAI_Hanamaru']
     if cmd > 0:
         bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     if cmd > 1:
         bot_ids += ['LiveAI_Yukiho', 'LiveAI_Alisa']
     if cmd > 2:
-        bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Dia', 'LiveAI_Mari', 'LiveAI_Kanan']
+        bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Dia', 'LiveAI_Mari', 'LiveAI_Kanan', 'LiveAI_Hanamaru']
     srfs = init_srfs(bot_ids)
     bots = {}
     for bot_id in bot_ids:
@@ -1527,7 +1527,7 @@ def main(cmd = 1):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(3)
+    main(0)
     # trendword = 'スクフェス'
     # sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
     # active = sentiment_dic['active']
