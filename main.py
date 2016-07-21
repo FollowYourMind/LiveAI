@@ -1527,7 +1527,7 @@ def main(cmd = 1):
         bot.run()
     monitor(bots, dq, lock)
 if __name__ == '__main__':
-    main(0)
+    main(3)
     # trendword = 'スクフェス'
     # sentiment_dic = crawling.analyse_sentiment_yahoo(word = trendword)
     # active = sentiment_dic['active']
