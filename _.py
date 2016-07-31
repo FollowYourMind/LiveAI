@@ -339,11 +339,12 @@ class Ping(object):
           else:
               print('[NG]: ' + 'ServerName->' + host + ', Msg->\'' + msg + '\'')
               self.is_connectable = False
-def reconnect_wifi():
+def reconnect_wifi(force = False):
     try:
         if Ping('google.com').is_connectable:
             p('ping is connecting. reconnect-program -> finished!!!!')
-            return True
+            if not force:
+              return True
         networksetup_cmd = '/usr/sbin/networksetup'
         optionargs = ['off']
         args = [networksetup_cmd, '-setairportpower', 'en0']

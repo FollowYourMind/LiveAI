@@ -153,7 +153,7 @@ class TwtrTools(MyObject):
 			print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
 			p(e)
 			if e.response is None:
-				if _.reconnect_wifi():
+				if _.reconnect_wifi(force = True):
 					self.send_tweet(ans, screen_name, status_id, imgfile, is_debug, try_cnt)
 			if e.response and e.response.status == 403:
 				print('403')
@@ -176,7 +176,7 @@ class TwtrTools(MyObject):
 		except tweepy.error.TweepError as e:
 			print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
 			if e.response is None:
-				if _.reconnect_wifi():
+				if _.reconnect_wifi(force = True):
 					self.send_direct_message(ans, screen_name, is_debug, try_cnt)
 			if e.response and e.response.status == 403:
 				print('403')

@@ -1266,12 +1266,12 @@ class StreamResponseFunctions(MyObject):
             SM.get_hot_shindan(n = 3)
             ans = SM.result(form = ''.join(['お手伝い', self.default_character]))
             task_restart()
-        elif todo == 'teiki_recheck':
-            p('tweet分速', len(self.tmp.status_ids))
+        # elif todo == 'teiki_recheck':
+        #     p('tweet分速', len(self.tmp.status_ids))
             # results = self.twf.twtr_api.user_timeline(screen_name = self.bot_id, page = 1)
             # p(len(results))
-            self.tmp.status_ids = []
-            task_restart()
+            # self.tmp.status_ids = []
+            # task_restart()
         # elif todo == 'reload_modules':
         #     importlib.reload(natural_language_processing)
         #     importlib.reload(dialog_generator)
