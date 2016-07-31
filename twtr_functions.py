@@ -57,6 +57,7 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
+		_.reconnect_wifi(force = True)
 		return False
 	def on_warning(self, notice):
 		p(notice, 'warning')
