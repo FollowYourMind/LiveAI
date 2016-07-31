@@ -229,7 +229,7 @@ class MorphologicalAnalysis(MyObject):#MeCab
         cleaned_sentence, ex_faces = self.regex_tools.extract_kaomojis(extracted_rest)
         ma_ls = self.integrate_ex_ma(cleaned_sentence, ex = ex_ls)
         if ex_ids:
-            ma_ls = [ma if not ma[0] == 'atmarkedID' else [ex_ids[0],'名詞', '固有名詞', 'regex_id', '*', '*', '*', ex_ids.pop(0)[1:], '*', '*'] for ma in ma_ls]
+            ma_ls = [ma if not ma[0] == 'atmarkedID' else [ex_ids[0],'名詞', '固有名詞', 'regex_id', '*', '*', '*', ex_ids.pop(0), '*', '*'] for ma in ma_ls]
         if ex_faces:
             ma_ls = [ma if not ma[0] == '^ ^' else [ex_faces[0], '顔文字', '顔文字', 'regex_顔文字', '*', '*', '*', ex_faces.pop(0), 'カオ', 'カオ'] for ma in ma_ls]
         return ma_ls

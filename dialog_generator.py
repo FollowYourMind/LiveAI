@@ -214,7 +214,7 @@ class TFIDF(MyObject):
                 return self.extract_keywords_from_ma(ma = ma, threshold = threshold, n = n, length = length, is_print = is_print, needs = needs, random_cnt = random_cnt)
         def extract_keywords_from_ma(self, ma, threshold = 50, n = 5, length = 1, is_print = True, needs = {'名詞', '固有名詞', '動詞', '形容詞'}, random_cnt = 1):
                 def keyword_filter(datas):
-                        exception_set = {'ちゃん'}
+                        exception_set = {'ちゃん', 'こと'}
                         return [data for data in datas if not data[0] in exception_set]
                 keyword_tf_idf = self.calc_keywords_tf_idf(ma, length = length, needs = needs)
                 kwcnt = len(keyword_tf_idf)
@@ -1015,7 +1015,7 @@ class DialogObject(MyObject):
         ans = ''
         if context:
             try:
-                s = context.split('</>')[-1] + s
+                s = ''.join([context.split('</>')[-1], s])
             except:
                 pass
         s = _.clean_text(s, isKaigyouOFF = False)
@@ -1035,6 +1035,7 @@ class DialogObject(MyObject):
             person = ''
             if character != 'sys':
                 person = character
+            p(self.keywords)
             if 'SS' in tools:
                 for kw in self.keywords[:need_cnt]:
                     process = threading.Thread(target = self.ss_log_sender, args=(kw, q, person, 400), name='Sender-SSrel[{}]'.format(kw))
@@ -1102,7 +1103,7 @@ if __name__ == '__main__':
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''''' 
+    text = '''@you に‎kusoripu送信して''' 
     UserLists = {
     # '鞠莉': [''],
     # '花丸': [''],
@@ -1149,7 +1150,7 @@ if __name__ == '__main__':
     # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
     # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
     # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
-    person = '果南'
+    person = '海未'
     while True:
         d_obj = DialogObject(text)
         ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'MC', username = '@〜〜')

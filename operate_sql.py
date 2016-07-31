@@ -223,7 +223,7 @@ def get_phrase(s_type = '', status = '', n = 10, character = 'sys'):
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @core_sql.atomic()
 def save_phrase(phrase, author = '_mmkm', status = 'mid', s_type = 'UserLearn', character = 'sys'):
-	P = Phrases.create(phrase = phrase)
+	P = Phrases.create(phrase = phrase,status = status, s_type = s_type, author = author)
 	return P
 
 # [TODO]

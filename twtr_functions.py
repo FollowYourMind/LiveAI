@@ -107,6 +107,7 @@ class TwtrTools(MyObject):
 			return self.twtr_api.get_status(id = status_id)
 		except tweepy.error.TweepError as e:
 			return None
+
 	def send(self, ans, screen_name = '', status_id = '', imgfile = '', mode = 'dm', try_cnt = 0):
 		if mode == 'dm':
 			return self.send_direct_message(ans = ans, screen_name = screen_name)
@@ -151,6 +152,9 @@ class TwtrTools(MyObject):
 		except tweepy.error.TweepError as e:
 			print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
 			p(e)
+			if e.response is None:
+				if _.reconnect_wifi():
+					self.send_tweet(ans, screen_name, status_id, imgfile, is_debug, try_cnt)
 			if e.response and e.response.status == 403:
 				print('403')
 				return False
@@ -171,6 +175,9 @@ class TwtrTools(MyObject):
 			return True
 		except tweepy.error.TweepError as e:
 			print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
+			if e.response is None:
+				if _.reconnect_wifi():
+					self.send_direct_message(ans, screen_name, is_debug, try_cnt)
 			if e.response and e.response.status == 403:
 				print('403')
 				return False
@@ -305,7 +312,22 @@ if __name__ == '__main__':
 	twf = TwtrTools('LiveAI_Alpaca')
 	# objs = twf.get_followers_all('LiveAI_Maki')
 	# p(objs[0]._json)
-	twf.filter_stream()
+	# twf.filter_stream()
+	ids = ['759603873992482816',
+  '759603125388840961',
+  '759602847390371841',
+  '759602710995800064',
+  '759602278789619712',
+  '759601706057379840',
+  '759601116656967680',
+  '759600518532435968',
+  '759598655380656128',
+  '759598458911154176',
+  '759596691750170624']
+	results = twf.twtr_api.home_timeline(since_id = ids[0], page = 1)
+	p([(result.user.screen_name, result._json) for result in results if not result.id_str in set(ids)])
+	# twf.send_tweet(ans = 'test', screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0)
+
 	# ans = twf.get_listmembers_all(username = 'LiveAI_Rin' , listname = 'BOaaa')
 	# ans = twf.get_status(status_id = '715662952372699136')
 	# p(ans._json['user']['screen_name'])

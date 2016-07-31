@@ -119,6 +119,7 @@ class StreamResponseFunctions(MyObject):
         self.tmp = Temp()
         self.stats = Stats()
         self.tmp.charas = Temp()
+        self.tmp.status_ids = []
         #
         self.bot_dir = DATADIR + '/' + bot_id
         self.is_debug_direct_message = 'dm' in debug_style or 'all' in debug_style
@@ -149,7 +150,6 @@ class StreamResponseFunctions(MyObject):
         return True
     def default_profile(self):
         try:
-            # self.sync_json('config', is_save = False)
             if 'まねっこ' in self.bot_profile.location:
                 self.bot_profile.location = '...'
             self.twf.update_profile(name = self.bot_profile.name, description = self.bot_profile.description, location= self.bot_profile.location, url = self.bot_profile.url, filename = self.bot_profile.abs_icon_filename, BGfilename = '', Bannerfilename = self.bot_profile.abs_banner_filename)
@@ -260,8 +260,8 @@ class StreamResponseFunctions(MyObject):
                 ans = 'QR-Codeをつくりました。'
             else:
                 ans = 'QR-Code作成に失敗'
-        elif is_kusoripu(text):
-            operate_sql.save_phrase(phrase = text, author = screen_name, status = 'kusoripu', character = 'sys', s_type = 'AutoLearn')
+        elif is_kusoripu(status['text']):
+            operate_sql.save_phrase(phrase = status['text'], author = screen_name, status = 'kusoripu', character = 'sys', s_type = 'AutoLearn')
             rand = np.random.rand()
             if rand < 0.1:
                 ans = get_kusoripu(tg1 = screen_name)
@@ -271,7 +271,7 @@ class StreamResponseFunctions(MyObject):
         elif status['in_reply_to_screen_name'] in {None, self.bot_id}:
             special_response_word = _.crowlList(text = text, dic = self.tmp.response)
             if special_response_word:
-                np.random.seed()
+                # np.random.seed()
                 ans = operate_sql.get_phrase(status =  special_response_word, character= self.default_character)
             else:
                 text = _.clean_text2(text)
@@ -280,6 +280,7 @@ class StreamResponseFunctions(MyObject):
         #ツイート
         if ans and screen_name:
             with operate_sql.userinfo_with(screen_name) as userinfo:
+                userinfo.status_id = status['id_str']
                 if not 'select_chara' in userinfo._data:
                     userinfo.select_chara = self.default_character
                 if userinfo.select_chara == self.default_character:
@@ -342,7 +343,6 @@ class StreamResponseFunctions(MyObject):
             userinfo.select_chara = self.default_character
         dialog_obj = dialog_generator.DialogObject(status['text'].replace(self.atmarked_bot_id, ''))
         nlp_summary = dialog_obj.nlp_data.summary
-        acceptability = np.random.rand()
         if not self.bot_id in status['text'] and mode != 'dm':
             pass
         # 応答
@@ -411,7 +411,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -433,7 +433,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -453,7 +453,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -544,7 +544,7 @@ class StreamResponseFunctions(MyObject):
                 if not ans:
                     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
 
-        elif userinfo.cnt > 6 and mode != 'dm':
+        elif userinfo.cnt > 7 and mode != 'dm':
             ans = operate_sql.get_phrase(status =  'cntOver', n = 20, character = character)
             userinfo.mode = 'ignore'
 
@@ -632,7 +632,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -640,7 +640,7 @@ class StreamResponseFunctions(MyObject):
                 if nlp_summary.akkusativ is None:
                     ans = 'えっと...だれを呼び出すのですか？'
                 else:
-                    target_name = nlp_summary.akkusativ
+                    target_name = nlp_summary.akkusativ.replace('@', '')
                     try:
                         # self.twf.give_fav(status_id)
                         # TODO] Dicをつくるべし。
@@ -673,7 +673,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -686,7 +686,7 @@ class StreamResponseFunctions(MyObject):
                 elif nlp_summary.dativ is None:
                     ans = ''.join(['えっと...誰に', nlp_summary.akkusativ, 'を送信するのですか？'])
                 else:
-                    target_name = nlp_summary.dativ
+                    target_name = nlp_summary.dativ.replace('@', '')
                     user = self.twf.get_userinfo(screen_name = target_name)
                     if not user['following']:
                         ans = 'そのユーザーはFF外です。送信はできません。わたしをフォローするように伝えてください。わたしのフォロバが遅れている場合は、管理者に問い合わせてください。'
@@ -707,7 +707,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -733,15 +733,15 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
             else:
                 nlp_summary.akkusativ = self._convert_first_personal_pronoun(word = nlp_summary.akkusativ, convert_word = screen_name)
-                target_name = nlp_summary.akkusativ
+                target_name = nlp_summary.akkusativ.replace('@', '')
                 if not target_name:
-                    target_name = nlp_summary.dativ
+                    target_name = nlp_summary.dativ.replace('@', '')
                 if not target_name:
                     ans = 'えっと...誰をまねるのですか？'
                 else:
@@ -770,7 +770,7 @@ class StreamResponseFunctions(MyObject):
             elif nlp_summary.has_function('希望', '要望', '勧誘'):
                 is_accepted = True
             elif nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -796,7 +796,7 @@ class StreamResponseFunctions(MyObject):
             if nlp_summary.has_function('希望', '要望', '勧誘'):
                 is_accepted = True
             if nlp_summary.has_function('命令'):
-                if acceptability < 0.2:
+                if np.random.rand() < 0.2:
                     is_accepted = True
             if not is_accepted:
                 ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -805,9 +805,9 @@ class StreamResponseFunctions(MyObject):
                     if userinfo.mode in {'mon', 'battle_game'}:
                         enemy_name = None
                     else:
-                        enemy_name = nlp_summary.dativ
+                        enemy_name = nlp_summary.dativ.replace('@', '')
                     if not enemy_name:
-                        enemy_name = nlp_summary.akkusativ
+                        enemy_name = nlp_summary.akkusativ.replace('@', '')
 
                     userinfo.mode = 'battle_game'
                     intext = status['text'].replace(''.join(['@', self.bot_id, ' ']), '').replace('@', '')
@@ -840,7 +840,7 @@ class StreamResponseFunctions(MyObject):
                 if nlp_summary.akkusativ is None:
                     target_name = screen_name
                 else:
-                    target_name = nlp_summary.akkusativ
+                    target_name = nlp_summary.akkusativ.replace('@', '')
                     user = self.twf.get_userinfo(screen_name = tgname)
                     is_following = user['following']
                 if is_following:
@@ -913,12 +913,12 @@ class StreamResponseFunctions(MyObject):
         # Rest Functions
         ##############
         # elif nlp_summary.has_function('要望', '希望', '勧誘'):
-        #     if acceptability < 0.7:
+        #     if np.random.rand() < 0.7:
         #         ans = operate_sql.get_phrase(status =  'ok', character = character)
         #     else:
         #         ans = operate_sql.get_phrase(status =  'reject', character = character)
         # elif nlp_summary.has_function('命令'):
-        #     if acceptability < 0.2:
+        #     if np.random.rand() < 0.2:
         #         ans = operate_sql.get_phrase(status =  'ok', character = character)
         #     else:
         #         ans = operate_sql.get_phrase(status =  'reject', character = character)
@@ -929,11 +929,14 @@ class StreamResponseFunctions(MyObject):
         #         ans = operate_sql.get_phrase(status =  'no', character = character)
         # else:
         #     if nlp_summary.entity:
-        #         if acceptability > 0.85:
+        #         if np.random.rand() > 0.85:
         #             if nlp_summary.entity:
         #                 ans = ''.join([nlp_summary.entity, 'は', nlp_summary.value, '...覚えましたし'])
         #             else:
         #                 ans = ''.join(['なにが', nlp_summary.value, '...???'])
+        if ans == 'ignore':
+            self.twf.give_fav(status_id)
+            ans = ''
         if not ans:
             if self.tmp.imitating != self.bot_id:
                 ans = np.random.choice(operate_sql.get_twlog_users(n = 100, screen_name = self.tmp.imitating))
@@ -942,8 +945,6 @@ class StreamResponseFunctions(MyObject):
                 ans = ans.replace('<人名>', status['user']['name']).replace(self.atmarked_bot_id, '')
                 if not ans:
                     ans = '...'
-        if ans == 'ignore':
-            ans = ''
         if is_new_user:
             p('detected_new_user')
             user = self.twf.get_userinfo(screen_name = screen_name)
@@ -1015,21 +1016,21 @@ class StreamResponseFunctions(MyObject):
         status['mode'] = 'timeline'
         if not self.is_ignore(status):
             self.stats.TL_cnt += 1
-            np.random.seed()
-            status_id = status['id_str']
+            # np.random.seed()
             screen_name = status['user']['screen_name']
             replyname = status['in_reply_to_screen_name']
             status['clean_text'] = _.clean_text(status['text'])
-            #ツイートステータス情報追加処理
-            status['now'] = self.sync_now()
-            self.display_tweets(status)
             #直近ツイート処理
             if self.monitor_timeline(status):
                 return True
             # リアクション
             if self.is_react(status):
                 with operate_sql.userinfo_with(screen_name) as userinfo:
+                    userinfo.status_id = status['id_str']
                     tweet_status = self.main(status, mode = 'tweet', userinfo = userinfo)
+            self.display_tweets(status)
+        # ステータスIDをリストへ入れる。 定期取得時に重複を省くため
+        self.tmp.status_ids.append(status['id_str'])
     def display_tweets(self, status):
             if not status['in_reply_to_screen_name'] is None:
                 print(''.join([self.default_character,'|', status['user']['name'], '|\n@', status['in_reply_to_screen_name'], status['text'], '\n++++++++++++++++++++++++++++++++++']))
@@ -1098,10 +1099,9 @@ class StreamResponseFunctions(MyObject):
         status['retweeted'] = False
         status['is_quote_status'] = False
         if not self.is_ignore(status):
-            np.random.seed()
+            # np.random.seed()
             #ツイートステータス情報追加処理
             status['clean_text'] = _.clean_text(status['text'])
-            status['now'] = self.sync_now()
             with operate_sql.userinfo_with(status['user']['screen_name']) as userinfo:
                 tweet_status = self.main(status, mode = 'dm', userinfo = userinfo)
         return True
@@ -1266,6 +1266,12 @@ class StreamResponseFunctions(MyObject):
             SM.get_hot_shindan(n = 3)
             ans = SM.result(form = ''.join(['お手伝い', self.default_character]))
             task_restart()
+        elif todo == 'teiki_recheck':
+            p('tweet分速', len(self.tmp.status_ids))
+            # results = self.twf.twtr_api.user_timeline(screen_name = self.bot_id, page = 1)
+            # p(len(results))
+            self.tmp.status_ids = []
+            task_restart()
         # elif todo == 'reload_modules':
         #     importlib.reload(natural_language_processing)
         #     importlib.reload(dialog_generator)
@@ -1290,12 +1296,13 @@ class StreamResponseFunctions(MyObject):
         rand_time = self.sync_now() + timedelta(hours = hours, minutes = minutes, seconds = seconds)
         return rand_time
     def initialize_tasks(self):
-        operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teikiMC', 'teiki.trendword', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program', 'followback_check'], taskdict = {'status': 'end'})
+        operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teikiMC', 'teiki.trendword', 'teiki_recheck', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program', 'followback_check', 'hot_shindan_maker'], taskdict = {'status': 'end'})
         self.sync_now()
         task_duration_dic = {
             # 'teiki': 30,
             'teikiMC': 20,
             'teiki.trendword': 120,
+            'teiki_recheck': 1,
             'erase.tmp.stats.tweet_cnt_hour': 60,
             'followback_check': 30,
             'update.lists': 30,
@@ -1512,7 +1519,7 @@ def main(cmd = 1):
     from collections import deque
     dq = deque()
     lock = threading.Lock()
-    bot_ids = ['LiveAI_Hanamaru']
+    bot_ids = ['LiveAI_Alpaca']
     if cmd > 0:
         bot_ids = ['LiveAI_Umi', 'LiveAI_Honoka', 'LiveAI_Kotori', 'LiveAI_Maki', 'LiveAI_Rin', 'LiveAI_Hanayo', 'LiveAI_Nozomi', 'LiveAI_Eli', 'LiveAI_Nico']
     if cmd > 1:
