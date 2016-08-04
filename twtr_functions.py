@@ -101,7 +101,7 @@ class TwtrTools(MyObject):
 	@_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def user_stream(self, srf, q, lock, stop_event):
-		_.reconnect_wifi()
+		# _.reconnect_wifi()
 		stream = tweepy.Stream(auth = self.twtr_auth, listener = StreamListener(srf, q, lock), timeout = 60, async = True)
 		stream.userstream(stall_warnings=False, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
 		stop_event.wait()
