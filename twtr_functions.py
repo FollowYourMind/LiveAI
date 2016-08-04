@@ -55,13 +55,12 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def keep_alive(self):
 		p(self.bot_id, 'keep_alive...')
 		return True
-	def on_exception(self, exception):
-		p(exception, self.bot_id, 'exception')
-		_.reconnect_wifi(force = True)
-		return False
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True
+	def on_exception(self, exception):
+		p(exception, self.bot_id, 'exception')
+		return False
 	def on_disconnect(self, notice):
 		d(notice, 'disconnect')
 		return False
@@ -89,12 +88,22 @@ class TwtrTools(MyObject):
 		twtr_apis = {key: tweepy.API(value, wait_on_rate_limit = True) for key, value in twtr_auths.items()}
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
+	#安定版
+	# @_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
+	# @_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
+	# def user_stream(self, srf, q, lock, stop_event):
+	# 	stream = tweepy.Stream(auth = self.twtr_auth, listener = StreamListener(srf, q, lock), timeout = 300, async = True)
+	# 	stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
+	# 	stop_event.wait()
+	# 	p('stopping')
+	# 	stream.running = False
+	#ベータ版
 	@_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def user_stream(self, srf, q, lock, stop_event):
-		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, q, lock), timeout = 300, async = True)
-		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
+		_.reconnect_wifi()
+		stream = tweepy.Stream(auth = self.twtr_auth, listener = StreamListener(srf, q, lock), timeout = 60, async = True)
+		stream.userstream(stall_warnings=False, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
 		stop_event.wait()
 		p('stopping')
 		stream.running = False
@@ -117,7 +126,8 @@ class TwtrTools(MyObject):
 		else:
 			return self.send_tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
 	def send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0):
-		try:
+		# try:
+		if True:
 			if screen_name:
 				ans1 = ''.join(['@', screen_name,' ', ans]).replace('@@', '@')
 			else:
@@ -150,44 +160,47 @@ class TwtrTools(MyObject):
 					return True
 			else:
 				return True
-		except tweepy.error.TweepError as e:
-			print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
-			p(e)
-			if e.response is None:
-				if _.reconnect_wifi(force = True):
-					self.send_tweet(ans, screen_name, status_id, imgfile, is_debug, try_cnt)
-			if e.response and e.response.status == 403:
-				print('403')
-				return False
-			else:
-				return True
-		except Exception as e:
-			print('[Tweet.ERR] @', screen_name, ' ', ans)
-			print(e)
-			return False
+		# else:
+			# return
+		# except tweepy.error.TweepError as e:
+		# 	print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
+		# 	p(e)
+		# 	if e.response is None:
+		# 		if _.reconnect_wifi(force = True):
+		# 			self.send_tweet(ans, screen_name, status_id, imgfile, is_debug, try_cnt)
+		# 	if e.response and e.response.status == 403:
+		# 		print('403')
+		# 		return False
+		# 	else:
+		# 		return True
+		# except Exception as e:
+		# 	print('[Tweet.ERR] @', screen_name, ' ', ans)
+		# 	print(e)
+		# 	return False
 
 	def send_direct_message(self, ans, screen_name = '', is_debug = False, try_cnt = 0):
-		try:
+		# try:
+		if True:
 			if not is_debug:
 				tweetStatus = self.twtr_api.send_direct_message(screen_name = screen_name, text = ans)
 				print('[DM.OK] @', screen_name, ' ', ans)
 			else:
 				print('[Debug][DM.OK] @', screen_name, ' ', ans2)
 			return True
-		except tweepy.error.TweepError as e:
-			print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
-			if e.response is None:
-				if _.reconnect_wifi(force = True):
-					self.send_direct_message(ans, screen_name, is_debug, try_cnt)
-			if e.response and e.response.status == 403:
-				print('403')
-				return False
-			else:
-				return True
-		except Exception as e:
-			print('[DM.ERR] @', screen_name, ' ', ans)
-			print(e)
-			return False
+		# except tweepy.error.TweepError as e:
+		# 	print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
+		# 	if e.response is None:
+		# 		if _.reconnect_wifi(force = True):
+		# 			self.send_direct_message(ans, screen_name, is_debug, try_cnt)
+		# 	if e.response and e.response.status == 403:
+		# 		print('403')
+		# 		return False
+		# 	else:
+		# 		return True
+		# except Exception as e:
+		# 	print('[DM.ERR] @', screen_name, ' ', ans)
+		# 	print(e)
+		# 	return False
 
 	def getTrendwords(self, mode = 'withoutTag'):
 		# 'locations': [{'woeid': 23424856, 'name': 'Japan'}]

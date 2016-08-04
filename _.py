@@ -308,11 +308,11 @@ def restart_program():
     os.execl(python, python, * sys.argv)
 
 class Ping(object):
-    def __init__(self, host):
+    def __init__(self, host, ping_location = '/sbin/ping'):
         loss_pat='0 received'
         msg_pat='icmp_seq=1 '
         ping = subprocess.Popen(
-            ["ping", "-c", "1", host],
+            [ping_location, '-c', '1', host],
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
             shell = False,

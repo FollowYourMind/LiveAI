@@ -82,7 +82,7 @@ class TweetLogPool(MyObject):
             self.status_ids.append(status_id)
             self.timeline_twlog = self.timeline_twlog[-20:]
 class StreamResponseFunctions(MyObject):
-    def __init__(self, bot_id):
+    def __init__(self, bot_id, lock):
         debug_style = ''
         bot_chara_dic = { 'LiveAI_Umi': '海未',
             'LiveAI_Honoka': '穂乃果',
@@ -111,6 +111,7 @@ class StreamResponseFunctions(MyObject):
         else:
             self.default_character = bot_chara_dic[bot_id]
         self.bot_id = bot_id
+        self.lock = lock
         self.atmarked_bot_id = ''.join(['@', self.bot_id])
         self.manager_id = 'kaihatsu_paka'
         self.twf = twtr_functions.TwtrTools(self.bot_id)
@@ -141,12 +142,25 @@ class StreamResponseFunctions(MyObject):
         else:
             # tweeet 数をインクリメントする
             self.stats.tweet_cnt_hour += 1
-        if mode == 'dm':
-            return self.twf.send_direct_message(ans, screen_name = screen_name, is_debug = self.is_debug_direct_message, try_cnt = try_cnt)
-        elif mode in {'open', 'tweet'}:
-            return self.twf.send_tweet(ans, screen_name = screen_name, imgfile = imgfile, status_id = status_id, is_debug = self.is_debug_tweet, try_cnt = try_cnt)
-        else:
-            p(['??', mode])
+        try:
+            if mode == 'dm':
+                return self.twf.send_direct_message(ans, screen_name = screen_name, is_debug = self.is_debug_direct_message, try_cnt = try_cnt)
+            elif mode in {'open', 'tweet'}:
+                return self.twf.send_tweet(ans, screen_name = screen_name, imgfile = imgfile, status_id = status_id, is_debug = self.is_debug_tweet, try_cnt = try_cnt)
+            else:
+                    p(['??', mode])
+        except tweepy.error.TweepError as e:
+            print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
+            p(e)
+            if e.response is None:
+                with self.lock:
+                    if _.reconnect_wifi():
+                        self.send(ans, screen_name,  imgfile, status_id, mode, try_cnt)
+            if e.response and e.response.status == 403:
+                print('403')
+                return False
+            else:
+                return True
         return True
     def default_profile(self):
         try:
@@ -319,9 +333,12 @@ class StreamResponseFunctions(MyObject):
         if not userinfo.select_chara:
             userinfo.select_chara = self.default_character
         userinfo.context = text
+
         call_chara_ls = iscalledBOT(text = text,  select_set = {self.default_character})
         if not call_chara_ls:
             pass
+        elif mode != 'dm' and not self.bot_id in status['text']:
+            return True
         elif any([call_phrase in text for call_phrase in {'おいで', 'かもん', 'hey', 'きて', 'こい', '来', '114514'}]):
             new_chara = call_chara_ls[0]
             if new_chara != userinfo.select_chara:
@@ -447,7 +464,7 @@ class StreamResponseFunctions(MyObject):
                     chara = character
                 userinfo['tmp'] = '</>'.join([chara, tmplabel])
                 userinfo.cnt = 0
-                ans = '[学習モード]\n' +chara +'に「' + tmplabel+ '」として覚えさせるテキストをリプライしてください。\nendと入力するまでモードは続きます。'
+                ans = '[学習モード]\n' + chara + 'に「' + tmplabel+ '」として覚えさせるテキストをリプライしてください。\nendと入力するまでモードは続きます。'
         elif nlp_summary.value in {'勧誘する'}:
             is_accepted = False
             if nlp_summary.has_function('希望', '要望'):
@@ -1003,11 +1020,15 @@ class StreamResponseFunctions(MyObject):
             return True
         elif iscalledBOT(text = text,  select_set = {self.default_character}):
             return True
+        elif '#お手伝いbot全員集合' in status['text']:
+            if status['user']['screen_name'] == 'kaihatsu_paka':
+                return True
         rand = np.random.rand()
-        if status['user']['screen_name'] in self.bots_set:
+        if any(['bot' in name for name in {status['user']['screen_name'], status['user']['name']}]):
+            p(status['user']['name'] + ' is bot')
             if rand < 0.001: #BOTに対する自発。0.1%
                 return True
-        if rand < 0.01: #自発。0.5%
+        elif rand < 0.01: #自発。0.5%
             return True
         return False
 
@@ -1258,9 +1279,9 @@ class StreamResponseFunctions(MyObject):
             operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'time_line_cnt', 'number': self.stats.TL_cnt})
             operate_sql.save_stats(stats_dict = {'whose': self.bot_id, 'status': 'direct_message_cnt', 'number': self.stats.DM_cnt})
             task_restart(is_noised = False)
-        elif todo == 'reconnect_wifi':
-            _.reconnect_wifi()
-            task_restart()
+        # elif todo == 'reconnect_wifi':
+        #     _.reconnect_wifi()
+        #     task_restart()
         elif todo == 'hot_shindan_maker':
             SM = crawling.ShindanMaker()
             SM.get_hot_shindan(n = 3)
@@ -1296,7 +1317,7 @@ class StreamResponseFunctions(MyObject):
         rand_time = self.sync_now() + timedelta(hours = hours, minutes = minutes, seconds = seconds)
         return rand_time
     def initialize_tasks(self):
-        operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teikiMC', 'teiki.trendword', 'teiki_recheck', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'reconnect_wifi', 'restart_program', 'followback_check', 'hot_shindan_maker'], taskdict = {'status': 'end'})
+        operate_sql.update_task(who_ls = [self.bot_id], kinds = ['tweet', 'teiki','teikiMC', 'teiki.trendword', 'teiki_recheck', 'erase.tmp.stats.tweet_cnt_hour', 'update.lists', 'default','update_userprofile','save_stats', 'followback_check', 'hot_shindan_maker'], taskdict = {'status': 'end'})
         self.sync_now()
         task_duration_dic = {
             # 'teiki': 30,
@@ -1310,8 +1331,8 @@ class StreamResponseFunctions(MyObject):
             'save_stats': 20,
             'hot_shindan_maker': 120
             }
-        if self.bot_id == 'LiveAI_Umi':
-            task_duration_dic['reconnect_wifi'] = 3
+        # if self.bot_id == 'LiveAI_Umi':
+        #     task_duration_dic['reconnect_wifi'] = 3
         def save_task(task_name, duration_min):
             rand_start_min = np.random.randint(0, 20)
             operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': task_name, 'to_whom': '', 'tmptext': str(duration_min), 'when': self.get_time(minutes = rand_start_min)})
@@ -1408,12 +1429,74 @@ def monitor(bots, q, lock):
                 break
             except:
                 _.log_err()
+
     async def restarter(period = 1200):
         while True:
-            await asyncio.sleep(period)
-            for bot_id, bot in bots.items():
-                await asyncio.sleep(20)
-                bot.restart()
+            try:
+                await asyncio.sleep(period)
+                for bot_id, bot in bots.items():
+                    await asyncio.sleep(20)
+                    bot.restart()
+            except KeyboardInterrupt:
+                break
+            except:
+                _.log_err()
+
+    async def reconnect_wifi_async(period = 60, force = False):
+        while True:
+            try:
+                await asyncio.sleep(period)
+                # reconect algorithm
+                # check ping to google.com
+                if _.Ping('google.com').is_connectable:
+                    p('ping is connecting. reconnect-program -> finished!!!!')
+                    if not force:
+                        return True
+                # variables
+                networksetup_cmd = '/usr/sbin/networksetup'
+                optionargs = ['off']
+                args = [networksetup_cmd, '-setairportpower', 'en0']
+                i = 0
+                # while loop to reconnect Internet
+                while True:
+                    p('reconnection retry_cnt:', i)
+                    i += 1
+                    subprocess.Popen(
+                        args + ['off'],
+                        stdin = subprocess.PIPE,
+                        stdout = subprocess.PIPE,
+                        stderr = subprocess.PIPE,
+                        shell = False,
+                        close_fds = True
+                    )
+                    p('wifi network has been turned off... and restarting')
+                    p('wait 2sec...')
+                    await asyncio.sleep(2)
+                    subprocess.Popen(
+                        args + ['on'],
+                        stdin = subprocess.PIPE,
+                        stdout = subprocess.PIPE,
+                        stderr = subprocess.PIPE,
+                        shell = False,
+                        close_fds = True
+                    )
+                    if i > 3:
+                      return False
+                    p('reconnecting wifi, wait 10sec...')
+                    p('checking ping...')
+                    await asyncio.sleep(10)
+                    # re-ping to check the Internet connection
+                    if _.Ping('google.com').is_connectable:
+                      p('ping is connecting. reconnect-program -> finished!!!!')
+                      break
+                    else:
+                      p('ping is NOT connecting... restart -> reconnect-program...')
+                      await asyncio.sleep(2)
+                return True
+            except KeyboardInterrupt:
+                break
+            except:
+                _.log_err()
     async def _test(period = 20):
         print('test')
         await asyncio.sleep(period)
@@ -1462,16 +1545,17 @@ def monitor(bots, q, lock):
     # asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
     asyncio.ensure_future(restarter(period = 1800))#1800
+    asyncio.ensure_future(reconnect_wifi_async(period = 60))
     # asyncio.ensure_future(_test(period = 20))
     try:
         loop.run_forever()
     finally:
         loop.close()
         print('end')
-def init_srfs(bots):
+def init_srfs(bots, lock):
     def _init_srf(bot_id):
         try:
-            return bot_id, StreamResponseFunctions(bot_id)
+            return bot_id, StreamResponseFunctions(bot_id, lock)
         except:
             _.log_err()
     srfs = {}
@@ -1526,7 +1610,7 @@ def main(cmd = 1):
         bot_ids += ['LiveAI_Yukiho', 'LiveAI_Alisa']
     if cmd > 2:
         bot_ids += ['LiveAI_Yoshiko', 'LiveAI_Riko', 'LiveAI_You', 'LiveAI_Chika', 'LiveAI_Ruby', 'LiveAI_Dia', 'LiveAI_Mari', 'LiveAI_Kanan', 'LiveAI_Hanamaru']
-    srfs = init_srfs(bot_ids)
+    srfs = init_srfs(bot_ids, lock)
     bots = {}
     for bot_id in bot_ids:
         bot = LiveAI_Async(bot_id, srfs, dq, lock)
