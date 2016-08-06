@@ -1435,8 +1435,25 @@ def monitor(bots, q, lock):
             try:
                 await asyncio.sleep(period)
                 for bot_id, bot in bots.items():
-                    await asyncio.sleep(20)
+                    await asyncio.sleep(30)
                     bot.restart()
+            except KeyboardInterrupt:
+                break
+            except:
+                _.log_err()
+
+    async def thread_checker(period = 60):
+        while True:
+            try:
+                await asyncio.sleep(period)
+                print(threading.enumerate())
+                for bot_id, bot in bots.items():
+                    print('checking '+ bot.bot_thread.name)
+                    if not bot.bot_thread.is_alive():
+                        bot.restart()
+                    else:
+                        print(bot_id + ' is aliving...')
+                    await asyncio.sleep(15)
             except KeyboardInterrupt:
                 break
             except:
@@ -1545,6 +1562,7 @@ def monitor(bots, q, lock):
     # asyncio.ensure_future(multi_fetch(q, lock))
     asyncio.ensure_future(task_manage(period = 30))
     asyncio.ensure_future(restarter(period = 1800))#1800
+    asyncio.ensure_future(thread_checker(period = 60))#1800
     asyncio.ensure_future(reconnect_wifi_async(period = 60))
     # asyncio.ensure_future(_test(period = 20))
     try:

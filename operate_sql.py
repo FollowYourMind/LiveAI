@@ -244,6 +244,7 @@ def data_save(data):
 @contextmanager
 @core_sql.atomic()
 def userinfo_with(screen_name):
+	userinfo = None
 	try:
 		userinfo = get_userinfo(screen_name)
 		yield userinfo
