@@ -9,6 +9,7 @@ from _ import p, d, MyObject, MyException
 import natural_language_processing
 import operate_sql
 import main
+@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 class StreamListener(tweepy.streaming.StreamListener):
 	def __init__(self, srf = None, q = None, lock = None, stop_event = None):
 		super().__init__()
@@ -19,6 +20,9 @@ class StreamListener(tweepy.streaming.StreamListener):
 		self.stop_event = stop_event
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
+	def on_data(self, data):
+		pass
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
@@ -29,25 +33,19 @@ class StreamListener(tweepy.streaming.StreamListener):
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		# if self.stop_event.is_set():
-		# 	p('stop_event...')
-		# 	return False
-		# else:
 		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		# self.q.append(status)
+		raise Exception
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
 		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		# self.q.append(status)
-		# self.q.put_nowait((status, self.bot_id, 'direct_message'))
 		return True
+	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_event(self, status):
 		bot_process = threading.Thread(target = self.srf.on_event_main, args=(status._json,), name = self.bot_id)
 		bot_process.start()
-		# self.q.put_nowait((status, self.bot_id, 'event'))
 		return True
 	def on_limit(self, track):
 		p(self.bot_id, 'track', track)
@@ -58,7 +56,6 @@ class StreamListener(tweepy.streaming.StreamListener):
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True
-	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
 		return True
