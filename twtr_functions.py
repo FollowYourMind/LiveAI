@@ -11,55 +11,59 @@ import operate_sql
 import main
 # @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 class StreamListener(tweepy.streaming.StreamListener):
-	def __init__(self, srf = None, q = None, lock = None, stop_event = None):
+	def __init__(self, srf = None, q = None, lock = None, events = None):
 		super().__init__()
 		self.srf = srf
 		self.bot_id = srf.bot_id
 		self.q = q
 		self.lock = lock
-		self.stop_event = stop_event
+		self.events = events
 	def __del__(self):
 		p(self.bot_id, 'stopping streaming...')
 	# @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	# def on_data(self, data):
-	# 	pass
+		# p(self.events.stop.is_set(), self.events.ping.is_set())
 	def on_connect(self):
 		return True
 	def on_friends(self, friends):
-		bot_process = threading.Thread(target = self.srf.on_friends_main, args=(friends,), name = self.bot_id)
+		bot_process = threading.Thread(target = self.srf.on_friends_main, args=(friends,), name = self.bot_id+ '_on_friends', daemon = True)
 		bot_process.start()
+		self.events.ping.set()
 		return True
 	def on_delete(self, status_id, user_id):
+		self.events.ping.set()
 		return True
 	# @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_status(self, status):
-		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id)
+		bot_process = threading.Thread(target = self.srf.on_status_main, args=(status._json,), name = self.bot_id+ '_on_status', daemon = True)
 		bot_process.start()
-		# self.stop_event.set()
-		# raise Exception
+		self.events.ping.set()
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_direct_message(self,status):
-		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id)
+		bot_process = threading.Thread(target = self.srf.on_direct_message_main, args=(status._json,), name = self.bot_id+ '_on_direct_message', daemon = True)
 		bot_process.start()
+		self.events.ping.set()
 		return True
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = True)
 	def on_event(self, status):
-		bot_process = threading.Thread(target = self.srf.on_event_main, args=(status._json,), name = self.bot_id)
+		bot_process = threading.Thread(target = self.srf.on_event_main, args=(status._json,), name = self.bot_id + '_on_event', daemon = True)
 		bot_process.start()
-		return True
-	def on_limit(self, track):
-		p(self.bot_id, 'track', track)
+		self.events.ping.set()
 		return True
 	def keep_alive(self):
 		p(self.bot_id, 'keep_alive...')
+		self.events.ping.set()
+		return True
+	def on_limit(self, track):
+		p(self.bot_id, 'track', track)
 		return True
 	def on_warning(self, notice):
 		p(notice, 'warning')
 		return True
 	def on_exception(self, exception):
 		p(exception, self.bot_id, 'exception')
-		raise exception
+		return False
 	def on_disconnect(self, notice):
 		d(notice, 'disconnect')
 		return False
@@ -87,30 +91,19 @@ class TwtrTools(MyObject):
 		twtr_apis = {key: tweepy.API(value, wait_on_rate_limit = True) for key, value in twtr_auths.items()}
 		self.twtr_auth = twtr_auths[bot_id]
 		self.twtr_api = twtr_apis[bot_id]
-	#安定版
-	# @_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
-	# @_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	# def user_stream(self, srf, q, lock, stop_event):
-	# 	stream = tweepy.Stream(auth = self.twtr_auth, listener = StreamListener(srf, q, lock), timeout = 300, async = True)
-	# 	stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, async=True, encoding='utf8')
-	# 	stop_event.wait()
-	# 	p('stopping')
-	# 	stream.running = False
 	#ベータ版
 	# @_.retry(Exception, tries=30, delay=30, max_delay=240, jitter=0.25)
 	# @_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
-	def user_stream(self, srf, q, lock, stop_event):
+	def user_stream(self, srf, q, lock, events):
 		# _.reconnect_wifi()
-		# try:
 		p('start user_stream')
 		auth = self.twtr_auth
-		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, q, lock, stop_event), async=True, timeout = 180)
-		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, encoding='utf8')
-		stop_event.wait()
+		stream = tweepy.Stream(auth = auth, listener = StreamListener(srf, q, lock, events), async=False, timeout = 180)
+		stream.userstream(stall_warnings=True, _with=None, replies=None, track=None, locations=None, encoding='utf8', async=True)
+		p('waiting stop event')
+		events.stop.wait()
 		p('stopping user_stream')
 		stream.running = False
-		# except:
-		# 	_.log_err()
 	@_.retry(tweepy.TweepError, tries=30, delay=0.3, max_delay=16, jitter=0.25)
 	def filter_stream(self, twq = None, track=['python']):
 		auth = self.twtr_auth

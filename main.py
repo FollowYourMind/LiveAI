@@ -1183,7 +1183,7 @@ class StreamResponseFunctions(MyObject):
             if tasks:
                 try:
                     for task in tasks:
-                        implement_thread = threading.Thread(target = self.implement_tasks, args=(task._data,))
+                        implement_thread = threading.Thread(target = self.implement_tasks, args=(task._data,), name = 'implement_task-'+ task._data['id'], daemon = True)
                         implement_thread.start()
                 except:
                     _.log_err()
@@ -1410,6 +1410,7 @@ def monitor(bots, q, lock):
             except:
                 _.log_err()
     async def task_manage(period = 60):
+        await asyncio.sleep(120)
         while True:
             try:
                 now = datetime.utcnow() + timedelta(hours = 9)
@@ -1446,14 +1447,16 @@ def monitor(bots, q, lock):
         while True:
             try:
                 await asyncio.sleep(period)
-                print(threading.enumerate())
+                # print(threading.enumerate())
                 for bot_id, bot in bots.items():
                     print('checking '+ bot.bot_thread.name)
                     if not bot.bot_thread.is_alive():
                         bot.restart()
+                    elif not bot.events.ping.is_set():
+                        bot.restart()
                     else:
-                        print(bot_id + ' is aliving...')
-                    await asyncio.sleep(15)
+                        bot.events.ping.clear()
+                        print(bot.bot_thread.name + ' thread is active...')
             except KeyboardInterrupt:
                 break
             except:
@@ -1598,24 +1601,28 @@ class LiveAI_Async(MyObject):
         self.srf = self.srfs[self.bot_id]
         self.q = q
         self.lock = lock
-        self.stop_event = threading.Event()
-        self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.stop_event), name = self.bot_id)
+        self.events = Temp()
+        self.events.stop = threading.Event()
+        self.events.ping = threading.Event()
+        self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.events), name = self.bot_id, daemon = True)
     def run(self):
-        p('running thread')
+        p(self.bot_thread.name + ' running thread')
         self.bot_thread.start()
     def stop(self):
-        p('stopping thread')
-        self.stop_event.set()
+        p(self.bot_thread.name + ' stopping thread')
+        self.events.stop.set()
         self.bot_thread.join()
-        self.stop_event.clear()
+        self.events.stop.clear()
+        p(self.bot_thread.name + ' has stop thread')
     def restart(self):
-        p('restarting thread')
+        p(self.bot_thread.name + ' restarting thread')
         self.stop()
         if not self.bot_thread.is_alive():
-            self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.stop_event), name = self.bot_id)
+            p(self.bot_thread.name + ' restarting cloning thread')
+            self.bot_thread = threading.Thread(target = self.twf.user_stream, args=(self.srf, self.q, self.lock, self.events), name = self.bot_id, daemon = True)
             self.run()
         else:
-            p('bot is aliving.. err')
+            p(self.bot_thread.name + ' is active.. err')
 
 def main(cmd = 1):
     from collections import deque
