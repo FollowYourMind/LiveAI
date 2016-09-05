@@ -78,7 +78,7 @@ def extract_haiku(mas):
                 ExSets2 = {'非自立', '接尾'}
                 if mas[index1][2] in ExSets2 or mas[index2][2] in ExSets2:
                         return ''
-                return ''.join(['\n',''.join(origin[0:index1]), '\n        ', ''.join(origin[index1:index2]), '\n                ', ''.join(origin[index2:]), '...', comment])
+                return ''.join(['\n',''.join(origin[0:index1]), '\n    ', ''.join(origin[index1:index2]), '\n        ', ''.join(origin[index2:]), '...', comment])
 
 def getBoomWords(username = '_umiA', n = 400):
         try:
@@ -112,7 +112,7 @@ class TFIDF(MyObject):
                 self.fix_s1_tfidf = None
 
         @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
-        @talk_sql.atomic()
+        @db.atomic()
         def upsert_word(self, ma, is_learn = False):
                 genkei = ma[7]
                 hinshi = ma[1]
@@ -256,33 +256,34 @@ class TFIDF(MyObject):
 class TrigramMarkovChain(MyObject):
         def __init__(self, character = 'sys'):
                 self.character = character
-                self.selected_character_database = []
-        @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
-        @talk_sql.atomic()
-        def generate(self, word, is_randomize_metasentence = True):
-                ans = ''
-                metaframe_str = self.get_metasentence()
-                metaframe = metaframe_str.split(',')
+                # self.selected_character_database = []
                 self.database = TrigramModel.select()
                 self.selected_character_database = self.database.where(TrigramModel.character == self.character)
-                if not word:
-                        try:
-                                Ws = self.selected_character_database.where(TrigramModel.W1 == '<BOS>', TrigramModel.P2 == '名詞').order_by(TrigramModel.cnt.desc())
-                                word = self.choose_randomword(Ws, place = 2)
-                        except Exception as e:
-                                word = '...'
-                # try:
-                #         backward_ans = self.generate_backward(startWith = word)
-                # except Exception as e:
-                #         d(e)
-                backward_ans = ''
+        def get_startwith(self):
                 try:
-                        forward_ans = self.generate_forward(word, Plist = metaframe)
+                        Ws = self.selected_character_database.where(    TrigramModel.W1 == '<BOS>', TrigramModel.P2 ==   '名詞').order_by(TrigramModel.cnt.desc())
+                        word = self.choose_randomword(Ws, place = 2)
                 except Exception as e:
-                        d(e)
+                        word = '...'
+                return word
+        @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
+        @db.atomic()
+        def generate(self, word = '', is_randomize_metasentence = True):
+                ans = ''
+                # metaframe_str = self.get_metasentence()
+                # metaframe = metaframe_str.split(',')
+                if not word:
+                        word = self.get_startwith()
+                try:
+                        forward_ans = self.generate_forward(word)
+                        if not forward_ans:
+                            word = self.get_startwith()
+                            forward_ans = ''.join(['......ところで、', self.generate_forward(word)])
+                except:
+                        _.log_err()
                         forward_ans = ''
-                ans = ''.join([backward_ans, forward_ans])
-                ans = ans.replace('<BOS>', '').replace('<EOS>', '')
+                # ans = ''.join([backward_ans, forward_ans])
+                ans = forward_ans.replace('<BOS>', '').replace('<EOS>', '')
                 return ans
         def choose_randomword(self, Ws, place = 2):
                 word_cnt_ls = [w.cnt for w in Ws]
@@ -329,19 +330,15 @@ class TrigramMarkovChain(MyObject):
                         #         except Exception as e:
                         #                 pass
                         return W
-        def generate_forward(self, startWith = '', Plist = ['<BOS>','名詞','','名詞','助詞','動詞','助詞','助詞','名詞','名詞','名詞','助詞','動詞','助動詞','助動詞','<EOS>'], break_set = {'」', '。', '!', '！', '?', '？'}, is_debug = False, n = 100000):
+        def generate_forward(self, startWith = '', Plist = ['<BOS>','名詞','','名詞','助詞','動詞','助詞','助詞','名詞','名詞','名詞','助詞','動詞','助動詞','助動詞','<EOS>'], break_set = {'」', '。', '!', '！', '?', '？'}, is_debug = False, is_correct_with_hinshi = False, n = 100000):
                 QuestionPhrase = '<KEY>...？'
-                # p(Plist)
-                # Plist = ['<BOS>', '名詞', '助詞', '名詞', '記号', '<EOS>']
                 lenP = len(Plist)
-                is_correct_with_hinshi = True
                 i = 0
                 if startWith:
-                        ans = ['<BOS>', startWith]
+                        ans = ['', startWith]
                 else:
-                        ans = ['<BOS>']
-                        i -= 1
-                while True:
+                        ans = ['', '<BOS>']
+                for i in range(40):
                         W = ''
                         i1 = i+1
                         i2 = i+2
@@ -350,9 +347,9 @@ class TrigramMarkovChain(MyObject):
                         if i2 >= lenP:
                                 is_correct_with_hinshi = False
                         else:
-                                P3 = Plist[i2]
-                                P2 = Plist[i1]
-                                P1 = Plist[i]
+                            P3 = Plist[i2]
+                            P2 = Plist[i1]
+                            P1 = Plist[i]
                         if not W and is_correct_with_hinshi:
                                 # print('2単語一致前方2品詞一致')
                                 try:
@@ -389,25 +386,23 @@ class TrigramMarkovChain(MyObject):
                                 except DoesNotExist:
                                         pass
                         if not W:
+                                if i == 0:
+                                        return ''
                                 # print('1単語一致2')
                                 try:
                                         Ws = self.selected_character_database.where(TrigramModel.W1 == pre1).order_by(TrigramModel.cnt.desc()).limit(n)
                                         W = self.choose_randomword(Ws, place = 2)
                                 except DoesNotExist:
-                                        if i == 0:
-                                                return QuestionPhrase.replace('<KEY>', pre2)
+                                        pass
                         if not W and is_correct_with_hinshi:
                                 W = self.get_same_hinshi(P2)
                         if ans[-1] != W:
                                 ans.append(W)
                         else:
                                 break
-                        i += 1
                         if W in {'<EOS>'}:
                                 break
                         # if W in break_set:
-                        #         break
-                        # if i > 30:
                         #         break
                 return ''.join(ans)
 #
@@ -497,7 +492,7 @@ class TrigramMarkovChain(MyObject):
         # print(e)
 def updateMC(taskid = 0, character = '', taskdict = {'character':'sys'}):
     try:
-        with talk_sql.transaction():
+        with db.transaction():
             if taskid != 0:
                 t = TrigramModel.update(**taskdict).where(TrigramModel.id == taskid)
             else:
@@ -505,13 +500,13 @@ def updateMC(taskid = 0, character = '', taskdict = {'character':'sys'}):
             t.execute()
     except Exception as e:
         print(e)
-        talk_sql.rollback()
+        db.rollback()
 
 def saveMetaS(P):
         Pstr = ','.join(P)
         try:
-                # talk_sql.create_tables([TrigramModel, mSentence], True)
-                with talk_sql.transaction():
+                # db.create_tables([TrigramModel, mSentence], True)
+                with db.transaction():
                         try:
                                 M, created = mSentence.get_or_create(framework = Pstr)
                                 if created == True:
@@ -525,14 +520,14 @@ def saveMetaS(P):
                                         M.save()
                         except Exception as e:
                                 d(e)
-                        talk_sql.commit()
+                        db.commit()
         except Exception as e:
-                talk_sql.rollback()
+                db.rollback()
 
 def save_modpair(_from, _to, _tag = ''):
     try:
-        # talk_sql.create_tables([TrigramModel, mSentence, mod_pair], True)
-        with talk_sql.transaction():
+        # db.create_tables([TrigramModel, mSentence, mod_pair], True)
+        with db.transaction():
             try:
                 M, created = mod_pair.get_or_create(w_from = _from, w_to = _to)
                 if created:
@@ -549,15 +544,15 @@ def save_modpair(_from, _to, _tag = ''):
                     M.save()
             except Exception as e:
                 print(e)
-            talk_sql.commit()
+            db.commit()
     except Exception as e:
-        talk_sql.rollback()
+        db.rollback()
 
 def get_modpair(_from = '', _to = '', _tag = '', n = 100):
     ansdic = {"from": '', "to": '', "tag": '', "cnt": ''}
     try:
-        # talk_sql.create_tables([TrigramModel, mSentence], True)
-        with talk_sql.transaction():
+        # db.create_tables([TrigramModel, mSentence], True)
+        with db.transaction():
             try:
                 if not _to:
                     Ms = mod_pair.select().where(mod_pair.w_from == _from, mod_pair.w_tag == _tag).order_by(mod_pair.cnt.desc()).limit(n)
@@ -576,9 +571,9 @@ def get_modpair(_from = '', _to = '', _tag = '', n = 100):
                     return Ms[0].w_cnt
             except Exception as e:
                 print(e)
-            talk_sql.commit()
+            db.commit()
     except Exception as e:
-        talk_sql.rollback()
+        db.rollback()
         return ansdic
 
 def trigram_main(s, is_debug = False, character = 'sys'):
@@ -646,7 +641,7 @@ def learn_trigram(s_ls, character = 'sys', over = 0, save_freqcnt = 5):
                 trigram = q.get(timeout = 5)
                 p(trigram)
                 if trigram:
-                    with talk_sql.atomic():
+                    with db.atomic():
                         save_trigram_in_transaction(trigram, character = character)
                         p('____Receiver-', str(process_id), 'saved!!')
                 # time.sleep(random.random())
@@ -860,12 +855,12 @@ class DialogObject(MyObject):
         self.tfidf = TFIDF()
         self.get_kw_thread = threading.Thread(target = self._get_keywords, args=(s, ), name='get_kw')
         self.get_kw_thread.start()
-        if self.nlp_data.summary.function == '断定':
-            self.save_fact()
+        # if self.nlp_data.summary.function == '断定':
+            # self.save_fact()
     def is_fact(self):
-        # talk_sql.create_tables([FactModel], True)
+        # db.create_tables([FactModel], True)
         try:
-            with talk_sql.transaction():
+            with db.transaction():
                 fact_dict = self.nlp_data.summary
                 fact = FactModel.get(entity = fact_dict.entity, value = fact_dict.value, akkusativ = fact_dict.akkusativ, dativ = fact_dict.dativ)
                 return fact
@@ -875,15 +870,15 @@ class DialogObject(MyObject):
             return None
         except IntegrityError as e:
             d(e)
-            talk_sql.rollback()
+            db.rollback()
             raise Exception
         except Exception as e:
             d(e)
             return False
     def save_fact(self):
-        # talk_sql.create_tables([FactModel], True)
+        # db.create_tables([FactModel], True)
         try:
-            with talk_sql.transaction():
+            with db.transaction():
                 fact_dict = self.nlp_data.summary
                 fact, is_created = FactModel.get_or_create(entity = fact_dict.entity, value = fact_dict.value, akkusativ = fact_dict.akkusativ, dativ = fact_dict.dativ)
                 if not is_created:
@@ -891,11 +886,11 @@ class DialogObject(MyObject):
                 else:
                     fact.cnt = 1
                 fact.save()
-                talk_sql.commit()
+                db.commit()
                 return fact, is_created
         except Exception as e:
             p(e)
-            talk_sql.rollback()
+            db.rollback()
             return False
     def _get_longest_split(self, s = '', split_word = '」'):
         try:
@@ -946,7 +941,7 @@ class DialogObject(MyObject):
                     self.rel_words.extend(_.flatten(wn_dic.values()))
 
     @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
-    @webdata_sql.atomic()
+    @db.atomic()
     def ss_log_sender(self, kw, q, person = '', n = 100):
         dialogs = None
         dialogs = operate_sql.get_ss_dialog_within(kw = kw, person = person, n = n)
@@ -954,7 +949,7 @@ class DialogObject(MyObject):
             for d in dialogs:
                 q.append((d[0][1:-1], d[1][1:-1]))
     @_.retry(OperationalError, tries=10, delay=0.3, max_delay=None, backoff=1, jitter=0)
-    @twlog_sql.atomic()
+    @db.atomic()
     def tweet_log_sender(self, kw, q, UserList = [], BlackList = [], n = 100):
         dialogs = None
         try:
@@ -1002,10 +997,11 @@ class DialogObject(MyObject):
                     ans = ans.replace('<人名>', 'あるぱか')
         ans = self._get_longest_split(ans, split_word = '<数>')
         ans = self._get_longest_split(ans, split_word = 'さん')
+        ans = self._get_longest_split(ans, split_word = '！')
         ans = ans.replace('<接尾>', 'さん').replace('<地域>', 'アキバ')
         ans = ans.replace('Three', '').replace('two', '').replace('one', '').replace('zero', '').replace('RaidOntheCity', '')
         if not ans:
-            ans = operate_sql.get_phrase(status = 'nod')
+            ans = operate_sql.get_phrase(status = 'あいづち')
         if not ans[-1] in {'。', '!', '?', '！', '？'}:
             ans = ''. join([ans, '。'])
         return ans
@@ -1070,9 +1066,9 @@ class DialogObject(MyObject):
             pass
         except Exception as e:
             _.log_err(is_print = True, is_logging = True)
-            ans = operate_sql.get_phrase(status = 'nod', character = character)
+            ans = operate_sql.get_phrase(status = 'あいづち', character = character)
             if '...:[' in ans:
-                ans = operate_sql.get_phrase(status = 'nod')
+                ans = operate_sql.get_phrase(status = 'あいづち')
             if '...:[' in ans:
                 ans = ''
         finally:
@@ -1097,65 +1093,192 @@ class DialogObject(MyObject):
             rand_p = tf_idf / per
             ans = np.random.choice(texts, 1, replace = False, p = rand_p)[0]
             return ans
+
+class Converter(MyObject):
+    def __init__(self):
+        self.MA = natural_language_processing.MorphologicalAnalysis()
+        self.hira2kata = natural_language_processing.zj
+    def large_to_small(self, s):
+            if not s:
+                end = ''
+            else:
+                end = s[-1]
+            if end in {'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', 'が', 'ざ', 'だ', 'ば', 'ぱ', 'ア', 'カ', 'サ', 'タ', 'ナ', 'ハ', 'マ', 'ヤ', 'ラ', 'ワ', 'ガ', 'ザ', 'ダ', 'バ', 'パ'}:
+                small = 'ぁ'
+            elif end in {'い', 'き', 'し', 'ち', 'に', 'ひ', 'み', 'り', 'ゐ', 'ぎ', 'じ', 'ぢ', 'び', 'ぴ', 'イ', 'キ', 'シ', 'チ', 'ニ', 'ヒ', 'ミ', 'リ', 'ヰ', 'ギ', 'ジ', 'ヂ', 'ビ', 'ピ'}:
+                small = 'ぃ'
+            elif end in {'う', 'く', 'す', 'つ', 'ぬ', 'ふ', 'む', 'ゆ', 'る', 'を', 'ん', 'ぐ', 'ず', 'づ', 'ぶ', 'ぷ', 'ウ', 'ク', 'ス', 'ツ', 'ヌ', 'フ', 'ム', 'ユ', 'ル', 'ヲ', 'ン', 'グ', 'ズ', 'ヅ', 'ブ', 'プ'}:
+                small = 'ぅ'
+            elif end in {'え', 'け', 'せ', 'て', 'ね', 'へ', 'め', 'れ', 'ゑ', 'げ', 'ぜ', 'で', 'べ', 'ぺ', 'エ', 'ケ', 'セ', 'テ', 'ネ', 'ヘ', 'メ', 'レ', 'ヱ', 'ゲ', 'ゼ', 'デ', 'ベ', 'ペ'}:
+                small = 'ぇ'
+            elif end in {'お', 'こ', 'そ', 'と', 'の', 'ほ', 'も', 'よ', 'ろ', 'ご', 'ぞ', 'ど', 'ぼ', 'ぽ', 'オ', 'コ', 'ソ', 'ト', 'ノ', 'ホ', 'モ', 'ヨ', 'ロ', 'ゴ', 'ゾ', 'ド', 'ボ', 'ポ'}:
+                small = 'ぉ'
+            else:
+                small = ''
+            return small
+    def aegi(self, s):
+        self.mas = self.MA.get_mecab_ls(s)
+        head = ['ぁあ…っ！', 'んっ..', 'あはっ...//...'] + ['']*5
+        ans = np.random.choice(head)
+        for ma in self.mas:
+            if ma[1] in {'記号'}:
+                continue
+            # elif ma[1] in {'動詞'}:
+
+            elif ma[1] in {'名詞'} and ma[2] in {'一般','自立', '固有名詞'} and ma[8] != '*':
+                if np.random.rand() > 0.5:
+                    connect = np.random.choice(['、', '...', 'っ'])
+                    ans += ''.join([self.hira2kata(ma[8][0]), connect])
+            ans += ma[0]
+            if np.random.rand() > 0.5:
+                komoji = self.large_to_small(ma[8])
+                if not komoji:
+                    komoji = 'っ'
+            else:
+                komoji = ''
+            if komoji:
+                komoji += np.random.choice(['...', '...', '......' , '', '♡', '♡', '♡', '♡', 'っ'])
+            add = ['...んっ...', '......'] + [komoji]*2 + ['…']*4+ ['']*2
+            ans += np.random.choice(add)
+        last = ['...//', '...♡', '']
+        ans += np.random.choice(last)
+        ans = ans.replace('っっ', 'っ').replace('ぃっ', '')
+        return ans
+Conv = Converter()
+
+
+def constract_nlp(text = '', dialog_obj = None):
+    # if dialog_obj is None:
+    #     text_without_tag = re.sub(r'(#[^\s　]+)', '', text)
+    #     text_without_tag_url = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', text_without_tag)
+    #     dialog_obj = DialogObject(text_without_tag_url)
+    nlp_summary = dialog_obj.nlp_data.summary
+    cmds = dialog_obj.nlp_data.cmds
+    action = ''
+    target = ''
+    is_accepted = False
+    if cmds:
+        cmd = cmds[0]
+        action = cmd['func']
+        target = cmd['var']
+        mod = cmd['mod']
+        if mod == 'all':
+            action += '.all'
+    if action and target:
+        pass
+    elif nlp_summary.has_function('疑問(疑問(what))'):
+        action = 'search'
+    elif nlp_summary.value in {'検索する', '調べる'}:
+        action = 'search'
+    elif '#とは' in text:
+        action = 'search'
+    elif nlp_summary.value in {'呼ぶ','よぶ', '呼び出す','よびだす', '呼び出しする', '出す'}:
+        action = 'call'
+    elif nlp_summary.value in {'作る', 'つくる', '作成する'}:
+        if nlp_summary.akkusativ in {'QR'}:
+            action = 'make.QR'
+    elif nlp_summary.value in {'覚える', '記憶する', '学習する', 'おぼえる'}:
+        action = 'learn'
+    elif nlp_summary.value in {'勧誘する'}:
+        action = 'gacha'
+    elif nlp_summary.value in {'やる', 'する'}:
+        if nlp_summary.akkusativ == '診断メーカー':
+                action = 'shindanmaker'
+    elif nlp_summary.value in {'送る','送れる', '送信する'}:
+        if nlp_summary.akkusativ in {'kusoripu', 'クソリプ'}:
+            action = 'kusoripu'
+        else:
+            action = 'send?'
+    elif nlp_summary.value in {'クソリプ送信する', 'kusoripu送信する','爆撃する'}:
+        if nlp_summary.has_function('希望', '要望'):
+            action = 'kusoripu'
+            target = nlp_summary.dativ.replace('@', '')
+    elif nlp_summary.value in {'変更','変更する', '変える', '切り替える', 'チェンジする'}:
+        if nlp_summary.akkusativ in {'名前', 'ネーム', 'スクリーンネーム', 'name'}:
+                action = 'change.name'
+        elif nlp_summary.akkusativ in {'アイコン', 'iKON', '写真', '顔写真', 'icon'}:
+                action = 'change.icon'
+        elif nlp_summary.akkusativ in {'背景', 'バナー', 'banner'}:
+                action = 'change.banner'
+    elif nlp_summary.value in {'戻る','もどる', 'なおる', '直る'}:
+        if nlp_summary.dativ in {'デフォルト', '元', '元通り'}:
+            action = 'default'
+    elif nlp_summary.value in {'まねる','真似る', 'まねする', '真似する', 'ものまねする', 'モノマネする', '擬態する', '変身して', 'メタモルフォーゼする'}:
+        action = 'imitate'
+        target = nlp_summary.akkusativ.replace('@', '')
+        if not target:
+            target = nlp_summary.dativ.replace('@', '')
+    elif nlp_summary.value in {'遊ぶ'}:
+        if nlp_summary.has_function('希望', '要望', '勧誘'):
+            if np.random.rand() > 0.2:
+                action = 'srtr'
+            else:
+                action = 'battle_game'
+    elif nlp_summary.dativ in {'尻取り'}:
+        action = 'srtr'
+    elif nlp_summary.value in {'尻取りする', '頭取りする', '頭とりする'}:
+        action = 'srtr'
+    elif nlp_summary.value in {'戦う', '対戦する', '倒す', 'バトルする',  'たたかう', '争う'}:
+        if nlp_summary.has_function('希望', '要望', '勧誘'):
+            action = 'battle_game'
+    elif nlp_summary.value in {'教える', '伝える'}:
+        if nlp_summary.akkusativ in {'トレンド', '流行語'}:
+            action = 'tell_trendword'
+        elif nlp_summary.akkusativ in {'経験値', 'exp', 'EXP', 'Exp'}:
+            action = 'tell_exp'
+        else:
+            action = 'tell?'
+    elif nlp_summary.value in {'分析する', '感情分析する'}:
+        action = 'sentimental_analysis'
+    elif nlp_summary.value in {'御籤する', '占う'}:
+        action = 'omikuji'
+    elif nlp_summary.value in {'フォロバする'}:
+        action = 'followback'
+    elif nlp_summary.value in {'起きる', '起こす'}:
+        action = 'wake'
+    elif nlp_summary.value in {'喘ぐ', 'あえぐ', '逝く', '乱れる', 'みだれる', '悶えて', 'もだえて', 'エッチする', '破廉恥する', 'ハレンチする'}:
+        action = 'harenchi'
+    elif nlp_summary.value in {'なる'}:
+        if nlp_summary.dativ in {'エッチ', '破廉恥', '変態さん', 'はれんち', '変態', '淫乱', '卑猥'}:
+            action = 'harenchi'
+    if action:
+        if nlp_summary.has_function('命令'):
+            if np.random.rand() > 0.2:
+                action = 'reject'
+    return action, target
+
+
 if __name__ == '__main__':
     import sys
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-    text = '''@you に‎kusoripu送信して''' 
-    UserLists = {
-    # '鞠莉': [''],
-    # '花丸': [''],
-    # 'ルビィ': [''],
-    # 'ダイヤ': [''],
-    # 'ヨハネ': [''],
-    # '曜': [''],
-    # '千歌': [''],
-    # '梨子': [''],
-    # '果南': [''],
-    # '海未': ['omorashi_umi', 'maid_umi_bot', 'lovery_umi', 'ultimate_umi', '315_Umi_Time', 'sousaku_umi', 'Umichan_life', 'Umi_admiral_', 'sleep_umi', 'umi0315_pokemon', 'sonoda_smoke', 'harem_Umimi_bot', 'waracchaimasu', 'aisai_umi', 'quiet_umi_'],
-    # 'にこ': ['sousaku_nico', 'nico_mylove_bot', 'lovery_nico', 'haijin_niko'],
-    # '凛': ['sousaku_rinchan', 'lovery_rin', 'rin_sitteruyo', 'rin_h_bot_', 'hungry_rin_bot', 'kanojo_rin', 'rin_paku', 'reverse_rin', 'ponkotsurin_bot', 'haijin_rin', 'Rin_drug', 'starsky_rin', 'owataRinbot', 'Rin_Hoshizora', 'maid_rin_bot', 'HosizorarinLive', 'syokiRincyan', 'mutsurin01', 'rin_rice_bot', 'all_bad_rin'],
-    # 'ことり': ['umikiti_kotori', 'Smallbirds_poke', 'kotori_ss'],
-    # '花陽': ['haijinLove_pana', 'hanayo_hanahana', 'OnigiriHanayo', 'maid_hanayo_bot', 'Logical_Hanayo', 'haijin_hanayo', 'gohanayo'],
-    # '希': ['maid_nozomi_bot', 'nozomigazoubot', 'nozomi_h_bot'],
-    # '絵里': ['best_gnist_eri', 'SunnyEriAngel', 'eli_h_bot'], 
-    # '穂乃果': ['umikiti_hono', 'aisaihonoka', 'haijin_honoka_'],
-    # '真姫': ['maki_h_bot_', 'makiniko_love', 'sousaku_maki', 'haijin_maki_', 'nishikino_smoke'],
-    # '雪穂': ['yukiho_h_bot_', 'haijin_yukiho'],
-    '亜里沙': ['']
-    }
-    # for chara, userlist in UserLists.items():
-    #     p(chara, userlist)
-    #     # s_ls = operate_sql.get_twlog_list(n = 100000, UserList = userlist, contains = '')
-    # # chara = '絵里'
-    #     ssd = operate_sql.get_ss_dialog(person = chara, n = 1000000)
-    #     s_ls = [s.text[1:-1] for s in ssd]
-    #     learn_trigram(s_ls, character = chara, over = 0)
+    # text = '''@you に‎kusoripu送信して''' 
+    text = '''klapto @aa 13分'''   # text = 'したい'
+    # trigram_markov_chain_instance = TrigramMarkovChain('海未')
+    # ans = trigram_markov_chain_instance.generate(text)
+    # p(ans)
+    obj = DialogObject(text)
+    p(obj.nlp_data)
+    # a = constract_nlp(text, obj)
+    # p(a)
 
-    # task = TrigramModel.update(**{'character': '善子'}).where(TrigramModel.character == 'ヨハネ')
-    # task.execute()
-    # p(TrigramModel.select().where(TrigramModel.character == 'ヨハネ').count())
-    # p(umis)
-    # for umi in umis:
-    #     umi.character = '凛2'
-    #     umi.save()
-    # @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
-    # def deldata(data):
-    #     data.delete_instance()
+    # p('オリジナル: ', text)
+    # for i in range(10):
+    #     p('ちゃんあの喘ぎtake' + str(i), Conv.aegi(text))
+    # trigram_markov_chain_instance = TrigramMarkovChain(character)
+    # # while True:
+    # ans = trigram_markov_chain_instance.generate(word = '日本', is_randomize_metasentence = True)
+    # p(ans)
+        # time.sleep(0.1)
+    # person = '海未'
+    # while True:
+    #     d_obj = DialogObject(text)
+    #     ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'SS', username = '@〜〜')
+    #     p(person, ansu)
+    #     break
 
-    # for umi in umis:
-    #     deldata(umi)
-    # ans = ss_log_sender(text = text, kw = 'みなさん', person = '穂乃果', min_similarity = 0.2)
-    # ans = TFIDF.calc_cosine_similarity(s1 = text, s2 = 'みなさんこんにちは')
-    # ans = DialogObject(text).dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.3, character = '海未', tools = 'SSLOGMC', username = '@〜〜')
-    person = '海未'
-    while True:
-        d_obj = DialogObject(text)
-        ansu = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = person, tools = 'MC', username = '@〜〜')
-        p(person, ansu)
-        break
         # d_obj = DialogObject(ansu)
         # ansh = d_obj.dialog(context = '', is_randomize_metasentence = True, is_print = False, is_learn = False, n =5, try_cnt = 10, needs = {'名詞', '固有名詞'}, UserList = [], BlackList = [], min_similarity = 0.1, character = '穂乃果', tools = 'SSMC', username = '@〜〜')
         # p('穂乃果「', ansh)
@@ -1164,6 +1287,6 @@ if __name__ == '__main__':
     # for key in keygen:
     #     p(key)s
 
-    # talk_sql.create_tables([TFIDFModel], True)
+    # db.create_tables([TFIDFModel], True)
     # s_ls = operate_sql.get_twlog_list(n = 100000, UserList = [], contains = '')
     # TFIDF.learn_tf_idf(s_ls)

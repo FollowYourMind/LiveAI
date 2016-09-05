@@ -34,7 +34,7 @@ class Shiritori(MyObject):
 		# elif text == 'check':
 		# 	try:
 		# 		checkword = cmdlist[1]
-		# 		with core_sql.atomic():
+		# 		with db.atomic():
 		# 			word = Words.select().where(Words.word == checkword).limit(1).get()
 		# 		return checkword + 'の結果...\nよみ:'+ word.yomi+'\n語頭:'+ word.head+'\n語尾:'+ word.tail+'\n長さ:'+ str(word.length)
 		# 	except Exception as e:
@@ -45,7 +45,9 @@ class Shiritori(MyObject):
 			return self.srtr()
 	def srtr(self):
 		s = self.s
+		status = ''
 		ans = ''
+		last = ''
 		answord = ''
 		wordsList = []
 		kanasList = []
@@ -72,139 +74,114 @@ class Shiritori(MyObject):
 			rawNouns = natural_language_processing.MA.get_mecab(s, form=['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
 			kanaNouns = natural_language_processing.MA.get_mecab(s, mode = 8, form = ['名詞'], exception = {'数', '接尾', '非自立', '接続助詞', '格助詞', '代名詞'})
 			if not rawNouns:
-				ans += '名詞の単語が見あたりません。他の単語はありませんか？\MISS'
-				raise
+				status = 'alert_nonoun'
 			else:
 				rawnoun = rawNouns[0]
 				kana = kanaNouns[0]
-		try:
-			cleaned_noun = re.sub(re.compile("[!-@[-`{-~]"), '', kana)
-			gobi = cleaned_noun[-1:]
-			if gobi == 'ー':
-				gobi = cleaned_noun.replace('ー','')[-1:]
-			gotou = cleaned_noun[:1]
-			gobi = gobi.replace('ャ','ヤ').replace('ュ','ユ').replace('ョ','ヨ').replace('ッ','ツ').replace('ィ','イ').replace('ァ','ア').replace('ェ','エ').replace('ゥ','ウ').replace('ォ','オ').replace('ヵ','カ').replace('ヶ','ケ').replace('ヮ','ワ')
-			if self.game_mode != 'reverse':
-				pass
-			else:
-				gotou, gobi = gobi, gotou
-			word = {}
-			lenword = len(kana)
-			last = ''
+				if kana == '*':
+					status = 'alert_nonoun'
+		if not status:
 			try:
-				if self.game_mode != 'reverse':
-					last = kanasList[-1][-1]
-					if last  == 'ー':
-						last  = kanasList[-1].replace('ー','')[-1]
-				else:
-					last = kanasList[-1][0]
-				last = last.replace('ャ','ヤ').replace('ュ','ユ').replace('ョ','ヨ').replace('ッ','ツ').replace('ィ','イ').replace('ァ','ア').replace('ェ','エ').replace('ゥ','ウ').replace('ォ','オ').replace('ヵ','カ').replace('ヶ','ケ').replace('ヮ','ワ')
-			except Exception as e:
-				d(e, 'srtr')
-			if last == '':
-				wordsList.append(rawnoun)
-				kanasList.append(kana)
-			if self.event == 'showlist':
-				return wordsList
-			elif self.event == 'restart':
-				wordsList = []
-				kanasList = []
+				cleaned_noun = re.sub(re.compile('[!-@[-`{-~]'), '', kana)
+				gobi = cleaned_noun[-1:]
+				if gobi == 'ー':
+					gobi = cleaned_noun.replace('ー','')[-1:]
+				gotou = cleaned_noun[:1]
+				gobi = gobi.replace('ャ','ヤ').replace('ュ','ユ').replace('ョ','ヨ').replace('ッ','ツ').replace('ィ','イ').replace('ァ','ア').replace('ェ','エ').replace('ゥ','ウ').replace	('ォ','オ').replace('ヵ','カ').replace('ヶ','ケ').replace('ヮ','ワ')
+				if self.game_mode == 'reverse':
+					gotou, gobi = gobi, gotou
+				word = {}
+				lenword = len(kana)
+				last = ''
 				try:
-					num = re.match("\d*", s)
-					extracted = num.group()
-					self.len_rulelen_rule = int(extracted)
-					is_changed = True
-					s = s.replace('文字', '').replace('字', '').replace('以上', '')
+					if self.game_mode != 'reverse':
+						last = kanasList[-1][-1]
+						if last  == 'ー':
+							last  = kanasList[-1].replace('ー','')[-1]
+					else:
+						last = kanasList[-1][0]
+					last = last.replace('ャ','ヤ').replace('ュ','ユ').replace('ョ','ヨ').replace('ッ','ツ').replace('ィ','イ').replace('ァ','ア').replace('ェ','エ').replace('ゥ','ウ').	replace('ォ','オ').replace('ヵ','カ').replace('ヶ','ケ').replace('ヮ','ワ')
 				except Exception as e:
-					len_rule = 1
-				if self.len_rule > 1:
-					ruleNOTE = 'では、'+ str(self.len_rule) + '字以上で'
-					rawnoun = "μ's"
-					kana = 'ミューズ'
-					if self.game_mode != 'reverse':
-						gobi = kana[-1]
-					else:
-						gobi = kana[0]
-				else:
-					ruleNOTE = ''
-				if gobi == 'ン':
-					rawnoun = 'しりとり'
-					kana = 'シリトリ'
-					gobi = 'リ'
-				wordsList.append(rawnoun)
-				kanasList.append(kana)
-				if self.game_mode != 'reverse':
-					game_name = 'しりとり'
-					hajimeru_owaru = 'から始まる'
-				else:
-					game_name = '逆しりとり'
-					hajimeru_owaru = 'で終わる'
-				ans += 'いいですね。'+ruleNOTE+ game_name+ 'しましょう。\nそれでは、「'+rawnoun+'」の「'+gobi+'」' +hajimeru_owaru +  '語から開始です。'
-			elif lenword < self.len_rule and rawnoun != 'しりとり':
-				ans += '「'+rawnoun+'」ですね。'+ str(self.len_rule) +'字縛りなので、字数が短いです。\n別の単語はないのですか？「しりとりおわり」で降参しても構いませんよ♪。\MISS'
-			else:
-				ans ='「'+rawnoun+'」ですね。'+gobi+'...\n'
-				if last != gotou:
-					if self.game_mode != 'reverse':
-						hajimeru_owaru = 'から始まる'
-					else:
-						hajimeru_owaru = 'で終わる'
-					ans += 'その言葉ではだめです。\n「' + last + '」' + hajimeru_owaru + '別の単語でお願いします。「しりとりおわり」で終了してもOKです。\MISS'
-				elif rawnoun in wordsList:
-					ans += 'その言葉は既に使われましたよ。私の勝利ですっ!! \END'
-					wordsList = []
-					kanasList = []
-	
-				elif gobi == 'ン':
-					ans += 'いま、「ン」がつきましたね。私の勝利ですっ!!\END'
-					wordsList = []
-					kanasList = []
-	
-				else:
+					d(e, 'srtr')
+				if not last:
 					wordsList.append(rawnoun)
 					kanasList.append(kana)
-					LoseFlag = False
-					# LoseFLAG
-					if turncnt > 25:
-						LoseFlag = True
-					with talk_sql.atomic():
-						if LoseFlag:
-							answords = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi), TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi << ['数']).order_by(TFIDFModel.df.desc()).limit(50)
-							answord = self.choose_answord(answords)
+				if self.event == 'showlist':
+					return wordsList
+				elif self.event == 'restart':
+					wordsList = []
+					kanasList = []
+					try:
+						num = re.match("\d*", s)
+						extracted = num.group()
+						self.len_rulelen_rule = int(extracted)
+						is_changed = True
+						s = s.replace('文字', '').replace('字', '').replace('以上', '')
+					except Exception as e:
+						len_rule = 1
+					if gobi == 'ン':
+						rawnoun = 'しりとり'
+						kana = 'シリトリ'
+						gobi = 'リ'
+					wordsList.append(rawnoun)
+					kanasList.append(kana)
+					if self.game_mode != 'reverse':
+						status = 'start_normal'
+					else:
+						status = 'start_reverse'
+				elif lenword < self.len_rule and rawnoun != 'しりとり':
+					status = 'alert_short'
+				else:
+					if last != gotou:
+						if self.game_mode != 'reverse':
+							status = 'alert_miss'
+						else:
+							status = 'alert_miss_reverse'
+					elif rawnoun in wordsList:
+						status = 'win_double'
+					elif gobi == 'ン':
+						status = 'win_N'
+		
+					else:
+						wordsList.append(rawnoun)
+						kanasList.append(kana)
+						LoseFlag = False
+						# LoseFLAG
+						if turncnt > 25:
+							LoseFlag = True
+						with db.atomic():
+							if LoseFlag:
+								answords = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi), TFIDFModel.yomi.endswith('ン'), 	TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi << ['数']).order_by(TFIDFModel.df.desc()).limit(50)
+								answord = self.choose_answord(answords)
+							else:
+								if self.game_mode != 'reverse':
+									select_words = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi),~TFIDFModel.yomi.contains('*'), ~	TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '	接尾'])
+								else:
+									select_words = TFIDFModel.select().where(TFIDFModel.yomi.endswith(gobi),~TFIDFModel.yomi.contains('*'), 	TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
+								answords = select_words.order_by(TFIDFModel.df.desc()).limit(300)
+								answord = self.choose_answord(answords)
+						if answord.word in wordsList:
+							status = 'lose_double'
+						elif answord.yomi[-1] == 'ン':
+							status = 'lose_N'
 						else:
 							if self.game_mode != 'reverse':
-								select_words = TFIDFModel.select().where(TFIDFModel.yomi.startswith(gobi),~TFIDFModel.yomi.contains('*'), ~TFIDFModel.yomi.endswith('ン'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
+								status = 'return_normal'
+								next_char = answord.yomi[-1]
 							else:
-								select_words = TFIDFModel.select().where(TFIDFModel.yomi.endswith(gobi),~TFIDFModel.yomi.contains('*'), TFIDFModel.hinshi << ['名詞', '固有名詞'], ~TFIDFModel.hinshi2 << ['数', '接尾'])
-							answords = select_words.order_by(TFIDFModel.df.desc()).limit(300)
-							answord = self.choose_answord(answords)
-					if answord.word in wordsList:
-						wordsList = []
-						kanasList = []
-						losecnt =+ 1
-						ans += answord.word + ' ですッ!! あ、既に出ていた単語でした...。くっ、私の負けです。\END'
-					elif answord.yomi[-1] == 'ン':
-						ans += answord.word + ' ですッ!! あ、「ン」がついてしまいました...。くっ、私の負けです。\END'
-					else:
-						if self.game_mode != 'reverse':
-							shiji = '頭文字'
-							next_char = answord.yomi[-1]
-						else:
-							shiji = '末尾の文字'
-							next_char = answord.yomi[0]
-						anskana = answord.yomi
-						if next_char == 'ー':
-							next_char = answord.yomi[-2]
-							anskana = answord.yomi[:-1]
-						wordsList.append(answord.word)
-						kanasList.append(anskana)
-						ans += answord.word + '(' + answord.yomi + ')'+ ' ですっ!! 次の'+ shiji + 'は「' + next_char +'」ですよ。'
-		except Exception as e:
-			d(e, 'srtr')
-			ans += '思いつきませんでした。悔しいですけど、私の負けです。\END'
-			wordsList = []
-			kanasList = []
-		with core_sql.atomic():
+								status = 'return_reverse'
+								next_char = answord.yomi[0]
+							anskana = answord.yomi
+							if next_char == 'ー':
+								next_char = answord.yomi[-2]
+								anskana = answord.yomi[:-1]
+							wordsList.append(answord.word)
+							kanasList.append(anskana)
+			except Exception as e:
+				d(e, 'srtr')
+				wordsList = []
+				kanasList = []
+		with db.atomic():
 			self.srtrdb.name = self.user
 			self.srtrdb.mode = self.game_mode
 			self.srtrdb.word_stream = '<JOIN>'.join(wordsList)
@@ -212,6 +189,37 @@ class Shiritori(MyObject):
 			self.srtrdb.len_rule = self.len_rule
 			self.srtrdb.tmp_time = datetime.utcnow()
 			self.srtrdb.save()
+		p(status)
+		if last:
+			last = last.replace('ャ','ヤ').replace('ュ','ユ').replace('ョ','ヨ').replace('ッ','ツ').replace('ィ','イ').replace('ァ','ア').replace('ェ','エ').replace('ゥ','ウ').replace	('ォ','オ').replace('ヵ','カ').replace('ヶ','ケ').replace('ヮ','ワ')
+		if not status:
+			ans = '思いつきませんでした。悔しいですけど、私の負けです。\END'
+		elif status == 'start_normal':
+			ans = 'いいですね。'+ str(self.len_rule) + '字以上でしりとりをしましょう。\nそれでは、「' + rawnoun + '」から開始です。'
+		elif status == 'start_reverse':
+			ans = 'いいですね。'+ str(self.len_rule) + '字以上で逆しりとりしましょう。\nそれでは、「'+rawnoun+'」から開始です。'
+		elif status == 'alert_nonoun':
+			ans = '名詞の単語が見あたりません。他の単語はありませんか？\MISS'
+		elif status == 'alert_short':
+			ans = '「' + rawnoun + '」ですね。'+ str(self.len_rule) +'字縛りなので、字数が短いです。\n「しりとりおわり」で降参しても構いません。\MISS'
+		elif status == 'alert_miss':
+			ans = 'その言葉ではだめです。\n「' + last + '」ではじめる別の単語でお願いします。「しりとりおわり」で終了してもOKです。\MISS'
+		elif status == 'alert_miss_reverse':
+			ans = 'その言葉ではだめです。\n「' + last + '」でおわる別の単語でお願いします。「しりとりおわり」で終了してもOKです。\MISS'
+		elif status == 'lose_double':
+			ans =  '「' + rawnoun + '」ですね。'+gobi+'...\n' + answord.word + ' ですッ!! あ、既に出ていた単語でした...。くっ、私の負けです。\END'
+		elif status == 'lose_N':
+			ans =  '「' + rawnoun + '」ですね。'+gobi+'...\n' + answord.word + ' ですッ!! あ、「ン」がついてしまいました...。くっ、私の負けです。\END'
+		elif status == 'win_double':
+			ans =  '「' + rawnoun + '」ですね。'+gobi+'...\n' + 'その言葉は既に使われましたよ。私の勝利ですっ!! \END'
+		elif status == 'win_N':
+			ans =  '「' + rawnoun + '」ですね。'+gobi+'...\n' + '「ン」で終わりましたね。私の勝利です。 \END'
+		elif status == 'return_normal':
+			ans = '「' + rawnoun + '」ですね。'+gobi+'...\n' + answord.word + '(' + answord.yomi + ')'+ ' ですっ!! 次の頭文字は「' + next_char +'」ですよ。'
+		elif status == 'return_reverse':
+			ans = '「' + rawnoun + '」ですね。'+gobi+'...\n'+ answord.word + '(' + answord.yomi + ')'+ ' ですっ!! 次の末尾の文字は「' + next_char +'」ですよ。'
+		else:
+			ans = 'エラーが発生しました。管理者にお問い合わせください。[{status}] \END'.format(status = status)
 		return ans
 	@_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = '')
 	def choose_answord(self, answords):
@@ -259,7 +267,7 @@ class CharacterStatus(object):
 		if self.level_up_cnt > 0:
 			self.praise_flag = True
 		self.update_hp_gage()
-	@core_sql.atomic()
+	@db.atomic()
 	def read_status(self, user = 'masaMikam'):
 		status = CharacterStatusModel.select().where(CharacterStatusModel.name == user).get()
 		return status
@@ -359,7 +367,7 @@ class BattleGame():
 		self.save_character_model(self.my_status.__dict__)
 		self.save_character_model(self.enemy_status.__dict__)
 		return '\n'.join(ans_ls)
-	@core_sql.atomic()
+	@db.atomic()
 	def save_character_model(self, status):
 		character_status, created = CharacterStatusModel.get_or_create(name = status['name'])
 		character_status = CharacterStatusModel(**status)
@@ -563,22 +571,22 @@ if __name__ == '__main__':
 		user = 'p_ev'
 		text = "うんこ"
 	# p(CharacterStatus('アルパカあああ').__dict__)
-	battle_game = BattleGame('_mmkm', 'chana')
-	ans = battle_game.main(text)
-	print(ans)
+	# battle_game = BattleGame('_mmkm', 'chana')
+	# ans = battle_game.main(text)
+	# print(ans)
 	# cmdlist = でtext.split(' ')
 	# text = cmdlist[0]
-	# text = '苦情救済'
-	# ret = Shiritori(text, user).main()
-	# print(ret)	
+	text = '援護'
+	ret = Shiritori(text, user).main()
+	print(ret)	
 	# core_sql.create_tables([ShiritoriModel], True)
 
-	# word = 'askww'
-	# ejje_url = ''.join(["http://ejje.weblio.jp/content/", word])
-	# html = urllib.request.urlopen(ejje_url)
-	
-	# soup = bs4.BeautifulSoup(html, "lxml")
-	# print(soup.find('div', class_ = "summaryM"))
-	# print(str(soup.find("div", class_ = "summaryM")).split('</b>')[1][:-6])
-		# print('abcde'[:-1])
-	# core_sql.close()
+
+
+
+
+
+
+
+
+

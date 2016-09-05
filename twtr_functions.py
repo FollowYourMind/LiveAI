@@ -119,85 +119,40 @@ class TwtrTools(MyObject):
 		if mode == 'dm':
 			return self.send_direct_message(ans = ans, screen_name = screen_name)
 		elif mode == 'open':
-			return self.send_tweet(ans = ans, screen_name = '', status_id = '', imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
+			return self.send_tweet(ans = ans, screen_name = '', status_id = '', imgfile = imgfile, try_cnt = try_cnt)
 		else:
-			return self.send_tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, is_debug = is_debug, try_cnt = try_cnt)
-	def send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0):
-		# try:
-		if True:
+			return self.send_tweet(ans = ans, screen_name = screen_name, status_id = status_id, imgfile = imgfile, try_cnt = try_cnt)
+	def send_tweet(self, ans, screen_name = '', status_id = '', imgfile = '',  try_cnt = 0):
+		if screen_name:
+			ans1 = ''.join(['@', screen_name,' ', ans]).replace('@@', '@')
+		else:
+			ans1 = ans
+		if len(ans1) > 140:
+			is_split = True
+			ans2 = ''.join([ans1[0:139], '…'])
+		else:
+			is_split = False
+			ans2 = ans1
+		if imgfile:
+			tweet_status = self.twtr_api.update_with_media(imgfile, status = ans2, in_reply_to_status_id = status_id)
+			print(self.bot_id, '[Tweet.IMG.OK] @', screen_name, ' ', ans2)
+		else:
+			tweet_status = self.twtr_api.update_status(status = ans2, in_reply_to_status_id = status_id)
+			print(self.bot_id, '[Tweet.OK] @', screen_name, ' ', ans2)
+		# 140字越えの際は、分割ツイート
+		if is_split:
 			if screen_name:
-				ans1 = ''.join(['@', screen_name,' ', ans]).replace('@@', '@')
+				try_cnt += 1
+				return self.send_tweet(''.join(['...', ans[139:]]), screen_name = screen_name, status_id = status_id, try_cnt = try_cnt)
 			else:
-				ans1 = ans
+				return tweet_status
+		else:
+			return tweet_status
 
-			if len(ans) > 140:
-				is_split = True
-				ans2 = ''.join([ans1[0:139], '…'])
-			else:
-				is_split = False
-				ans2 = ans1
-			if imgfile:
-				if not is_debug:
-					tweetStatus = self.twtr_api.update_with_media(imgfile, status = ans2, in_reply_to_status_id = status_id)
-					print(self.bot_id, '[Tweet.IMG.OK] @', screen_name, ' ', ans2)
-				else:
-					print(self.bot_id, '[Debug][Tweet.IMG.OK] @', screen_name, ' ', ans2)
-			else:
-				if not is_debug:
-					tweetStatus = self.twtr_api.update_status(status = ans2, in_reply_to_status_id = status_id)
-					print(self.bot_id, '[Tweet.OK] @', screen_name, ' ', ans2)
-				else:
-					print(self.bot_id, '[Debug][Tweet.OK] @', screen_name, ' ', ans2)
-			# 140字越えの際は、分割ツイート
-			if is_split:
-				if screen_name:
-					try_cnt += 1
-					return self.tweet(''.join(['...', ans[139:]]), screen_name = screen_name, status_id = status_id, is_debug = is_debug, try_cnt = try_cnt)
-				else:
-					return True
-			else:
-				return True
-		# else:
-			# return
-		# except tweepy.error.TweepError as e:
-		# 	print('[ERR][Tweet.TweepError] @', screen_name, ' ', ans)
-		# 	p(e)
-		# 	if e.response is None:
-		# 		if _.reconnect_wifi(force = True):
-		# 			self.send_tweet(ans, screen_name, status_id, imgfile, is_debug, try_cnt)
-		# 	if e.response and e.response.status == 403:
-		# 		print('403')
-		# 		return False
-		# 	else:
-		# 		return True
-		# except Exception as e:
-		# 	print('[Tweet.ERR] @', screen_name, ' ', ans)
-		# 	print(e)
-		# 	return False
-
-	def send_direct_message(self, ans, screen_name = '', is_debug = False, try_cnt = 0):
-		# try:
-		if True:
-			if not is_debug:
-				tweetStatus = self.twtr_api.send_direct_message(screen_name = screen_name, text = ans)
-				print('[DM.OK] @', screen_name, ' ', ans)
-			else:
-				print('[Debug][DM.OK] @', screen_name, ' ', ans2)
-			return True
-		# except tweepy.error.TweepError as e:
-		# 	print('[ERR][DM.TweepError] @', screen_name, ' ', ans)
-		# 	if e.response is None:
-		# 		if _.reconnect_wifi(force = True):
-		# 			self.send_direct_message(ans, screen_name, is_debug, try_cnt)
-		# 	if e.response and e.response.status == 403:
-		# 		print('403')
-		# 		return False
-		# 	else:
-		# 		return True
-		# except Exception as e:
-		# 	print('[DM.ERR] @', screen_name, ' ', ans)
-		# 	print(e)
-		# 	return False
+	def send_direct_message(self, ans, screen_name = '', try_cnt = 0):
+		tweet_status = self.twtr_api.send_direct_message(screen_name = screen_name, text = ans)
+		print('[DM.OK] @', screen_name, ' ', ans)
+		return tweet_status
 
 	def getTrendwords(self, mode = 'withoutTag'):
 		# 'locations': [{'woeid': 23424856, 'name': 'Japan'}]
@@ -278,65 +233,83 @@ class TwtrTools(MyObject):
   		s['retweeted'] = False
   		s['is_quote_status'] = False
   		return s
-	def download_userobject_urls(self, userobject, DIR = DIRusers):
+	def download_userobject_urls(self, userobject, target_object, DIR = DIRusers):
 		screen_name = userobject.screen_name
+		if target_object is None:
+			target_object = operate_sql.BotProfile(screen_name)
 		USERDIR = '/'.join([DIR, screen_name])
 		if not os.path.exists(USERDIR):
 			os.mkdir(USERDIR)
+		target_object.name = userobject.name.replace(' ' , '')
+		target_object.description = userobject.description
+		target_object.abs_icon_filename = ''
+		target_object.abs_background_filename = ''
+		target_object.abs_banner_filename = ''
 		try:
-			userobject.abs_icon_filename = _.saveImg(media_url = userobject.profile_image_url.replace('_normal', ''), DIR = USERDIR, filename = ''.join([screen_name, '_icon.jpg']))
+			# if not userobject.profile_image_url is None:
+			if hasattr(userobject, 'profile_image_url'):
+				target_object.abs_icon_filename = _.saveImg(media_url = userobject.profile_image_url.replace('_normal', ''), DIR = USERDIR, filename = ''.join([screen_name, '_icon.jpg']))
 		except Exception as e:
-			print('[ERR]imitate.icon')
-			print(e)
-			userobject.abs_icon_filename = ''
+			_.log_err()
 		try:
-			userobject.abs_background_filename = _.saveImg(media_url = userobject.profile_background_image_url, DIR = USERDIR, filename = ''.join([screen_name, '_background.jpg']))
+			# if not userobject.profile_banner_url is None:
+			if hasattr(userobject, 'profile_banner_url'):
+				target_object.abs_banner_filename = _.saveImg(media_url = userobject.profile_banner_url, DIR = USERDIR, filename = ''.join([screen_name, '_banner.jpg']))
 		except Exception as e:
-			print('[ERR]imitate.bg')
-			print(e)
-			userobject.abs_background_filename = ''
-		try:
-			userobject.abs_banner_filename = _.saveImg(media_url = userobject.profile_banner_url, DIR = USERDIR, filename = ''.join([screen_name, '_banner.jpg']))
-		except Exception as e:
-			print('[ERR]imitate.banner')
-			print(e)
-			userobject.abs_banner_filename = ''
-		return userobject
+			_.log_err()
+		return target_object
 	def imitate(self, screen_name, DIR = DIRusers):
 		try:
-			user = self.twtr_api.get_user(screen_name = screen_name)
-			user = self.download_userobject_urls(user, DIR = DIR)
-			alt_name = user.name.replace(' ', '')
-			alt_description = user.description
-			is_following = user.following
-			if not is_following:
+			userobj = self.twtr_api.get_user(screen_name = screen_name)
+			if not userobj.following:
 				return False
-
-			self.update_profile(name = alt_name, description = alt_description, location = ''.join(['まねっこ中@', screen_name]), url = '', filename = user.abs_icon_filename, BGfilename = user.abs_background_filename, Bannerfilename = user.abs_banner_filename)
+			user = self.download_userobject_urls(userobj, target_object = None, DIR = DIR)
+			set_time = datetime.utcnow() + timedelta(hours=9, minutes=10)
+			self.update_profile(name = user.name, description = user.description, location = ''.join([set_time.strftime('%m月%d日%H:%M'), 'までモノマネ中@', screen_name]), url = '', filename = user.abs_icon_filename, BGfilename = user.abs_background_filename, Bannerfilename = user.abs_banner_filename)
 			return True
 		except Exception as e:
-			print('[ERR]imitate')
-			print(e)
+			_.log_err()
 			return False
 
 if __name__ == '__main__':
-	twf = TwtrTools('LiveAI_Alpaca')
+	twf = TwtrTools('LiveAI_Hanamaru')
+	# twf.send(ans = '書込凍結のbotを捜索中(表示が出てれば無事です)', screen_name = 'LiveAI_Alpaca', mode = 'tweet')
+	# twf.update_profile(name = '実験垢@', description='', location='', url = '', filename = '', BGfilename = '', Bannerfilename = '')
+	# twf.imitate('LiveAI_Umi')
+	# p()
+	
+	set_time = datetime.now(JST).strftime('%Y%m%d%H%M%S')
+	p(set_time.strftime('%Y%m%d%H%M%S'))
+	# st = twf.send(ans = 'test23', screen_name = 'kaihatsu_paka', mode = 'tweet')
+	# if st:
+	# 	p(st.id_str)
+	# user = twf.get_userinfo(screen_name = 'kaihatsu_paka')
+	# p(user)
+	# user.name
+	# user_id = user.id_str
+	#'id': 768871329332203522,
+	# a = twf.twtr_api.me()
+	# a = twf.twtr_api.get_user(screen_name = 'LiveAI_Umi')
+	# a = operate_sql.BotProfile()
+	# p(a.location)
+	# p(a.__dict__)
+	# p(hasattr( a, 'name'))
 	# objs = twf.get_followers_all('LiveAI_Maki')
 	# p(objs[0]._json)
 	# twf.filter_stream()
-	ids = ['759603873992482816',
-  '759603125388840961',
-  '759602847390371841',
-  '759602710995800064',
-  '759602278789619712',
-  '759601706057379840',
-  '759601116656967680',
-  '759600518532435968',
-  '759598655380656128',
-  '759598458911154176',
-  '759596691750170624']
-	results = twf.twtr_api.home_timeline(since_id = ids[0], page = 1)
-	p([(result.user.screen_name, result._json) for result in results if not result.id_str in set(ids)])
+	# ids = ['759603873992482816',
+ #  '759603125388840961',
+ #  '759602847390371841',
+ #  '759602710995800064',
+ #  '759602278789619712',
+ #  '759601706057379840',
+ #  '759601116656967680',
+ #  '759600518532435968',
+ #  '759598655380656128',
+ #  '759598458911154176',
+ #  '759596691750170624']
+	# results = twf.twtr_api.home_timeline(since_id = ids[0], page = 1)
+	# p([(result.user.screen_name, result._json) for result in results if not result.id_str in set(ids)])
 	# twf.send_tweet(ans = 'test', screen_name = '', status_id = '', imgfile = '', is_debug = False,  try_cnt = 0)
 
 	# ans = twf.get_listmembers_all(username = 'LiveAI_Rin' , listname = 'BOaaa')

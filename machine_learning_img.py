@@ -16,23 +16,23 @@ NUM_CLASSES = 13
 IMAGE_SIZE = 28
 IMAGE_PIXELS = IMAGE_SIZE*IMAGE_SIZE*3
 
-def convData(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
-	imgdics = _.getDeepPathDic(DIR)
+def conv_data(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
+	imgdics = _.get_deeppath_dic(DIR)
 	print(imgdics)
 	train_label = [label for address, label in imgdics]
-	train_image = [convIMG(address, DIR) for address, label in imgdics]
+	train_image = [conv_image(address, DIR) for address, label in imgdics]
 	train_image = np.asarray(train_image)
 	train_label = np.asarray(train_label)
 	return train_image, train_label
 
-def convIMG(address, DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
+def conv_image(address, DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_imgswork"):
 	imgaddress = DIR+address
-	recogresult = opencv_functions.FaceRecognition(imgaddress, isShow = False, saveStyle = '', workDIR = 'work', through = True)
+	recogresult = opencv_functions.FaceRecognition(imgaddress, isShow = False, saveStyle = '', work_dir = 'work', through = True)
 	img = recogresult[0]
 	img = opencv_functions.adjustIMG(img, K = 0, isHC = True, size = (28, 28))
 	return img.flatten().astype(np.float32)/255.0
-# convIMG('CV_FACE_icon0_LL1-01_20160212003336.png', '/Users/masaMikam/OneDrive/imgs/learn/others/')
-def convLabel(label):
+# conv_image('CV_FACE_icon0_LL1-01_20160212003336.png', '/Users/masaMikam/OneDrive/imgs/learn/others/')
+def conv_label(label):
     tmp = np.zeros(NUM_CLASSES)
     print(tmp)
     tmp[int(label)] = 1
@@ -58,7 +58,7 @@ def conv_model(X, y, keep_prob = 0.5):
 	h_fc1 = tf.nn.dropout(h_fc1, keep_prob)
 	return skflow.models.logistic_regression(h_fc1, y, class_weight=None)
 
-def CNNmodel(X, y):
+def cnn_model(X, y):
 	keep_prob = tf.placeholder(tf.float32)
 	return conv_model(X, y, keep_prob = keep_prob)
 
@@ -69,12 +69,12 @@ def CNNmodel(X, y):
 # score = metrics.accuracy_score(label_test, classifier.predict(data_test))
 # print('Accuracy: {0:f}'.format(score))
 
-def train(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", saveDIR = "/Users/masaMikam/OneDrive/imgs/DNNmodel2", logdir = '/Users/masaMikam/OneDrive/tmp/TFdata'):
+def train(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", save_dir = "/Users/masaMikam/OneDrive/imgs/DNNmodel2", logdir = '/Users/masaMikam/OneDrive/tmp/TFdata'):
 	print('trainingLABELs... paste it to predictFunc!!\n', [clsdir for clsdir in os.listdir(DIR) if not clsdir in set(['.DS_Store'])])
-	images, labels = convData(DIR)
+	images, labels = conv_data(DIR)
 	data_train, data_test, label_train, label_test = cross_validation.train_test_split(images, labels, test_size=0.2, random_state=42)
 	classifier = skflow.TensorFlowEstimator(
-	    model_fn = CNNmodel, n_classes=NUM_CLASSES, batch_size=10, steps=1000,
+	    model_fn = cnn_model, n_classes=NUM_CLASSES, batch_size=10, steps=1000,
 	    learning_rate=1e-4, optimizer='Adam', continue_training=True)
 	# classifier = skflow.TensorFlowDNNClassifier(hidden_units=[10, 20, 10],
  #                                            n_classes=NUM_CLASSES, steps=1000,
@@ -83,23 +83,23 @@ def train(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", saveDIR = "/
 		classifier.fit(data_train, label_train, logdir=logdir)
 		score = metrics.accuracy_score(label_test, classifier.predict(data_test))
 		print('Accuracy: {0:f}'.format(score))
-		classifier.save(saveDIR)
+		classifier.save(save_dir)
 
  # ['chino', 'eri', 'hanayo', 'honoka', 'kotori', 'maki', 'niko', 'nozomi', 'rin', 'umi']
  # ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂']
-def predictAns(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/show.png", isShow = True, model = '/Users/masaMikam/Dropbox/Project/umiA/Data/lib/DNNmodel', workDIR = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂']):
+def predictAns(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/show.png", isShow = True, model = '/Users/masaMikam/Dropbox/Project/umiA/Data/lib/DNNmodel', work_dir = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂']):
 	classifier = skflow.TensorFlowEstimator.restore(model)
 	# imgaddress = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/images-10.jpeg"
 	# imgaddress = '/Users/masaMikam/Dropbox/Project/umiA/Data/twimgs/20160204152357.jpg'
-	img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', workDIR = '')
+	img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', work_dir = '')
 	img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28))
 	result = classifier.predict(img)
 	anslabel = label[result]
-	return anslabel, FACEflag, altfilename
+	return anslabel, face_flag, altfilename
 
-def trainSVM(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", saveDIR = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", logdir = '/Users/masaMikam/OneDrive/tmp/TFdata'):
+def train_svm(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", save_dir = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", logdir = '/Users/masaMikam/OneDrive/tmp/TFdata'):
 	print('trainingLABELs... paste it to predictFunc!!\n', [clsdir for clsdir in os.listdir(DIR) if not clsdir in set(['.DS_Store'])])
-	images, labels = convData(DIR)
+	images, labels = conv_data(DIR)
 	data_train, data_test, label_train, label_test = cross_validation.train_test_split(images, labels, test_size=0.2, random_state=42)
 	# classifier = sklearn.
 	scores = []
@@ -117,17 +117,41 @@ def trainSVM(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", saveDIR =
 	accuracy = (sum(scores) / len(scores)) * 100
 	msg = '正答率: {accuracy:.2f}%'.format(accuracy=accuracy)
 	print(msg)
-	# clf.save(saveDIR)
-	joblib.dump(clf, saveDIR) 
+	# clf.save(save_dir)
+	joblib.dump(clf, save_dir) 
 
-def predictSVM(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/show.png", isShow = True, model = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", workDIR = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
+# def predict_svm(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/show.png", isShow = True, model = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", work_dir = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
+# 	img_kind = ''
+# 	# img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', work_dir = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
+# 	if face_flag:
+# 		img_kind = 'cat'
+# 	if not img_kind:
+# 		img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', work_dir = '', cascade_lib = cascade_lib_anime)
+# 		if face_flag:
+# 			img_kind = 'anime'
+# 	if img_kind == 'anime' or is_force:
+# 		classifier = joblib.load(model)
+# 		img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
+# 		img = img.flatten().astype(np.float32)/255.0
+# 		result = classifier.predict(img.reshape(1, -1))
+# 		anslabel = label[result[0]]
+# 		return anslabel, img_kind, altfilename
+# 	elif img_kind == 'cat':
+# 		anslabel = 'cat'
+# 		return anslabel, img_kind, altfilename
+# 	else:
+# 		anslabel = 'no_face'
+# 		return anslabel, img_kind, filename
+
+def predict_svm(_id = '', is_show = True, model = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", work_dir = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
 	img_kind = ''
-	img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', workDIR = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
-	if FACEflag:
+	# img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', work_dir = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
+	recognize_faceimage(_id = '7aa33bfe-e6c0-4156-a4d0-7e53e88b1dd1', is_show = True, save_style = 'icon', frame_setting = {'thickness': 2, 'color':(0, 0, 255)}, through = False, cascade_lib = cascade_lib_anime)
+	if face_flag:
 		img_kind = 'cat'
-	if img_kind == '':
-		img, altfilename, frame, FACEflag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', workDIR = '', cascade_lib = cascade_lib_anime)
-		if FACEflag:
+	if not img_kind:
+		img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', work_dir = '', cascade_lib = cascade_lib_anime)
+		if face_flag:
 			img_kind = 'anime'
 	if img_kind == 'anime' or is_force:
 		classifier = joblib.load(model)
@@ -142,17 +166,16 @@ def predictSVM(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/
 	else:
 		anslabel = 'no_face'
 		return anslabel, img_kind, filename
-
 if __name__ == '__main__':
 	import sys, os, io
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 	# 6海未 7真姫
 	filename = '/Users/masaMikam/OneDrive/imgs/face/LL3/海未/CV_FACE_icon0_LL1-03_20160212165427.png'
 	DIR = '/Users/masaMikam/OneDrive/imgs/learn/雪穂/'
-	ans = predictSVM(filename  = filename, isShow = 1, model = modelSVM, workDIR = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
+	ans = predictSVM(filename  = filename, isShow = 1, model = modelSVM, work_dir = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
 	print(ans)
-	# label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR  = '')
-	# trainSVM(DIR = "/Users/masaMikam/OneDrive/imgs/learn/_work/", saveDIR = DATADIR + '/lib/SVM_us3/SVMmodel3.pkl')
+	# label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, work_dir  = '')
+	# train_svm(DIR = "/Users/masaMikam/OneDrive/imgs/learn/_work/", save_dir = DATADIR + '/lib/SVM_us3/SVMmodel3.pkl')
 
 	# adrs = [DIR+clsdir for clsdir in os.listdir(DIR) if not clsdir in set(['.DS_Store'])]
 	# print([predictSVM(filename  =adr, isShow = 0, model = modelSVM)[0] for adr in adrs[:1]])

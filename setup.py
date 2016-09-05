@@ -14,7 +14,10 @@ import time
 import urllib
 import bs4
 import pprint
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+JST = timezone(timedelta(hours=+9), 'JST')
+import base64
+import uuid
 from collections import Counter, deque
 from itertools import chain
 #logging

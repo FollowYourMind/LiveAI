@@ -9,6 +9,62 @@ import re
 from itertools import chain
 import _
 from _ import p, d, MyObject, MyException
+from setup import *
+from datetime import datetime, timedelta
+import functools
+
+C_OFF = 0x80
+
+S_HIR = '、。「」　ー０１２３４５６７８９' \
+          'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん' \
+            'っぁぃぅぇぉゃゅょ' \
+              'がぎぐげござじずぜぞだぢづでどばびぶべぼヴ' \
+                'ぱぴぷぺぽ' \
+
+S_ZEN = '、。「」　ー０１２３４５６７８９' \
+          'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' \
+            'ッァィゥェォャュョ'  \
+              'ガギグゲゴザジズゼゾダヂヅデドバビブベボヴ' \
+                'パピプペポ'
+
+S_SEI = '､｡｢｣ -0123456789'  \
+           'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ' \
+             'ｯｧｨｩｪｫｬｭｮ'
+S_DAK ='ｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾊﾋﾌﾍﾎｳ'
+S_HAT ='ﾊﾋﾌﾍﾎ'
+TENN, MARU = 'ﾞ', 'ﾟ'
+
+L_DAK = [c+TENN for c in S_DAK] + [c+MARU for c in S_HAT]
+S_CCH = ''.join(chr(i+C_OFF) for i in range(len(L_DAK)))
+S_HAN = S_SEI + S_CCH
+L_HAN = list(S_SEI) + L_DAK
+H_DAK = dict(zip(L_DAK, S_CCH))
+R_DAK = re.compile('[{}]{}|[{}]{}'.format(S_DAK, TENN, S_HAT, MARU))
+
+def comb(*fs):
+    return lambda x: functools.reduce(lambda y,f:f(y), fs, x)
+
+def trans(k,v):
+    assert len(k)==len(v)
+    tbl = str.maketrans(k,v) if type(v) is str else \
+          str.maketrans(dict(zip(k,v)))
+    return lambda s: s.translate(tbl)
+
+def replace(c0, c1):
+    return lambda s: s.replace(c0,c1)
+
+subd = lambda s: R_DAK.sub(lambda m:H_DAK[m.group()], s)
+zj=comb(trans(S_ZEN, S_HIR), replace('ヴ', 'う゛'))
+jz=comb(replace('う゛', 'ヴ'), trans(S_HIR, S_ZEN))
+zh=trans(S_ZEN, L_HAN)
+jh=comb(replace('う゛', 'ヴ'), trans(S_HIR, L_HAN))
+hz=comb(subd, trans(S_HAN, S_ZEN))
+hj=comb(subd, trans(S_HAN, S_HIR), replace('ヴ', 'う゛'))
+
+
+def test(name, fun, s):
+    print(name, 'ok' if s==fun(s) else 'ng', sep=' .... ')
+
 
 class RegexTools(MyObject):
     def __init__(self):
@@ -33,7 +89,7 @@ class RegexTools(MyObject):
         ex_ls = compiled_reg.findall(s)
         return rest_text, ex_ls
     def extract_specific_words(self, s):
-        spe_char = re.compile('\s{1,2}(\w{1,}?)\s{1,2}');
+        spe_char = re.compile('「(\w{1,10}?)」');
         ex_ls = spe_char.findall(s)
         extracted_rest = re.sub(spe_char, '<EX>' , s)
         return extracted_rest, ex_ls
@@ -52,33 +108,22 @@ class RegexTools(MyObject):
         except Exception as e:
             p(e)
             return '', text
-    # def extract_commas(self, src_ls):
-    #     try:
-    #         params = src_ls[1]
-    #         comma_cnt = params.count(',')
-    #         reg_comma = ''.join(['\s*[@#]*(.+)\s*', ',\s*[@#]*(.+)\s*' * comma_cnt])
-    #         compiled_reg_comma = re.compile(reg_comma, re.M)
-    #         reg_comma_ls = compiled_reg_comma.findall(params)
-    #         if isinstance(reg_comma_ls[0], str):
-    #             reg_comma_ls = [reg_comma_ls]
-    #         return {pair_set[0]: pair_set[1] for pair_set in [self.extract_param(param, reg_comma_ls[0]) for param in reg_comma_ls[0]]}
-    #     except:
-    #         pass
-    # def extract_cmds_dic(self, text):
-    #     try:
-    #         if '(' in text and ')' in text:
-    #             reg = '\s*([a-zA-Z_]+)\s*\(([^\)\)]*)\)'
-    #         else:
-    #             reg = '\s*([a-zA-Z_]+)\s*\s([^=\s]+?)[\s,]'
-    #         compiled_reg = re.compile(reg, re.M)
-    #         reg_ls = compiled_reg.findall(text)
-    #         text = re.sub(compiled_reg, '', text)
-    #         #-- と空白で挟まれたものをコマンドにする
-    #         return {reg[0]: self.extract_commas(reg) for reg in reg_ls}, text
-    #         # return {reg[0]: {sets[0]: sets[1] for sets in [extract_param(param, reg[1]) for param in reg[1:]]} for reg in reg_ls}, text
-    #     except Exception as e:
-    #         p(e)
-    #         return {}, text
+    def extract_commas(self, src_ls):
+        try:
+            params = src_ls[1]
+            comma_cnt = params.count(',')
+            reg_comma = ''.join(['\s*[@#]*(.+)\s*', ',\s*[@#]*(.+)\s*' * comma_cnt])
+            compiled_reg_comma = re.compile(reg_comma, re.M)
+            reg_comma_ls = compiled_reg_comma.findall(params)
+            if isinstance(reg_comma_ls[0], str):
+                reg_comma_ls = [reg_comma_ls]
+            return {pair_set[0]: pair_set[1] for pair_set in [self.extract_param(param, reg_comma_ls[0]) for param in reg_comma_ls[0]]}
+        except:
+            pass
+    def extract_cmds_dic(self, text):
+        reg = '\s*(?P<func>[a-zA-Z_.]+)\s{0,3}@*(?P<var>[0-9a-zA-Z:：_]+)*(\s+\-{0,3}\s*(?P<mod>[0-9a-zA-Z_]+))*'
+        reg_dic = self.complie_and_get_groupdict_all(reg, text)
+        return reg_dic
     def complie_and_get_groupdict(self, reg, text = None):
             if text is None:
                 text = ''
@@ -147,14 +192,34 @@ class RegexTools(MyObject):
         else:
             return None
         return sec
-    def extract_modification(self):
-            cnt_reg = '\(\<mecab\>\<数\>(?P<count>\d{1,2})(?P<count_scale>度|回)\)(\(\<mecab\>\<副助詞\>(?P<count_preposition>(だけ|ほど|くらい))\))*'
-            freq_reg = '\(\<mecab\>\<数\>(?P<frequency>\d{1,2}\w)(?P<frequency_scale>秒|分|時|日|週|sec|min|hour|day|week|year)\).+(?P<frequency_preposition>ごと|おき)\)[にで\s]*'
-            duration_reg = '\(\<mecab\>\<数\>(?P<duration>\d{1,2})(?P<duration_scale>秒|分|時|日|週|sec|min|hour|day|week|year)\)[の]*.+(?P<duration_preposition>後まで|間|あいだ|程度|ほど)\)[にで\s]*'
-            delay_reg = '\(\<mecab\>\<数\>(?P<delay>\d{1,2})(?P<delay_scale>秒|分|時|日|週|sec|min|hour|day|week|year)\)(?P<delay_preposition>後|すぎ)[にで\s]*'
-            # reg = ['.+(' , '|'.join([cnt_reg, duration_reg,  freq_reg, delay_reg]), ')+']
-            reg = ''.join(['|'.join([cnt_reg, duration_reg,  freq_reg, delay_reg])])
-            reg_group_dic = self.complie_and_get_groupdict(reg, self.text)
+    def extract_time(self, text):
+        if ':' in text:
+            time_reg = '[^1-9]*(?P<hour>\d{1,2}):(?P<min>\d{1,2})(:(?P<sec>\d{1,2}))*'
+        else:
+            hour_reg = '((?P<hour>\d{1,2})(時|hour))*'
+            min_reg = '((?P<min>\d{1,2})(分|min))*'
+            sec_reg = '((?P<sec>\d{1,2})(秒|sec))*'
+            time_reg = ''.join([''.join(['[^1-9]*', hour_reg, min_reg, sec_reg])])
+        reg_group_dic = self.complie_and_get_groupdict(time_reg, text)
+        reg_group_dic['total_seconds'] = 0
+        if not reg_group_dic['hour'] is None:
+            reg_group_dic['total_seconds'] += int(reg_group_dic['hour'])*3600
+        if not reg_group_dic['min'] is None:
+            reg_group_dic['total_seconds'] += int(reg_group_dic['min'])*60
+        if not reg_group_dic['sec'] is None:  
+            reg_group_dic['total_seconds'] += int(reg_group_dic['sec'])
+        return reg_group_dic
+    def extract_modification(self, text):
+        # text = '4時30分に起こして'
+        cnt_reg = '\(\<mecab\>\<数\>(?P<count>\d{1,2})(?P<count_scale>度|回)\)(\(\<mecab\>\<副助詞\>(?P<count_preposition>(だけ|ほど|くらい))\))*'
+        freq_reg = '\(\<mecab\>\<数\>(?P<frequency>\d{1,2}\w)(?P<frequency_scale>秒|分|時|日|週|sec|min|hour|day|week|year)\).+(?P<frequency_preposition>ごと|おき)\)[にで\s]*'
+        duration_reg = '\(\<mecab\>\<数\>(?P<duration>\d{1,2})(?P<duration_scale>秒|分|時|日|週|sec|min|hour|day|week|year)\)[の]*.+(?P<duration_preposition>後まで|間|あいだ|程度|ほど)\)[にで\s]*'
+        delay_reg = '(?P<delay>\d{1,2})(?P<delay_scale>秒|分|時|日|週|sec|min|hour|day|week|year)(?P<delay_preposition>後|すぎ)[にで\s]*'
+        # time_reg = '(?P<time>\d{1,2})(?P<time_scale>秒|分|時|日|週|sec|min|hour|day|week|year)[にで\s]*'
+        reg = ''.join(['|'.join([cnt_reg, duration_reg,  freq_reg, delay_reg])])
+        reg_group_dic = self.complie_and_get_groupdict(reg, text)
+        # p(reg_group_dic)
+        return reg_group_dic
 def is_kusoripu(self, s):
     if len(s) < 100:
         return False
@@ -781,9 +846,9 @@ def get_sentence_structure(nlp_dic, begin_id = 'EOS', is_nominalize = False):
         if c_mas:
             _C, nlp_dic = get_modification(target_chunk = s1v_chunk, target_ma = c_mas[-1], nlp_dic = nlp_dic)
     # 目的語ヲの検出
-    Owo_chunks = [ls for ls in [[from_chunk for ma in from_chunk['result'] if '助詞' in ma[1] and ma[0] in {'を'}] for from_chunk in from_chunks] if ls]
+    Owo_chunks = [ls for ls in [[from_chunk for ma in from_chunk['result'] if '助詞' in ma[1] and ma[0] in {'を', 'って'}] for from_chunk in from_chunks] if ls]
     if not Owo_chunks:
-        Owo_chunks = [ls for ls in [[all_chunk for ma in all_chunk['result'] if '助詞' in ma[1] and ma[0] in {'を'}] for all_chunk in all_chunks] if ls]
+        Owo_chunks = [ls for ls in [[all_chunk for ma in all_chunk['result'] if '助詞' in ma[1] and ma[0] in {'を', 'って'}] for all_chunk in all_chunks] if ls]
     if Owo_chunks:
         Owo_chunk = Owo_chunks[-1][-1]
         Owo_mas = [ma for ma in Owo_chunk['result'] if ma[1] in {'名詞', '固有名詞'}]
@@ -888,9 +953,9 @@ class RegexClass(RegexTools):
         self.Dativ = None
         self.Nominativ = None
         self.Akkusativ = None
-        mod_dic = self.extract_modification()
+        mod_dic = self.extract_modification(self.text)
         if mod_dic:
-            self.cnt = mod_dic['cnt']
+            self.cnt = mod_dic['count']
             self.delay_sec = self.convert_time_expression_into_datetime_sec(target = mod_dic['delay'], target_expression = mod_dic['delay_scale'])
             self.duration_sec = self.convert_time_expression_into_datetime_sec(target = mod_dic['duration'], target_expression = mod_dic['duration_scale'])
             self.frequency_sec = self.convert_time_expression_into_datetime_sec(target = mod_dic['frequency'], target_expression = mod_dic['frequency_scale'])
@@ -931,14 +996,13 @@ class RegexClass(RegexTools):
                 return ['(?P<', label, '>', ex_str, '+?)', '(\(\<mecab\>\<並立助詞\>.+?\)(?P<', label, '2>', ex_str, '+?))*', '(\(\<mecab\>\<並立助詞\>.+?\)(?P<', label, '3>.+?))*']
             shugo_reg = ['('] + heiretsuka(label = 'Nominativ') + ['\(\<mecab\>\<係助詞\>[はが]\)[、,\s]*)*']
             akkusativ_reg = ['('] + heiretsuka(label = 'Dativ') + ['\(\<mecab\>\<格助詞\>[にへ]\)[、,\s]*)*']
-            dativ_reg = ['((?P<Akkusativ>', ex_str, '+?)\s*\(\<mecab\>\<格助詞\>[を]\)[、,\s]*)*']
+            dativ_reg = ['((?P<Akkusativ>', ex_str, '+?)\s*\(\<mecab\>\<格助詞\>(を|って)\)[、,\s]*)*']
             mokuteki_reg = akkusativ_reg + dativ_reg
             # mokuteki_reg = ''.join(['(?P<Dativ>', '\(.+?\))'])
             modification_reg = []
             # .*(で|ろ|れ|せ|な|たい|れよ|！|!))(いで|よ|って|ほしい|ください|)
             action = ['(?P<action>', ex_str, '+?)(?P<action_>(\(\<mecab\>接続助詞:[て]\)|なさい|てよ|れよ))']
             reg = ''.join(['\s*'] + shugo_reg + mokuteki_reg + modification_reg + action)
-            # reg = mokuteki_reg
             reg_group_dic = self.complie_and_get_groupdict(reg, self.text)
             return reg_group_dic
         except Exception as e:
@@ -953,6 +1017,9 @@ class RegexClass(RegexTools):
 #
 class NLPdatas(MyObject):
     def __init__(self, sentence):
+        if sentence:
+            while sentence[-1] == ' ':
+                sentence = sentence[:-1]
         self.original_text = sentence
         if not '。' in self.original_text:
             self.split_texts = [self.original_text]
@@ -989,8 +1056,15 @@ class NLPdata(MyObject):
         self.mas = self.MA.get_mecab_ls(self.text)
         self.coupled_mas = self.MA.get_mecab_coupled(self.text, couple_target = {'助詞', '記号', '助動詞', '名詞'}, cp_kakoi = '({})', cp_splitter = '--', masking_format = '(<{label}>{original})',  is_mask_on = 1)
         self.annotated_text = self.MA.annotate_cp_ma_on_text(self.coupled_mas)
+        # p(self.annotated_text)
+
         ##Regular Expression
         self.regex_class = RegexClass(self.annotated_text)
+        self.cmds = self.regex_class.extract_cmds_dic(self.text)
+        self.summary.cmds = self.cmds
+        self.times = self.regex_class.extract_time(self.text)
+        self.get_timeobj()
+        self.summary.when = self.timeobj
         # ##SyntacticAnalysis
         self.joint_mas = self.MA.get_mecab_coupled(self.text, couple_target = {'記号', '助動詞', '名詞'}, cp_kakoi = '{}', cp_splitter = '', masking_format = '{original}',  is_mask_on = 1)
         self.ma_len = len(self.joint_mas)
@@ -1017,46 +1091,67 @@ class NLPdata(MyObject):
                     self.value_function_id_range = range(self.value_id + 1, value_function_id + 1)
                     self.value_function_mas = [self.joint_mas[function_id] for function_id in self.value_function_id_range]
         except Exception as e:
-            d(e, 'NLPdata.init.ma')
+            _.log_err()
             pass
-        else:
-            self.summary.function = self.judge_function()
-            # p(self.summary.function )
+        # else:
+            # self.summary.function = self.judge_function()
         try:
-            cabocha_akkusativ = self.extract_phrase_with_joshi({'を', 'で'})
+            cabocha_akkusativ = self.extract_phrase_with_joshi({'を', 'で', 'って'})
             if cabocha_akkusativ:
                 self.summary.akkusativ = cabocha_akkusativ[0]
         except Exception as e:
-            d(e, 'NLPdata.init.ak')
+            _.log_err()
             pass
         try:
             cabocha_dativ = self.extract_phrase_with_joshi({'に', 'へ'})
             if cabocha_dativ:
                 self.summary.dativ = cabocha_dativ[0]
         except Exception as e:
-            d(e, 'NLPdata.init.da')
+            _.log_err()
             pass
         try:
             cabocha_entity = self.extract_phrase_with_joshi({'が', 'は', 'とは'})
             if cabocha_entity:
                 self.summary.entity = cabocha_entity[0]
         except Exception as e:
-            d(e, 'NLPdata.init.en')
+            _.log_err()
             pass
+        self.summary.function = self.judge_function()
+    def get_timeobj(self):
+        for key, value in self.times.items():
+            if not value is None:
+                self.times[key] = int(value)
+        jnow = datetime.now(JST)
+        self.timeobj = jnow
+        if not self.times['hour'] is None:
+            self.timeobj = self.timeobj.replace(hour = self.times['hour'])
+        if not self.times['min'] is None:
+            self.timeobj = self.timeobj.replace(minute = self.times['min'])
+        if not self.times['sec'] is None:
+            self.timeobj = self.timeobj.replace(second = self.times['sec'])
+        if jnow > self.timeobj:
+            self.timeobj += timedelta(days = 1)
     def judge_function(self):
+        function_names = []
+        function_name = '断定'
         if not self.value_ma:
             return None
         elif not self.value_function_mas:
             if '命令' in self.value_ma[6]:
-                return '命令'
-            else:
-                return None
-        func_text = ''.join([ma[0] for ma in self.value_function_mas])
-        function_name = ''
-        reg_dic = self.regex_class.extract_function(func_text)
-        function_names = [function_name for function_name, extracted in reg_dic.items() if not extracted is None]
+                function_names = ['命令']
+        else:
+            func_text = ''.join([ma[0] for ma in self.value_function_mas])
+            reg_dic = self.regex_class.extract_function(func_text)
+            function_names = [function_name for function_name, extracted in reg_dic.items() if not extracted is None]
+        if self.summary.value in {'なに', '何'}:
+            function_names.append('疑問(what)')
+        elif self.summary.value in {'だれ', '誰'}:
+            function_names.append('疑問(what)')
+        elif self.summary.value in {'いつ', '何時'}:
+            function_names.append('疑問(what)')
+        elif self.summary.value in {'どうして', 'なぜ', '何故'}:
+            function_names.append('疑問(what)')
         if function_names:
-            p(function_names)
             if '断定' in function_names:
                 function_names.remove('断定')
             if '否定' in function_names:
@@ -1066,10 +1161,11 @@ class NLPdata(MyObject):
                 function_name = ''.join(['疑問', '(', function_name, ')'])
                 function_names.remove('疑問')
             if function_names:
-                if function_name != '':
-                    function_name = ''.join(['疑問', '(', function_names[0], ')'])
-                else:
-                    function_name = function_names[0]
+                function_name = function_names[0]
+                # if function_name != '':
+                #     function_name = ''.join(['疑問', '(', function_names[0], ')'])
+                # else:
+                #     function_name = function_names[0]
         if function_name == '断定':
             if '命令' in self.value_ma[6]:
                 function_name = '命令'
@@ -1115,26 +1211,40 @@ class NLPdata(MyObject):
         return [[construct_dic_into_text(cp_ma, k) if '(' in cp_ma[k] else cp_ma[k] for k in range(len(cp_ma))] for cp_ma in self.coupled_mas]
 class Temp(MyObject):
     pass
+
 if __name__ == '__main__':
     import sys
     import io
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    text = '''643920の診断メーカーをやって'''    # text = 'したい'
-    # a = MA.get_mecab(text, mode = 7, form = {'名詞', '動詞', '形容詞'}, exception = {'記号'}, is_debug = False)
-    # p(np.random.choice(a))
+    # a = constract_nlp(text)
+    # p(a)
     # reg = RegexTools()
-    # p(reg.extract_discorse(text))
-    # text = 'a'
-    # p(text[:3])
-    # aa = ['a', tmp, 'b', 'a', 'c', 'd', 'e']
-    # import random
-    # p(random.sample(aa, 3))
-    # p(MA.get_mecab_ls(text))
-    # p(MA.get_mecab_coupled(text))
-    # # p(NLPdata(text).regex_analysis.__dict__)
+    text = '@ss に20時にkusoripu送信'
     nlp_data = NLPdatas(text).main
+    p(nlp_data.summary.when.strftime('%m月%d日%H:%M'))
     p(nlp_data.summary)
+    # p(nlp_data.times['total_seconds'])
+    # a = 10
+    # for i in range(4000):
+    #     a /= 1.001
+    #     p(i, a)
+    #     if a < 1:
+    #         break
+    # p(1152 / 6 /24)
+    # p(nlp_data.timeobj)
+    # p(datetime.utcnow()+timedelta(hours = 9))
+    # from datetime import datetime, timedelta
+    # jnow = datetime.utcnow() + timedelta(hours = 9)
+    # tgtime = nlp_data.times
+    # if not tgtime['hour'] is None:
+    #     jnow = jnow.replace(hour = tgtime['hour'])
+    # if not tgtime['min'] is None:
+    #     jnow = jnow.replace(minute = tgtime['min'])
+    # if not tgtime['sec'] is None:
+    #     jnow = jnow.replace(second = tgtime['sec'])
+    # p(jnow)
+    # p(re.sub(r'(@[^\s　]+)', '{ID}', text).format(ID = 'chana'))
     # p([ma for ma in nlp_data.mas if ma[2] == '数'][0][0])
     # p(nlp_data.summary.has_function('希望', '要望', '勧誘'))
     # p(nlp_data.summary.has_function('疑問'))

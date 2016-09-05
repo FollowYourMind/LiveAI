@@ -138,7 +138,6 @@ def log_err(is_print = True, is_logging = True):
     if is_logging:
       logger.debug(err_info)
     return info[1], tbinfo
-
 class MyObject(object):
     def __len__(self):
         return len(self.__dict__)
@@ -405,7 +404,7 @@ def flatten(nested_list):
     """2重のリストをフラットにする関数"""
     return [e for inner_list in nested_list for e in inner_list]
 
-def getDeepPathDic(DIR):
+def get_deeppath_dic(DIR):
   def _filebool(jpg):
     if jpg in {'.DS_Store'}:
       return False
@@ -444,7 +443,6 @@ def crowlList(text = 'test', dic = ['']):
 def clean_text(text, isKaigyouOFF = False):
   text = re.sub(r'(@[^\s　]+)', '', text)
   text = re.sub(r'(#[^\s　]+)', '', text)
-  # text = re.sub(r'(http[^\s　]+)', '', text)
   text = re.sub(r'(https?|ftp)(://[\w:;/.?%#&=+-]+)', '', text)
   text = re.sub(r'(^[\s　]+)', '', text)
   text = re.sub(r'([\s　]+$)', '', text)
@@ -496,7 +494,7 @@ def download_file(url, DIR, filename = ''):
     print("[ERR.DL]")
     return ''
 
-def saveMedias(status, ID, DIR):
+def save_medias(status, ID, DIR):
   def saveMedia(medias, ID, i, screen_name):
     m = medias[i]
     media_url = m['media_url']
@@ -517,6 +515,9 @@ def saveMedias(status, ID, DIR):
     return [filename for filename in [saveMedia(medias, ID, i, status['user']['screen_name']) for i in range(len(medias))] if filename != '']
   except Exception as e:
     print(e)
+
+
+
 
 def saveImg(media_url, DIR, filename):
   if not os.path.exists(DIR):
@@ -560,12 +561,16 @@ def queue_put(q, msg, timeout = 5):
        d('tweet_log_sender put() timed out. Queue is Full')
        raise
 if __name__ == '__main__':
-  while True:
-    try:
-      p('aa')
-      time.sleep(2)
-    except KeyboardInterrupt:
-      p('yes')
+  # text = '\>aaaあいうえss'
+  # text = re.sub('([a-zA-Z!-/:-@¥[-`{-~]+)', '', text)
+  text = get_deeppath_dic(DIR = '/Users/masaMikam/Desktop/imgs/animebkup/')
+  p(text)
+  # while True:
+  #   try:
+  #     p('aa')
+  #     time.sleep(2)
+  #   except KeyboardInterrupt:
+  #     p('yes')
 
 
       

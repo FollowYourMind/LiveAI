@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from setup import *
+from sql_models import *
+
 import _
 from _ import p, d, MyObject, MyException
 import urllib
@@ -61,13 +63,20 @@ def extract_ss(url = 'http://www.lovelive-ss.com/?p={}'):
 	return s_ls
 def search_weblioEJJE(word = 'ask'):
 	try:
-		converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
-		ejje_url = ''.join(["http://ejje.weblio.jp/content/", converted_word])
-		soup = get_bs4soup(ejje_url)
-		return ''.join(['\'', word, '\'の訳:\n', str(soup.find("div", class_ = "summaryM")).split('</b>')[1][:-6]])
-	except Exception as e:
-		d(e)
-		return ''.join(['\'', word, '\'に一致する語は見つかりませんでした。'])
+		ans = CrawledData.select().where(CrawledData.title == word).get()
+		return ans.data
+	except DoesNotExist:
+		try:
+			converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
+			ejje_url = ''.join(["http://ejje.weblio.jp/content/", converted_word])
+			soup = get_bs4soup(ejje_url)
+			text = str(soup.find("div", class_ = "summaryM"))
+			ans = re.sub('([a-zA-Z!-/:-@¥[-`{-~\s]+)', '', text).replace('主な意味', '')
+			if ans:
+				CrawledData.create(tag = 'weblio', url = ejje_url, title = word, data = ans)
+			return ans
+		except:
+			return ''
 
 def search_wiki(word = 'クロマニョン人'):
 	ans = ''
@@ -191,6 +200,7 @@ class ShindanMaker(MyObject):
 			self.url = ''.join([url_base, href])
 		except:
 			return ''
+# def get_dm_image(self, n = 10):
 
 if __name__ == '__main__':
 	import sys
@@ -207,16 +217,47 @@ if __name__ == '__main__':
 	url = 'http://www.lovelive-ss.com/?p=8560'
 	# soup = get_bs4soup(url)
 	# p(soup)
-	import operate_sql
-	import natural_language_processing
-	site_url = 'http://www.lovelive-ss.com/?p={}'
+	# import operate_sql
+	# import natural_language_processing
+	# site_url = 'http://www.lovelive-ss.com/?p={}'
+	# import urllib
+	# import urllib.request # opener
+	# import urllib.parse # urlencode
+	# import http
+	# import http.cookiejar
+	
+	# opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+	USER_AGENT = {'User-Agent': 'Mozilla/5.0'} #Needed to prevent 403 error
+	phantomjs_path = '/usr/local/bin/phantomjs'
+	login_url = 'https://mobile.twitter.com/session/new'
+	# img_url = 'https://twitter.com/messages/media/772747782637563907'
+	img_url = 'https://ton.twitter.com/1.1/ton/data/dm/772785678509760515/772785678547423232/iEUEceDa.jpg'
+	driver = webdriver.PhantomJS(executable_path=phantomjs_path, service_log_path=os.path.devnull, desired_capabilities={'phantomjs.page.settings.userAgent':USER_AGENT})
+	driver.get(img_url)
+	try:
+		loginid = driver.find_element_by_id('session[username_or_email]')
+	except:
+		p('log-in')
+		tw_id, tw_pw = 'LiveAI_Rin','705216130'
+		driver.get(login_url)  # ログインページを開く
+		html = driver.page_source.encode('utf-8')
+		loginid = driver.find_element_by_id('session[username_or_email]')
+		password = driver.find_element_by_id('session[password]')
+		loginid.send_keys(tw_id)
+		password.send_keys(tw_pw)
+		driver.find_element_by_name('commit').click()
+		driver.get(img_url)
+		time.sleep(1)
+		driver.save_screenshot('DMimg.png')
+		driver.quit()
+	# p(search_weblioEJJE(word = 'some'))
 	# range(4538, 8000):
 	# reg = natural_language_processing.RegexTools()
 	# filename = '/Users/masaMikam/Dropbox/Project/LiveAI/test_google_maps_api_screenshot.png'
 	# url = 'https://www.google.co.jp/searchbyimage?image_url={}&encoded_image=&image_content=&filename=&hl=ja'.format(filename)
 	# soup = get_bs4soup(url)
 	# p(soup)
-	xkey = 'スクフェスのアイコン'
+	# xkey = 'スクフェスのアイコン'
 	# converted_word = urllib.parse.quote_plus(word, encoding="utf-8")
 	# g_url = 'https://www.google.co.jp/search?q={}&tbm=isch'.format(converted_word)
 	# get_googlemap(url = g_url)
@@ -228,11 +269,12 @@ if __name__ == '__main__':
 	# return sentiment_dic
 	# import threading
 	# threads = []
-	# for ss_number in range(4561, 10000):
+	#9061 2016/08/10
+	# for ss_number in range(9061, 10000):
 	# 	p(ss_number)
 	# 	try:
 	# 		url = site_url.format(ss_number)
-	# 		ss_ls = extract_ss(url = url)
+	# 		# ss_ls = extract_ss(url = url)
 	# 		# if ss_ls:
 	# 		# 	operate_sql.save_ss(url, ss_ls)
 
@@ -242,7 +284,7 @@ if __name__ == '__main__':
 	# 		operate_sql.save_ss_dialog(url)
 	# 	except Exception as e:
 	# 		d(e)
-		# time.sleep(1+np.random.rand()*3)
+	# 	time.sleep(1+np.random.rand()*3)
 	# for thread in threads:
 	# 	if thread.is_alive():
 	# 		thread.join()
