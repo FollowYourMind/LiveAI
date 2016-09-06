@@ -5,10 +5,11 @@ from setup import *
 DATADIR = '/Users/masaMikam/Desktop/Data'
 
 from playhouse.postgres_ext import PostgresqlExtDatabase, BinaryJSONField
-import uuid
 db = PostgresqlExtDatabase(database='LiveAI', user='masaMikam')
-def uniqueid_generater():
-    return base64.b64encode('/'.join([datetime.now(JST).strftime('%Y%m%d%H%M%S'), str(os.getpid())]).encode('utf-8'))
+def uuid_generater():
+    random.seed()
+    return uuid.uuid4()
+#     return base64.b64encode('/'.join([datetime.now(JST).strftime('%Y%m%d%H%M%S'), str(os.getpid())]).encode('utf-8'))
 ###################################################
 #
 # >>>>>>>>WEBDATA_SQL>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -398,7 +399,7 @@ class Xlink(SQLModel):
             (('synset', 'resource'), False),
         )
 class Quiz(SQLModel):
-    _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+    _id = UUIDField(primary_key = True, default = uuid_generater())
     tag = TextField(default = 'undefined')
     question = TextField(unique = True)
     answer = TextField(default = '')
@@ -411,7 +412,7 @@ class Quiz(SQLModel):
         db_table = 'quiz'
 
 class CrawledData(SQLModel):
-    _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+    _id = UUIDField(primary_key = True, unique = True, default = uuid_generater())
     tag = TextField(default = 'undefined')
     url = TextField(default = '')
     title = TextField(default = '')
@@ -421,7 +422,7 @@ class CrawledData(SQLModel):
     class Meta:
         db_table = 'crawled_data'
 # class Knowledge(SQLModel):
-#     _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+#     _id = TextField(primary_key = True, unique = True, default = uuid_generater())
 #     tag = TextField(default = 'undefined')
 #     _from = TextField(default = '')
 #     _to = TextField(default = '')
@@ -433,31 +434,32 @@ class CrawledData(SQLModel):
 #     class Meta:
 #         db_table = 'knowledge'
 class TweetStatus(SQLModel):
-    _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+    _id = TextField(primary_key = True, unique = True, default = uuid_generater())
     data = BinaryJSONField(dumps = None)
     created_at = DateTimeField(default = datetime.now(JST))
     class Meta:
         db_table = 'tweet_status'
 class DMStatus(SQLModel):
-    _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+    _id = TextField(primary_key = True, unique = True, default = uuid_generater())
     data = BinaryJSONField(dumps = None)
     created_at = DateTimeField(default = datetime.now(JST))
     class Meta:
         db_table = 'dm_status'
 class EventStatus(SQLModel):
-    _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
+    _id = TextField(primary_key = True, unique = True, default = uuid_generater())
     data = BinaryJSONField(dumps = None)
     created_at = DateTimeField(default = datetime.now(JST))
     class Meta:
         db_table = 'event_status'
 class BinaryBank(SQLModel):
-    # _id = TextField(primary_key = True, unique = True, default = uniqueid_generater())
-    _id = UUIDField(primary_key = True, unique = True, default = uuid.uuid4())
+    # _id = TextField(primary_key = True, unique = True, default = uuid_generater())
+    _id = UUIDField(primary_key = True, unique = True, default = uuid_generater())
     url = TextField(null = True, default = '')
     filename = TextField(null = True, default = '')
     _format =  TextField(null = True, default = '')
     data = BlobField()
     owner = TextField(null = True, default = '')
+    json = BinaryJSONField(dumps = None, null = True)
     created_at = DateTimeField(default = datetime.now(JST))
     class Meta:
         db_table = 'binarybank'

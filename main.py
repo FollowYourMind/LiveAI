@@ -271,7 +271,7 @@ class StreamResponseFunctions(MyObject):
     def main(self, status, mode = 'dm', userinfo = '', userbot = ''):
         ans = ''
         ans_ls = []
-        image_file = ''
+        file_id = None
         tweet_status = ''
         filename = ''
         text = status['clean_text']
@@ -312,6 +312,7 @@ class StreamResponseFunctions(MyObject):
         action, target = dialog_generator.constract_nlp(status['text'], dialog_obj)
         if userbot.mode in {'srtr', 'battle_game'}:
             action = userbot.mode
+            userinfo.reply_cnt = 0
         delay_sec = 0
 
         p(action, text_without_tag_url_ownid, userbot.mode)
@@ -359,7 +360,7 @@ class StreamResponseFunctions(MyObject):
             file_id, filename = opencv_functions.make_qrcode(data = qrdata)
             userbot.mode = 'dialog'
             if filename:
-                ans = 'QR-Codeをつくりました。(id:' + file_id + ')'
+                ans = 'QR-Codeをつくりました。(id:' + str(file_id) + ')'
             else:
                 ans = 'QR-Code作成に失敗'
         elif userbot.mode == 'harenchi':
@@ -441,49 +442,49 @@ class StreamResponseFunctions(MyObject):
                     operate_sql.save_task(taskdict = {'who': self.bot_id, 'what': 'default', 'to_whom': screen_name, 'when':set_time, 'tmptext': ''})
                     ans = '10分間変更！！'
                 self.default_profile()
-            elif status['entities']['hashtags']:
-                imgtag = status['entities']['hashtags'][0]['text']
-                try:
-                    ans = operate_sql.get_phrase(status =  'appreciate.giveme.img', character = character).format(imgtag)
-                except Exception as e:
-                    _.log_err()
-                    ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
+            # elif status['entities']['hashtags']:
+            #     imgtag = status['entities']['hashtags'][0]['text']
+            #     try:
+            #         ans = operate_sql.get_phrase(status =  'appreciate.giveme.img', character = character).format(imgtag)
+            #     except Exception as e:
+            #         _.log_err()
+            #         ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
+            elif 'save' in action:
+                ans = '[保存データ]'
+                for _id in binary_ids:
+                    ans += '\nid: ' + str(_id)
             else:
-                filename = operate_sql.db2file(_id = binary_ids[0], folderpath = None, filename = 'tmp')
+                # filename = operate_sql.db2file(_id = binary_ids[0], folderpath = None, filename = 'tmp')
                 label = ''
-                pic = opencv_functions.read_img(filename)
+                # pic = opencv_functions.read_img(filename)
                 try:
-                    is_bar_detected, zbarans = opencv_functions.passzbar(pic)
-                    if is_bar_detected:
-                        img_kind = zbarans[0].decode('utf-8')
-                        zbarans = zbarans[1].decode('utf-8')
-                    else:
-                        label, img_kind, image_file = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, workDIR  = '')
-                    if img_kind in {'QR-Code'}:
-                        ans = zbarans
-                        filename = ''
-                    elif img_kind == 'anime':
-                        ans = operate_sql.get_phrase(status =  'confirm.detect.img', character = character).format(label)
-                        # drc = '/'.join([DIRIMGfeedback, label])
-                        # if os.path.exists(drc) == False:
-                        #     os.mkdir(drc)
-                        # shutil.copy(filename, drc)
-                        userbot.mode = 'dialog'
-                        # userbot.tmpFile = '/'.join([drc, filename.split('/')[-1]])
-                        filename = image_file
-                    elif img_kind == 'cat':
-                        ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
-                        filename = image_file
-                    else:
-                        ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
-                        filename = ''
-                        userbot.mode = 'dialog'
+                    if not ans:
+                        result = machine_learning_img.predict_svm(_id = binary_ids[0], is_show = 0, model = modelSVM, label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
+                        if 'anime' in result:
+                            label = result['anime']['extracted'][0]['label']
+                            if label == self.default_character:
+                                label = '私'
+                            ans = '「{' + label +'}」の画像！'
+                            ans += '\nid:' + str(binary_ids[0]) + '\n編集済id:' + str(result['anime']['extracted'][0]['framed_id'])
+                            file_id = result['anime']['extracted'][0]['framed_id']
+                        elif 'cat' in result:
+                            ans = operate_sql.get_phrase(status =  'detect_cat', character = character)
+                            ans += '\nid:' + str(binary_ids[0])+ '\n編集済id:' + str(result['cat']['extracted'][0]['framed_id'])
+                            file_id = result['cat']['extracted'][0]['framed_id']
+                        else:
+                            ans = operate_sql.get_phrase(status =  'confirm.detect.img.noface', character = character).format(label)
+                    if not ans:
+                        is_bar_detected, zbarans = opencv_functions.passzbar(result['gray_cvimg'])
+                        if is_bar_detected:
+                            img_kind = zbarans[0].decode('utf-8')
+                            zbarans = zbarans[1].decode('utf-8')
+                            ans = zbarans + '\nid:' + str(binary_ids[0])
                 except:
                     _.log_err()
                     ans = ''
+                p(ans)
                 if not ans:
                     ans = operate_sql.get_phrase(status =  'err.get.img', character = character)
-
         elif (7 + int(userbot.intimacy) /10 < userbot.reply_cnt) and mode != 'dm':
             ans = operate_sql.get_phrase(status =  '会話終了', n = 20, character = character)
             userbot.mode = 'ignore'
@@ -787,6 +788,13 @@ class StreamResponseFunctions(MyObject):
             ans_ls.append(operate_sql.rank_intimacy(username = target, botname = self.default_character, nickname = nickname, is_partition = True, n = 500))
             ans_ls.append(operate_sql.rank_exp(username =  target, user_types = ['person', 'quasi-bot'], nickname = nickname, is_totalexp = False, n = 500))
             ans_ls.append(operate_sql.rank_exp(username =  target, user_types = ['person', 'quasi-bot'], nickname = nickname, is_totalexp = True, n = 500))
+        elif action == 'imgload':
+            if target:
+                ans = 'id:' + target
+                file_id = target
+        # elif action == 'composite':
+        #     if target:
+
         elif action == 'dict':
             self.twf.give_fav(status_id)
             ans = operate_sql.add_eitango(word = target, username = screen_name)
@@ -834,6 +842,8 @@ class StreamResponseFunctions(MyObject):
             if not welcomeans:
                 welcomeans = 'NEW_USER登録完了！！システムに登録しました。\n(ID変更の際も発生するメッセージです。引き継ぎの場合には、開発者まで。)'
                 ans_ls.append(welcomeans)
+        if not file_id is None:
+            filename = operate_sql.db2file(_id =  file_id, folderpath = None, filename = None)
         if ans:
             ans_ls.append(ans)
         if ans_ls:
@@ -844,6 +854,7 @@ class StreamResponseFunctions(MyObject):
                     set_time = self.get_time(hours = 0, seconds =  delay_sec)
                     operate_sql.save_task(taskdict = {'who':self.bot_id, 'what': '  tweet', 'to_whom': screen_name, 'when':set_time, 'tmpid': status_id, 'tmptext': ans})
                 else:
+                    p(filename)
                     tweet_status = self.send(ans, screen_name = screen_name, imgfile = filename, status_id = status_id, mode = mode)
                 userbot.context = '</>'.join([userbot.context, ans])
         return tweet_status
@@ -862,8 +873,8 @@ class StreamResponseFunctions(MyObject):
         if any([ng_word in status['text'] for ng_word in ['RT', 'QT', '【', 'ポストに到達', 'リプライ数']]):
             if status['mode'] != 'dm':
                 return True
-        # if 'LiveAI_' in screen_name:
-        #     return True
+        if 'LiveAI_' in screen_name:
+            return True
         return False
 
     def monitor_timeline(self, status):

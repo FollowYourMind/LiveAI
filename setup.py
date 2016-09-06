@@ -28,6 +28,7 @@ handler.setLevel(DEBUG)
 logger.setLevel(DEBUG)
 logger.addHandler(handler)
 #math
+import random
 import numpy as np
 import requests
 # 各種ライブラリをインポート

@@ -85,7 +85,7 @@ class RegexTools(MyObject):
     def extract_ids(self, s):
         reg = '@[a-zA-Z0-9_]+'
         compiled_reg = re.compile(reg, re.M)
-        rest_text = re.sub(compiled_reg, 'atmarkedID', s)
+        rest_text = re.sub(compiled_reg, 'userID', s)
         ex_ls = compiled_reg.findall(s)
         return rest_text, ex_ls
     def extract_specific_words(self, s):
@@ -121,7 +121,7 @@ class RegexTools(MyObject):
         except:
             pass
     def extract_cmds_dic(self, text):
-        reg = '\s*(?P<func>[a-zA-Z_.]+)\s{0,3}@*(?P<var>[0-9a-zA-Z:：_]+)*(\s+\-{0,3}\s*(?P<mod>[0-9a-zA-Z_]+))*'
+        reg = '\s*(?P<func>[a-zA-Z_.]+)\s{0,3}@*(?P<var>[0-9a-zA-Z:：\-_]+)*(\s+\-{0,3}\s*(?P<mod>[0-9a-zA-Z_\-]+))*'
         reg_dic = self.complie_and_get_groupdict_all(reg, text)
         return reg_dic
     def complie_and_get_groupdict(self, reg, text = None):
@@ -202,12 +202,15 @@ class RegexTools(MyObject):
             time_reg = ''.join([''.join(['[^1-9]*', hour_reg, min_reg, sec_reg])])
         reg_group_dic = self.complie_and_get_groupdict(time_reg, text)
         reg_group_dic['total_seconds'] = 0
-        if not reg_group_dic['hour'] is None:
-            reg_group_dic['total_seconds'] += int(reg_group_dic['hour'])*3600
-        if not reg_group_dic['min'] is None:
-            reg_group_dic['total_seconds'] += int(reg_group_dic['min'])*60
-        if not reg_group_dic['sec'] is None:  
-            reg_group_dic['total_seconds'] += int(reg_group_dic['sec'])
+        if 'hour' in reg_group_dic:
+            if not reg_group_dic['hour'] is None:
+                reg_group_dic['total_seconds'] += int(reg_group_dic['hour'])*3600
+        if 'min' in reg_group_dic:
+            if not reg_group_dic['min'] is None:
+                reg_group_dic['total_seconds'] += int(reg_group_dic['min'])*60
+        if 'sec' in reg_group_dic:
+            if not reg_group_dic['sec'] is None:  
+                reg_group_dic['total_seconds'] += int(reg_group_dic['sec'])
         return reg_group_dic
     def extract_modification(self, text):
         # text = '4時30分に起こして'
@@ -294,7 +297,7 @@ class MorphologicalAnalysis(MyObject):#MeCab
         cleaned_sentence, ex_faces = self.regex_tools.extract_kaomojis(extracted_rest)
         ma_ls = self.integrate_ex_ma(cleaned_sentence, ex = ex_ls)
         if ex_ids:
-            ma_ls = [ma if not ma[0] == 'atmarkedID' else [ex_ids[0],'名詞', '固有名詞', 'regex_id', '*', '*', '*', ex_ids.pop(0), '*', '*'] for ma in ma_ls]
+            ma_ls = [ma if not ma[0] == 'userID' else [ex_ids[0],'名詞', '固有名詞', 'regex_id', '*', '*', '*', ex_ids.pop(0), '*', '*'] for ma in ma_ls]
         if ex_faces:
             ma_ls = [ma if not ma[0] == '^ ^' else [ex_faces[0], '顔文字', '顔文字', 'regex_顔文字', '*', '*', '*', ex_faces.pop(0), 'カオ', 'カオ'] for ma in ma_ls]
         return ma_ls
@@ -1017,9 +1020,10 @@ class RegexClass(RegexTools):
 #
 class NLPdatas(MyObject):
     def __init__(self, sentence):
-        if sentence:
-            while sentence[-1] == ' ':
-                sentence = sentence[:-1]
+        # sentence = sentence.replace(' ', '')
+        # if sentence:
+        #     while sentence[-1] == ' ':
+        #         sentence = sentence[:-1]
         self.original_text = sentence
         if not '。' in self.original_text:
             self.split_texts = [self.original_text]
@@ -1123,12 +1127,15 @@ class NLPdata(MyObject):
                 self.times[key] = int(value)
         jnow = datetime.now(JST)
         self.timeobj = jnow
-        if not self.times['hour'] is None:
-            self.timeobj = self.timeobj.replace(hour = self.times['hour'])
-        if not self.times['min'] is None:
-            self.timeobj = self.timeobj.replace(minute = self.times['min'])
-        if not self.times['sec'] is None:
-            self.timeobj = self.timeobj.replace(second = self.times['sec'])
+        if 'hour' in self.times:
+            if not self.times['hour'] is None:
+                self.timeobj = self.timeobj.replace(hour = self.times['hour'])
+        if 'min' in self.times:
+            if not self.times['min'] is None:
+                self.timeobj = self.timeobj.replace(minute = self.times['min'])
+        if 'sec' in self.times:
+            if not self.times['sec'] is None:
+                self.timeobj = self.timeobj.replace(second = self.times['sec'])
         if jnow > self.timeobj:
             self.timeobj += timedelta(days = 1)
     def judge_function(self):
@@ -1220,7 +1227,7 @@ if __name__ == '__main__':
     # a = constract_nlp(text)
     # p(a)
     # reg = RegexTools()
-    text = '@ss に20時にkusoripu送信'
+    text = '''load 1cf87db3-d52b-4f7f-b358-050dd8144869 1cf87db3-d52b-4f7f-b358-050dd8144869'''
     nlp_data = NLPdatas(text).main
     p(nlp_data.summary.when.strftime('%m月%d日%H:%M'))
     p(nlp_data.summary)

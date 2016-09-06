@@ -29,7 +29,7 @@ def conv_image(address, DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/_
 	imgaddress = DIR+address
 	recogresult = opencv_functions.FaceRecognition(imgaddress, isShow = False, saveStyle = '', work_dir = 'work', through = True)
 	img = recogresult[0]
-	img = opencv_functions.adjustIMG(img, K = 0, isHC = True, size = (28, 28))
+	img = opencv_functions.adjust_image(img, K = 0, isHC = True, size = (28, 28))
 	return img.flatten().astype(np.float32)/255.0
 # conv_image('CV_FACE_icon0_LL1-01_20160212003336.png', '/Users/masaMikam/OneDrive/imgs/learn/others/')
 def conv_label(label):
@@ -92,7 +92,7 @@ def predictAns(filename  = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/
 	# imgaddress = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/rin/images-10.jpeg"
 	# imgaddress = '/Users/masaMikam/Dropbox/Project/umiA/Data/twimgs/20160204152357.jpg'
 	img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', work_dir = '')
-	img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28))
+	img = opencv_functions.adjust_image(img, isHC = True, K = 0, size = (28, 28))
 	result = classifier.predict(img)
 	anslabel = label[result]
 	return anslabel, face_flag, altfilename
@@ -107,7 +107,7 @@ def train_svm(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", save_dir
 	# kfold = cross_validation.KFold(len(data_train), n_folds=10)
 	# for train, test in kfold:
 	# デフォルトのカーネルは rbf になっている
-	clf = svm.SVC(C=2**2, gamma=2**-11)
+	clf = svm.SVC(C=2**2, gamma=2**-11, probability=True)
 	# 訓練データで学習する
 	clf.fit(data_train, label_train)
 	# テストデータの正答率を調べる
@@ -131,7 +131,7 @@ def train_svm(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", save_dir
 # 			img_kind = 'anime'
 # 	if img_kind == 'anime' or is_force:
 # 		classifier = joblib.load(model)
-# 		img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
+# 		img = opencv_functions.adjust_image(img, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
 # 		img = img.flatten().astype(np.float32)/255.0
 # 		result = classifier.predict(img.reshape(1, -1))
 # 		anslabel = label[result[0]]
@@ -143,37 +143,58 @@ def train_svm(DIR = "/Users/masaMikam/Dropbox/Project/umiA/Data/imgs/", save_dir
 # 		anslabel = 'no_face'
 # 		return anslabel, img_kind, filename
 
-def predict_svm(_id = '', is_show = True, model = "/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl", work_dir = '', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
+def predict_svm(_id = '7aa33bfe-e6c0-4156-a4d0-7e53e88b1dd1', is_show = True, model = '/Users/masaMikam/OneDrive/imgs/SVMmodel.pkl', label = ['others', 'ことり', 'にこ', 'チノ', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'], is_force = False):
 	img_kind = ''
-	# img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'cat', work_dir = '', cascade_lib = cascade_lib_cat, frameSetting = {'thickness': 2, 'color':(204,153,153)})
-	recognize_faceimage(_id = '7aa33bfe-e6c0-4156-a4d0-7e53e88b1dd1', is_show = True, save_style = 'icon', frame_setting = {'thickness': 2, 'color':(0, 0, 255)}, through = False, cascade_lib = cascade_lib_anime)
-	if face_flag:
-		img_kind = 'cat'
+	result_dic = {}
+	json = {}
 	if not img_kind:
-		img, altfilename, frame, face_flag = opencv_functions.FaceRecognition(filename, isShow = isShow, saveStyle = 'whole', work_dir = '', cascade_lib = cascade_lib_anime)
-		if face_flag:
-			img_kind = 'anime'
-	if img_kind == 'anime' or is_force:
+		result = opencv_functions.recognize_faceimage(_id = _id, is_show = False, cascade_lib = cascade_lib_cat)
+		if 'extracted' in result:
+			result_dic['cat'] = result
+	if not img_kind:
+		result = opencv_functions.recognize_faceimage(_id = _id, is_show = False, cascade_lib = cascade_lib_anime)
+
+		if 'extracted' in result:
+			result_dic['anime'] = result
+	if 'anime' in result_dic or is_force:
 		classifier = joblib.load(model)
-		img = opencv_functions.adjustIMG(img, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
-		img = img.flatten().astype(np.float32)/255.0
-		result = classifier.predict(img.reshape(1, -1))
-		anslabel = label[result[0]]
-		return anslabel, img_kind, altfilename
-	elif img_kind == 'cat':
-		anslabel = 'cat'
-		return anslabel, img_kind, altfilename
-	else:
-		anslabel = 'no_face'
-		return anslabel, img_kind, filename
+		for i in range(len(result_dic['anime']['extracted'])):
+			result_dic['anime']['extracted'][i]
+			cvimg = result_dic['anime']['extracted'][i]['icon_cvimg']
+			adjusted_img = opencv_functions.adjust_image(cvimg, isHC = True, K = 0, size = (28, 28)).reshape(-1, 1)
+			adjusted_img = adjusted_img.flatten().astype(np.float32)/255.0
+			result = classifier.predict(adjusted_img.reshape(1, -1))
+			# predicted_prob = classifier.predict_proba(result)
+			# p(predicted_prob)
+			result_dic['anime']['extracted'][i]['prediction'] = result
+			result_dic['anime']['extracted'][i]['label'] = label[result[0]]
+			frame_setting = {'thickness': 1, 'color':(0, 0, 255), 'scale':1.1, 'overlay_id' : '832b32bb-3e2d-4bbf-9217-ff358fa8a317'}
+			# 'fabdb2c9-50c7-459e-9a29-94bbcdd77381'
+			framed_cvimg = opencv_functions.frame_image(cvimg = result_dic['anime']['original_cvimg'], pos = result_dic['anime']['extracted'][i]['pos'], frame_setting = frame_setting)
+			result_dic['anime']['extracted'][i]['framed_cvimg'] = framed_cvimg
+			json['frame_setting'] = frame_setting
+			json['detection'] = 'anime'
+			json['prediction'] = result_dic['anime']['extracted'][i]['label']
+			result_dic['anime']['extracted'][i]['framed_id'] = opencv_functions.save_image_sql(cvimg = framed_cvimg, filename = ''.join([str(_id), '_SVMdetect', result_dic['anime']['extracted'][i]['label'], '_framed', str(i)]), url = str(_id), owner = None, json = json, compression_quality = 70, compression_format = 'jpg')
+	elif 'cat' in result_dic:
+		result_dic['cat']['extracted'][0]['label'] = 'cat'
+		json['detection'] = 'cat'
+		frame_setting = {'thickness': 1, 'color':(204,153,153), 'scale':1.1, 'overlay_id' :'fabdb2c9-50c7-459e-9a29-94bbcdd77381'}
+		json['frame_setting'] = frame_setting
+		framed_cvimg = opencv_functions.frame_image(cvimg = result_dic['cat']['original_cvimg'], pos = result_dic['cat']['extracted'][0]['pos'], frame_setting = frame_setting)
+		result_dic['cat']['extracted'][0]['framed_id'] = opencv_functions.save_image_sql(cvimg = framed_cvimg, filename = ''.join([str(_id), '_cat', '_framed', str(0)]), url = str(_id), owner = None, json = json, compression_quality = 70, compression_format = 'jpg')
+
+	return result_dic
 if __name__ == '__main__':
 	import sys, os, io
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 	# 6海未 7真姫
 	filename = '/Users/masaMikam/OneDrive/imgs/face/LL3/海未/CV_FACE_icon0_LL1-03_20160212165427.png'
 	DIR = '/Users/masaMikam/OneDrive/imgs/learn/雪穂/'
-	ans = predictSVM(filename  = filename, isShow = 1, model = modelSVM, work_dir = '', label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
+	ans = predict_svm(_id = '7aa33bfe-e6c0-4156-a4d0-7e53e88b1dd1', is_show = 1, model = modelSVM,  label = ['others', 'ことり', 'にこ', '真姫', '凛', '希', '海未', '真姫', '穂乃果', '絵里', '花陽', '雪穂'])
 	print(ans)
+	if 'anime' in ans:
+		p('a')
 	# label, img_kind, IMGfile = machine_learning_img.predictSVM(filename  = filename, isShow = False, model = modelSVM, work_dir  = '')
 	# train_svm(DIR = "/Users/masaMikam/OneDrive/imgs/learn/_work/", save_dir = DATADIR + '/lib/SVM_us3/SVMmodel3.pkl')
 

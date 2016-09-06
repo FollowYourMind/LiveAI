@@ -146,7 +146,7 @@ def upsert_shiritori(name = '', kwargs = {'kana_stream': '', 'word_stream': ''},
 @db.atomic()
 def save_tweet_status(status, is_display = True):
     try:
-        tweetstatus = TweetStatus.create(_id = status['id_str'], data = status)
+        tweetstatus = TweetStatus.create(_id = status['id_str'], data = status, created_at = datetime.now(JST))
         if not is_display:
             return tweetstatus
         elif not status['in_reply_to_screen_name'] is None:
@@ -156,6 +156,28 @@ def save_tweet_status(status, is_display = True):
         return tweetstatus
     except:
         return None
+
+@db.atomic()
+def save_dm_status(status, is_display = True):
+    try:
+        dm_status = DMStatus.create(_id = status['id_str'], data = status, created_at = datetime.now(JST))
+        if is_display:
+            print(''.join([status['user']['name'], '|\n', status['text'], '\n++++++++++++++++++++++++++++++++++']))
+        return dm_status
+    except:
+        return None
+
+@db.atomic()
+def save_event_status(status, is_display = True):
+    try:
+        dm_status = EventStatus.create(_id = uuid.uuid4(), data = status, created_at = datetime.now(JST))
+        if is_display:
+            pass
+        return dm_status
+    except:
+        return None
+
+
 @_.retry(apsw.BusyError, tries=10, delay=0.3, max_delay=None, backoff=1.2, jitter=0)
 @db.atomic()
 def get_twlog(status_id = 1):
@@ -484,14 +506,14 @@ def count_words():
     return wordscnt
 @db.atomic()
 def add_quiz(status):
-    Quiz.get_or_create(tag = 'test', question = '始皇帝の名', answer = '政', author = 'paka')
+    Quiz.get_or_create(_id = uuid.uuid4(), tag = 'test', question = '始皇帝の名', answer = '政', author = 'paka')
 
 import crawling
 @db.atomic()
 def add_eitango(word, username = 'paka'):
     ans = crawling.search_weblioEJJE(word = word)
     if ans:
-        Quiz.get_or_create(tag = '英単語', question = word, answer = ans, author = username)
+        Quiz.get_or_create(_id = uuid.uuid4(), tag = '英単語', question = word, answer = ans, author = username)
     return ans
 @db.atomic()
 def n_taku_quiz(tag = ['test', '英単語'], form_cnt = 4):
@@ -515,7 +537,7 @@ def n_taku_quiz(tag = ['test', '英単語'], form_cnt = 4):
     return ans
 
 @db.atomic()
-def dl2db(url, filename = None, _format = None, owner = None):
+def dl2db(url, filename = None, _format = None, owner = None, json = json):
     folder_tree = url.split('/')
     if filename is None:
         filename = folder_tree[-1]
@@ -523,11 +545,11 @@ def dl2db(url, filename = None, _format = None, owner = None):
         _format = ''.join(folder_tree[-1].split('.')[1:])
     with urllib.request.urlopen(url) as response:
         _data = response.read()
-        sql_data, is_created = BinaryBank.create_or_get(_id = uuid.uuid4(), filename = filename, _format = _format, url = url, data = _data, owner = owner)
+        sql_data, is_created = BinaryBank.create_or_get(_id = uuid.uuid4(), filename = filename, _format = _format, url = url, data = _data, owner = owner, json = json)
         return sql_data._id
 
 @db.atomic()
-def file2db(filepath = testpic, filename = None, _format = None, owner = None):
+def file2db(filepath = testpic, filename = None, _format = None, owner = None, json = None):
     folder_tree = filepath.split('/')
     if filename is None:
         filename = folder_tree[-1]
@@ -535,8 +557,7 @@ def file2db(filepath = testpic, filename = None, _format = None, owner = None):
         _format = ''.join(folder_tree[-1].split('.')[1:])
     with open(filepath, 'rb') as file:
         _data = file.read()
-        p(type(_data))
-        sql_data, is_created = BinaryBank.create_or_get(_id = uuid.uuid4(), filename = filename, _format = _format, url = filepath, data = _data, owner = owner)
+        sql_data, is_created = BinaryBank.create_or_get(_id = uuid.uuid4(), filename = filename, _format = _format, url = filepath, data = _data, owner = owner, json = json)
         return sql_data._id
 
 @_.forever(exceptions = Exception, is_print = True, is_logging = True, ret = None)
@@ -550,7 +571,7 @@ def db2file(_id = '97658366-aa50-44d2-aa7f-3906745ef137', folderpath = None, fil
     if filename is None:
         filename = _data.filename
     if not '.' in filename:
-        filename = '.'.join([filename, _data._format]) 
+        filename = '.'.join([filename, _data._format.replace(':orig', '')]) 
     filepath = '/'.join([folderpath, filename])
     with open(filepath, 'wb') as file:
         file.write(_data.data)
@@ -560,7 +581,7 @@ def save_medias2db(status):
   try:
     medias = status['extended_entities']['media']
     screen_name = status['user']['screen_name']
-    return [dl2db(url = ''.join([media['media_url'], ':orig']), filename = None, _format = None, owner = screen_name) for media in medias]
+    return [dl2db(url = ''.join([media['media_url'], ':orig']), filename = None, _format = None, owner = screen_name, json = None) for media in medias]
   except Exception as e:
     print(e)
 
@@ -570,17 +591,20 @@ if __name__ == '__main__':
     import os
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     # imgdata = 
+    # p(datetime.now(JST))
+    file2db(filepath = '/Users/masaMikam/Downloads/frame00553.png', filename = None, _format = None, owner = None)
     # save_medias(status)
     # url = 'http://pubdocs.worldbank.org/en/369791465266160108/060616-procurement-guideline-meeting-ECFA.pdf'
-    # dl2db(url)
+    # dl2db(url = 'http://matomame.jp/assets/images/matome/ca896f85e8cadb12cdfb/2850dc54f12ff0c4c14f5015d5ec48ab.JPG?t=1467542273')
     # status = TweetStatus.select().where(TweetStatus._id == '772457619415904256').get()
     # save_medias2db(status.data)
     # file2db()
-    
-    files = _.get_deeppath_dic(DIR = '/Users/masaMikam/Desktop/imgs/animebkup/')
-    for file in files:
-    	filepath = '/Users/masaMikam/Desktop/imgs/animebkup/' + file[0]
-    	file2db(filepath = filepath, filename = None, _format = None, owner = None)
+    # add_quiz()
+    # Quiz.get_or_create(tag = 'test', question = '行政監察と行政評価と政策評価の違い', answer = '', author = 'paka')
+    # files = _.get_deeppath_dic(DIR = '/Users/masaMikam/Desktop/imgs/animebkup/')
+    # for file in files:
+    # 	filepath = '/Users/masaMikam/Desktop/imgs/animebkup/' + file[0]
+    # 	file2db(filepath = filepath, filename = None, _format = None, owner = None)
     # a = get_phrase(phrase_type = '', status = '', n = 10, character = '海未')
     # p(a)
     # dl2db(url = 'http://pbs.twimg.com/media/Crl_GbTUIAAAYKn.jpg', filename = None, _format = None, owner = None)
